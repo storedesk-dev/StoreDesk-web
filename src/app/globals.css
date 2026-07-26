@@ -5,11 +5,12 @@
   --sd-blue-shadow: #0e43d8;
   --sd-green: #00a87b;
   --sd-mint: #28c88b;
-  --background: #ffffff;
-  --foreground: #17202a;
-  --muted: #5f6b7a;
-  --surface: #f4f7fb;
-  --border: rgba(14, 67, 216, 0.12);
+  --background: #f3f7ff;
+  --foreground: #122033;
+  --muted: #4f5d73;
+  --surface: #ffffff;
+  --border: rgba(14, 67, 216, 0.16);
+  --page-tint: linear-gradient(160deg, #e8f0ff 0%, #f4f7fb 38%, #e6f8f1 100%);
 }
 
 @theme inline {
@@ -20,7 +21,8 @@
 }
 
 body {
-  background: var(--background);
+  background: var(--page-tint);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans), "Segoe UI", system-ui, sans-serif;
   font-size: 16px;
@@ -36,6 +38,25 @@ h4 {
   letter-spacing: -0.02em;
   line-height: 1.2;
   color: var(--foreground);
+}
+
+.sd-section-blue {
+  background: linear-gradient(180deg, rgba(26, 99, 244, 0.1) 0%, rgba(255, 255, 255, 0.92) 55%, #fff 100%);
+}
+
+.sd-section-green {
+  background: linear-gradient(180deg, rgba(0, 168, 123, 0.12) 0%, rgba(255, 255, 255, 0.94) 55%, #fff 100%);
+}
+
+.sd-section-mix {
+  background: linear-gradient(135deg, rgba(26, 99, 244, 0.14), rgba(0, 168, 123, 0.12));
+}
+
+.sd-hero-wash {
+  background:
+    radial-gradient(ellipse 70% 55% at 12% 10%, rgba(26, 99, 244, 0.28), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 88% 20%, rgba(0, 168, 123, 0.22), transparent 50%),
+    linear-gradient(165deg, #dce8ff 0%, #eef6ff 40%, #e3f8ef 100%);
 }
 
 .perspective-\[1200px\] {

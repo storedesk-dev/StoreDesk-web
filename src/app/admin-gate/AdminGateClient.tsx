@@ -39,7 +39,13 @@ export default function AdminGateClient() {
         onSubmit={onSubmit}
         className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-6 shadow-lg shadow-blue-500/5"
       >
-        <Image src="/brand/logo-lockup-horizontal.svg" alt="StoreDesk" width={160} height={34} className="h-8 w-auto" />
+        <Image
+          src="/brand/logo-lockup-horizontal.jpg"
+          alt="StoreDesk"
+          width={160}
+          height={34}
+          className="h-8 w-auto object-contain"
+        />
         <h1 className="mt-5 text-lg font-bold tracking-tight">Admin</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Enter password to continue.</p>
         <input

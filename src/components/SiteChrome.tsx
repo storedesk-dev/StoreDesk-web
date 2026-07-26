@@ -2,71 +2,127 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { NAV, SITE } from "@/lib/site";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { NAV, SITE, contactMailto } from "@/lib/site";
+
+const NAV_ITEMS = [{ href: "/", label: "Home" }, ...NAV] as const;
+
+function isActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function SiteHeader({ solid = false }: { solid?: boolean }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname() || "/";
 
   return (
     <header
-      className={`relative z-50 border-b border-[var(--border)] ${
-        solid ? "bg-white/95 backdrop-blur" : "bg-white/80 backdrop-blur-sm"
+      className={`sticky top-0 z-50 border-b border-white/40 shadow-sm shadow-blue-500/10 backdrop-blur-xl ${
+        solid
+          ? "bg-gradient-to-r from-white/95 via-[#eef4ff]/95 to-[#e8faf3]/95"
+          : "bg-gradient-to-r from-white/90 via-[#eef4ff]/85 to-[#e8faf3]/90"
       }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#1A63F4]/50 to-[#00A87B]/50" />
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
         <Link href="/" className="shrink-0">
           <Image
-            src="/brand/logo-lockup-horizontal.svg"
+            src="/brand/logo-lockup-horizontal.jpg"
             alt={SITE.name}
-            width={168}
-            height={36}
+            width={200}
+            height={42}
             priority
-            className="h-9 w-auto"
+            className="h-9 w-auto object-contain"
           />
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-semibold text-[var(--muted)] md:flex">
-          {NAV.map((item) => (
-            <Link key={item.href} href={item.href} className="transition hover:text-[var(--sd-blue)]">
-              {item.label}
-            </Link>
-          ))}
+
+        <LayoutGroup id="site-nav">
+          <nav className="relative hidden items-center rounded-full bg-white/70 p-1 shadow-inner ring-1 ring-[var(--border)] md:flex">
+            {NAV_ITEMS.map((item) => {
+              const active = isActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`relative z-10 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                    active ? "text-white" : "text-[var(--muted)] hover:text-[var(--sd-blue)]"
+                  }`}
+                >
+                  {active ? (
+                    <motion.span
+                      layoutId="nav-active-chip"
+                      className="absolute inset-0 -z-10 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] shadow-md shadow-blue-500/30"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  ) : null}
+                  <span className="relative">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </LayoutGroup>
+
+        <div className="hidden items-center gap-2 md:flex">
           <a
             href={SITE.github}
-            className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[var(--foreground)] transition hover:border-[var(--sd-blue)] hover:text-[var(--sd-blue)]"
+            className="rounded-full border border-[var(--border)] bg-white/80 px-3 py-1.5 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--sd-blue)] hover:text-[var(--sd-blue)]"
           >
             GitHub
           </a>
-        </nav>
+          <a
+            href={contactMailto({ subject: "StoreDesk inquiry" })}
+            className="rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3.5 py-1.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:brightness-105"
+          >
+            Email us
+          </a>
+        </div>
+
         <button
           type="button"
-          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm font-semibold text-[var(--foreground)] md:hidden"
+          className="rounded-lg border border-[var(--border)] bg-white/80 px-3 py-1.5 text-sm font-semibold text-[var(--foreground)] md:hidden"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
         >
           Menu
         </button>
       </div>
+
       <AnimatePresence>
         {open ? (
           <motion.nav
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-[var(--border)] bg-white md:hidden"
+            className="overflow-hidden border-t border-[var(--border)] bg-white/95 md:hidden"
           >
-            <div className="flex flex-col gap-1 px-6 py-3">
-              {NAV.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="rounded-lg px-2 py-2 text-sm font-semibold text-[var(--foreground)]"
-                  onClick={() => setOpen(false)}
-                >
-                  {item.label}
-                </Link>
-              ))}
+            <div className="flex flex-col gap-1 px-4 py-3">
+              {NAV_ITEMS.map((item) => {
+                const active = isActive(pathname, item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${
+                      active
+                        ? "bg-gradient-to-r from-[#1A63F4] to-[#00A87B] text-white"
+                        : "text-[var(--foreground)]"
+                    }`}
+                    onClick={() => setOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+              <a
+                href={contactMailto({ subject: "StoreDesk inquiry" })}
+                className="mt-1 rounded-xl bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--sd-blue)]"
+                onClick={() => setOpen(false)}
+              >
+                Email {SITE.email}
+              </a>
             </div>
           </motion.nav>
         ) : null}
@@ -77,24 +133,26 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-[var(--border)] bg-[var(--surface)] px-6 py-12 text-[var(--foreground)]">
-      <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
+    <footer className="relative overflow-hidden border-t border-[var(--border)] bg-gradient-to-br from-[#0E43D8] via-[#1A63F4] to-[#00A87B] px-6 py-12 text-white">
+      <div className="pointer-events-none absolute -right-20 top-0 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-16 bottom-0 h-48 w-48 rounded-full bg-[#28C88B]/25 blur-3xl" />
+      <div className="relative mx-auto grid max-w-6xl gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
           <Image
-            src="/brand/logo-lockup-horizontal.svg"
+            src="/brand/logo-lockup-horizontal.jpg"
             alt={SITE.name}
             width={160}
             height={34}
-            className="mb-3 h-8 w-auto"
+            className="mb-3 h-8 w-auto rounded bg-white/95 object-contain p-1"
           />
-          <p className="max-w-sm text-sm text-[var(--muted)]">{SITE.tagline}</p>
+          <p className="max-w-sm text-sm text-white/85">{SITE.tagline}</p>
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Explore</p>
-          <ul className="mt-3 space-y-2 text-sm text-[var(--foreground)]">
-            {NAV.map((item) => (
+          <p className="text-xs font-bold uppercase tracking-wider text-white/70">Explore</p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {NAV_ITEMS.map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="hover:text-[var(--sd-blue)]">
+                <Link href={item.href} className="hover:text-white">
                   {item.label}
                 </Link>
               </li>
@@ -102,17 +160,17 @@ export function SiteFooter() {
           </ul>
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Contact</p>
-          <a href={`mailto:${SITE.email}`} className="mt-3 block text-sm font-semibold text-[var(--sd-blue)] hover:underline">
+          <p className="text-xs font-bold uppercase tracking-wider text-white/70">Contact</p>
+          <a href={contactMailto()} className="mt-3 block text-sm font-semibold underline decoration-white/40 hover:decoration-white">
             {SITE.email}
           </a>
-          <div className="mt-4 flex gap-4 text-xs text-[var(--muted)]">
+          <div className="mt-4 flex gap-4 text-xs text-white/75">
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
           </div>
         </div>
       </div>
-      <p className="mx-auto mt-10 max-w-6xl text-center text-xs text-[var(--muted)]">
+      <p className="relative mx-auto mt-10 max-w-6xl text-center text-xs text-white/65">
         © {new Date().getFullYear()} StoreDesk. Built for convenience stores & gas stations.
       </p>
     </footer>
