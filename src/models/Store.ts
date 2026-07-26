@@ -7,6 +7,9 @@ const StoreSchema = new Schema(
     agentKey: { type: String, required: true },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
     entitlements: { type: [String], default: ["desktop", "mobile", "edge"] },
+    licensePlan: { type: String, enum: ["trial", "standard", "custom"], default: "trial" },
+    supportEndsAt: { type: Date, required: true },
+    supportConfirmedAt: { type: Date },
     notes: { type: String }
   },
   { timestamps: true }

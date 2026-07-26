@@ -35,9 +35,21 @@ Assets under `public/brand/` from parent `brand-kit/` (`#1A63F4` / `#00A87B`).
 
 ## Scope
 
-- Marketing home
-- Create store → `STORE_ID` + `AGENT_KEY`
+- Marketing site: Product, How it works, About, Contact (`storedesk.dev@gmail.com`), Privacy, Terms
+- Direct `/admin` → password gate (Atlas DB password)
+- Licenses: trial / standard / custom with **supportEndsAt** + double confirm (`CONFIRM` + checkbox + dialog)
 - Rotate agent key / suspend store
 - Mock agents page (Hub later)
 
-Not in this app: catalog, Commander, invoices (those stay on Edge / StoreDesk Server).
+## Env (`.env.local`)
+
+| Variable | Required? | Purpose |
+|----------|-----------|---------|
+| `MONGODB_URI` | Yes for Atlas | Store license DB. Also supplies admin password if `ADMIN_PASSWORD` unset. |
+| `ADMIN_PASSWORD` | No | Override admin gate password (defaults to URI password). |
+
+Example:
+
+```txt
+MONGODB_URI=mongodb+srv://storedeskdev_db_user:****@storedesk.friyqcp.mongodb.net/storedesk?retryWrites=true&w=majority&appName=StoreDesk
+```
