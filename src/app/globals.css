@@ -5,22 +5,37 @@
   --sd-blue-shadow: #0e43d8;
   --sd-green: #00a87b;
   --sd-mint: #28c88b;
-  --background: #050608;
-  --foreground: #f4f7fb;
+  --background: #ffffff;
+  --foreground: #17202a;
+  --muted: #5f6b7a;
+  --surface: #f4f7fb;
+  --border: rgba(14, 67, 216, 0.12);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-sans), "Segoe UI", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-sans), "Segoe UI", system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--foreground);
 }
 
 .perspective-\[1200px\] {

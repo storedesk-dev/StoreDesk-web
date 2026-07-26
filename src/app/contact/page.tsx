@@ -22,33 +22,33 @@ export default function ContactPage() {
     <MarketingShell eyebrow="Contact" title="We read every message">
       <div className="grid gap-12 md:grid-cols-2">
         <div>
-          <p className="text-white/60 leading-relaxed">
+          <p className="text-[var(--muted)] leading-relaxed">
             Licensing, trials, support windows, and product questions go to the StoreDesk inbox.
           </p>
           <a
             href={`mailto:${SITE.email}`}
-            className="mt-6 inline-block text-2xl font-bold text-[var(--sd-mint)] hover:underline"
+            className="mt-6 inline-block text-2xl font-bold text-[var(--sd-blue)] hover:underline"
           >
             {SITE.email}
           </a>
-          <p className="mt-4 text-sm text-white/40">Typical reply within 1–2 business days.</p>
+          <p className="mt-4 text-sm text-[var(--muted)]">Typical reply within 1–2 business days.</p>
         </div>
-        <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
           <input
-            className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm"
             placeholder="Your name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
           />
           <input
-            className="w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm"
             placeholder="Store / company"
             value={store}
             onChange={(e) => setStore(e.target.value)}
           />
           <textarea
-            className="min-h-[140px] w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm"
+            className="min-h-[140px] w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm"
             placeholder="How can we help?"
             value={message}
             onChange={(e) => setMessage(e.target.value)}

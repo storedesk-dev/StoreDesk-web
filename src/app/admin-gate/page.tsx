@@ -5,7 +5,7 @@ export default function Page() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[#050608] text-white/50">
+        <main className="flex min-h-screen items-center justify-center bg-[var(--surface)] text-[var(--muted)]">
           Loading…
         </main>
       }

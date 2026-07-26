@@ -4,7 +4,7 @@ import { SITE } from "@/lib/site";
 export default function TermsPage() {
   return (
     <MarketingShell eyebrow="Legal" title="Terms">
-      <div className="max-w-3xl space-y-4 text-white/60">
+      <div className="max-w-3xl space-y-4 text-[var(--muted)]">
         <p>
           StoreDesk software is provided for licensed store locations. Support is available only through the support
           period attached to each license (trial or custom end date).

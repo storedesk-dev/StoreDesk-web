@@ -18,19 +18,19 @@ export default function HowItWorksPage() {
         {flow.map((step, i) => (
           <motion.div
             key={step.title}
-            className="relative grid gap-4 border-l border-white/15 py-8 pl-8 md:grid-cols-[200px_1fr]"
+            className="relative grid gap-4 border-l border-[var(--border)] py-8 pl-8 md:grid-cols-[200px_1fr]"
             initial={{ opacity: 0, x: -24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: "-10%" }}
             transition={{ delay: i * 0.06 }}
           >
             <div className="absolute -left-1.5 top-10 h-3 w-3 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B]" />
-            <h2 className="text-lg font-bold text-white/90">{step.title}</h2>
-            <p className="text-white/55 leading-relaxed">{step.detail}</p>
+            <h2 className="text-lg font-bold text-[var(--foreground)]">{step.title}</h2>
+            <p className="text-[var(--muted)] leading-relaxed">{step.detail}</p>
           </motion.div>
         ))}
       </div>
-      <pre className="mt-10 overflow-x-auto rounded-2xl border border-white/10 bg-black/50 p-6 text-xs leading-relaxed text-[var(--sd-mint)]">
+      <pre className="mt-10 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 font-mono text-xs leading-relaxed text-[var(--foreground)]">
 {`StoreDesk Mobile / Desktop
         │
         ▼

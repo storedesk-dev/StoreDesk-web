@@ -1,21 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Syne } from "next/font/google";
+import { Source_Sans_3, Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"]
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"]
-});
-
-const display = Syne({
-  variable: "--font-display",
+const sans = Source_Sans_3({
+  variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["600", "700", "800"]
+  weight: ["400", "500", "600", "700"]
+});
+
+const mono = Source_Code_Pro({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "600"]
 });
 
 export const metadata: Metadata = {
@@ -26,9 +22,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} ${display.variable} antialiased`}>
-        {children}
-      </body>
+      <body className={`${sans.variable} ${mono.variable} antialiased`}>{children}</body>
     </html>
   );
 }

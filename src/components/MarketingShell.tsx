@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
 export function MarketingShell({
@@ -14,25 +15,32 @@ export function MarketingShell({
   eyebrow?: string;
 }) {
   return (
-    <div className="min-h-screen bg-[#050608] text-white">
+    <div className="min-h-screen bg-white text-[var(--foreground)]">
       <SiteHeader solid />
-      <div className="relative overflow-hidden border-b border-white/10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(26,99,244,0.25),transparent_55%)]" />
-        <div className="relative mx-auto max-w-6xl px-6 py-16 md:py-20">
-          {eyebrow ? (
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--sd-mint)]">{eyebrow}</p>
-          ) : null}
-          <motion.h1
-            className="max-w-3xl text-4xl font-extrabold tracking-tight md:text-5xl"
-            style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            {title}
-          </motion.h1>
+      <div className="relative overflow-hidden border-b border-[var(--border)] bg-[var(--surface)]">
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-6 px-6 py-14 md:flex-row md:items-center md:justify-between md:py-16">
+          <div>
+            {eyebrow ? (
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">{eyebrow}</p>
+            ) : null}
+            <motion.h1
+              className="max-w-3xl text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {title}
+            </motion.h1>
+          </div>
+          <Image
+            src="/brand/logo-mark.svg"
+            alt=""
+            width={96}
+            height={96}
+            className="hidden h-24 w-24 shrink-0 md:block"
+          />
         </div>
       </div>
-      <div className="mx-auto max-w-6xl px-6 py-14">{children}</div>
+      <div className="mx-auto max-w-6xl px-6 py-12 md:py-14">{children}</div>
       <SiteFooter />
     </div>
   );

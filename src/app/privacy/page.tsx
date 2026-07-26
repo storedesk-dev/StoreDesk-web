@@ -4,7 +4,7 @@ import { SITE } from "@/lib/site";
 export default function PrivacyPage() {
   return (
     <MarketingShell eyebrow="Legal" title="Privacy">
-      <div className="prose prose-invert max-w-3xl space-y-4 text-white/60">
+      <div className="prose max-w-3xl space-y-4 text-[var(--muted)]">
         <p>
           StoreDesk Web’s marketing site does not require an account. License admin is password-gated and used by the
           StoreDesk team.

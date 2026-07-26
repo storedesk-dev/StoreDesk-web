@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
@@ -23,72 +24,98 @@ const pillars = [
 ];
 
 const steps = [
-  { n: "01", title: "Install on the store PC", body: "Run StoreDesk Worker + Desktop locally. Connect to Verifone Commander for live PLUs." },
-  { n: "02", title: "License the store", body: "We issue STORE_ID + AGENT_KEY with a support period (trial or custom end date)." },
-  { n: "03", title: "Pair Mobile", body: "Phone joins over LAN today; Cloud Hub relay is next so you are not stuck on the same Wi‑Fi forever." },
-  { n: "04", title: "Operate daily", body: "Scan, compare costs, review invoices, and push confirmed vendor prices — never auto-stock counts." }
+  {
+    n: "01",
+    title: "Install on the store PC",
+    body: "Run StoreDesk Worker + Desktop locally. Connect to Verifone Commander for live PLUs."
+  },
+  {
+    n: "02",
+    title: "License the store",
+    body: "We issue STORE_ID + AGENT_KEY with a support period (trial or custom end date)."
+  },
+  {
+    n: "03",
+    title: "Pair Mobile",
+    body: "Phone joins over LAN today; Cloud Hub relay is next so you are not stuck on the same Wi‑Fi forever."
+  },
+  {
+    n: "04",
+    title: "Operate daily",
+    body: "Scan, compare costs, review invoices, and push confirmed vendor prices — never auto-stock counts."
+  }
 ];
 
 export function LandingPage() {
   const parallaxRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: parallaxRef, offset: ["start end", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], [80, -80]);
-  const opacity = useTransform(scrollYProgress, [0, 0.3, 0.7, 1], [0.3, 1, 1, 0.4]);
+  const y = useTransform(scrollYProgress, [0, 1], [40, -40]);
 
   return (
-    <div className="bg-[#050608] text-white">
-      <div className="relative overflow-hidden">
+    <div className="bg-white text-[var(--foreground)]">
+      <div className="relative overflow-hidden bg-[var(--surface)]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-1/4 top-0 h-[60vh] w-[70vw] rounded-full bg-[radial-gradient(circle,rgba(14,67,216,0.45),transparent_70%)] blur-3xl" />
-          <div className="absolute -right-1/4 top-1/3 h-[50vh] w-[60vw] rounded-full bg-[radial-gradient(circle,rgba(0,168,123,0.35),transparent_70%)] blur-3xl" />
+          <div className="absolute -left-1/4 top-0 h-[50vh] w-[60vw] rounded-full bg-[radial-gradient(circle,rgba(26,99,244,0.12),transparent_70%)]" />
+          <div className="absolute -right-1/4 top-1/3 h-[45vh] w-[55vw] rounded-full bg-[radial-gradient(circle,rgba(0,168,123,0.1),transparent_70%)]" />
         </div>
         <SiteHeader />
 
-        <section className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-6 pb-24 pt-10 lg:grid-cols-2">
+        <section className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-6 pb-20 pt-10 lg:grid-cols-2 lg:pb-24">
           <div>
+            <motion.div
+              className="mb-6"
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Image
+                src="/brand/logo-mark.svg"
+                alt=""
+                width={88}
+                height={88}
+                priority
+                className="h-[88px] w-[88px]"
+              />
+            </motion.div>
             <motion.p
-              className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[var(--sd-mint)]"
-              initial={{ opacity: 0, y: 12 }}
+              className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]"
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
               Convenience · Gas · C-store ops
             </motion.p>
             <motion.h1
-              className="text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl"
-              style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
-              initial={{ opacity: 0, y: 20 }}
+              className="text-4xl font-bold tracking-tight text-[var(--foreground)] sm:text-5xl lg:text-[3.25rem] lg:leading-[1.1]"
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
             >
-              <span className="bg-gradient-to-r from-white via-white to-[var(--sd-mint)] bg-clip-text text-transparent">
-                StoreDesk
-              </span>
-              <span className="mt-2 block text-white/90">built for the counter — not the warehouse</span>
+              Built for the counter — not the warehouse
             </motion.h1>
             <motion.p
-              className="mt-5 max-w-md text-base leading-relaxed text-white/60 sm:text-lg"
-              initial={{ opacity: 0, y: 16 }}
+              className="mt-5 max-w-md text-lg leading-relaxed text-[var(--muted)]"
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12 }}
+              transition={{ delay: 0.1 }}
             >
               Price books, vendor costs, invoice review, and mobile scanning for stores that run Verifone Commander.
               Licenses in the cloud. Truth on the store PC.
             </motion.p>
             <motion.div
               className="mt-8 flex flex-wrap gap-3"
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.18 }}
+              transition={{ delay: 0.15 }}
             >
               <Link
                 href="/how-it-works"
-                className="rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-6 py-3 text-sm font-bold shadow-[0_0_32px_rgba(26,99,244,0.45)]"
+                className="rounded-full bg-[var(--sd-blue)] px-6 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:bg-[var(--sd-blue-shadow)]"
               >
                 How it works
               </Link>
               <Link
                 href="/contact"
-                className="rounded-full border border-white/20 bg-white/5 px-6 py-3 text-sm font-bold backdrop-blur"
+                className="rounded-full border border-[var(--border)] bg-white px-6 py-3 text-sm font-bold text-[var(--foreground)] hover:border-[var(--sd-blue)]"
               >
                 Contact us
               </Link>
@@ -98,21 +125,15 @@ export function LandingPage() {
         </section>
       </div>
 
-      {/* Sticky narrative */}
-      <section className="relative border-t border-white/10">
+      <section className="relative border-t border-[var(--border)]">
         <div className="mx-auto grid max-w-6xl md:grid-cols-[280px_1fr]">
           <div className="hidden md:block">
             <div className="sticky top-24 px-6 py-24">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--sd-mint)]">The idea</p>
-              <h2
-                className="mt-3 text-3xl font-extrabold tracking-tight"
-                style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
-              >
-                Why StoreDesk exists
-              </h2>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">The idea</p>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight">Why StoreDesk exists</h2>
             </div>
           </div>
-          <div className="space-y-24 px-6 py-20 md:border-l md:border-white/10 md:px-12">
+          <div className="space-y-16 px-6 py-16 md:border-l md:border-[var(--border)] md:px-12 md:py-20">
             {[
               {
                 t: "C-stores drown in spreadsheets",
@@ -129,43 +150,37 @@ export function LandingPage() {
             ].map((block, i) => (
               <motion.article
                 key={block.t}
-                initial={{ opacity: 0, x: 40 }}
+                initial={{ opacity: 0, x: 24 }}
                 whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: "-20%" }}
-                transition={{ duration: 0.55, delay: i * 0.05 }}
+                viewport={{ once: true, margin: "-15%" }}
+                transition={{ duration: 0.45, delay: i * 0.04 }}
               >
                 <h3 className="text-2xl font-bold">{block.t}</h3>
-                <p className="mt-3 max-w-xl text-white/55 leading-relaxed">{block.b}</p>
+                <p className="mt-3 max-w-xl text-base leading-relaxed text-[var(--muted)]">{block.b}</p>
               </motion.article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Horizontal scroll features */}
-      <section className="border-t border-white/10 bg-black/40 py-16">
+      <section className="border-t border-[var(--border)] bg-[var(--surface)] py-16">
         <div className="mx-auto max-w-6xl px-6">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--sd-mint)]">Product</p>
-          <h2
-            className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl"
-            style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
-          >
-            Three surfaces. One system.
-          </h2>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">Product</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Three surfaces. One system.</h2>
         </div>
-        <div className="mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-4 md:mx-auto md:max-w-6xl md:px-6">
+        <div className="mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-4 md:mx-auto md:max-w-6xl">
           {pillars.map((p, i) => (
             <motion.article
               key={p.title}
-              className="w-[85%] shrink-0 snap-center rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-transparent p-6 md:w-[340px]"
-              initial={{ opacity: 0, y: 30 }}
+              className="w-[85%] shrink-0 snap-center rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm md:w-[340px]"
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.08 }}
+              transition={{ delay: i * 0.06 }}
             >
               <div className="mb-4 h-1 w-12 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B]" />
               <h3 className="text-xl font-bold">{p.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-white/55">{p.body}</p>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">{p.body}</p>
             </motion.article>
           ))}
         </div>
@@ -176,48 +191,36 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Parallax band */}
-      <section ref={parallaxRef} className="relative overflow-hidden border-t border-white/10 py-28">
-        <motion.div style={{ y, opacity }} className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-1/2 h-[120%] w-[120%] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(circle,rgba(0,168,123,0.2),transparent_50%)]" />
+      <section ref={parallaxRef} className="relative overflow-hidden border-t border-[var(--border)] py-24">
+        <motion.div style={{ y }} className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-20">
+          <Image src="/brand/logo-mark.svg" alt="" width={280} height={280} className="h-64 w-64 md:h-72 md:w-72" />
         </motion.div>
         <div className="relative mx-auto max-w-3xl px-6 text-center">
-          <h2
-            className="text-3xl font-extrabold tracking-tight md:text-5xl"
-            style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
-          >
-            Not an inventory system.
-          </h2>
-          <p className="mt-5 text-lg text-white/55">
-            No on-hand counts. No reorder alerts. No warehouse bins. StoreDesk is for prices, vendors, invoices, and
-            the people standing at the register.
+          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Not an inventory system.</h2>
+          <p className="mt-5 text-lg leading-relaxed text-[var(--muted)]">
+            No on-hand counts. No reorder alerts. No warehouse bins. StoreDesk is for prices, vendors, invoices, and the
+            people standing at the register.
           </p>
         </div>
       </section>
 
-      {/* Steps */}
-      <section className="border-t border-white/10 px-6 py-20">
+      <section className="border-t border-[var(--border)] bg-[var(--surface)] px-6 py-20">
         <div className="mx-auto max-w-6xl">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--sd-mint)]">How it works</p>
-          <h2
-            className="mt-2 text-3xl font-extrabold"
-            style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
-          >
-            From install to daily ops
-          </h2>
-          <ol className="mt-12 grid gap-6 md:grid-cols-2">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">How it works</p>
+          <h2 className="mt-2 text-3xl font-bold">From install to daily ops</h2>
+          <ol className="mt-12 grid gap-5 md:grid-cols-2">
             {steps.map((s, i) => (
               <motion.li
                 key={s.n}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
-                initial={{ opacity: 0, y: 24 }}
+                className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm"
+                initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.06 }}
+                transition={{ delay: i * 0.05 }}
               >
-                <span className="font-mono text-sm text-[var(--sd-blue)]">{s.n}</span>
+                <span className="font-mono text-sm font-semibold text-[var(--sd-blue)]">{s.n}</span>
                 <h3 className="mt-2 text-lg font-bold">{s.title}</h3>
-                <p className="mt-2 text-sm text-white/55">{s.body}</p>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{s.body}</p>
               </motion.li>
             ))}
           </ol>
@@ -227,29 +230,27 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="border-t border-white/10 bg-gradient-to-br from-[#0E43D8]/40 via-[#050608] to-[#00A87B]/25 px-6 py-20">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2
-            className="text-3xl font-extrabold md:text-4xl"
-            style={{ fontFamily: "var(--font-display), system-ui, sans-serif" }}
-          >
-            Talk to us about a store license
-          </h2>
-          <p className="mt-4 text-white/60">
+      <section className="border-t border-[var(--border)] px-6 py-20">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-[var(--border)] bg-[var(--surface)] px-8 py-12 text-center">
+          <Image src="/brand/logo-lockup-horizontal.svg" alt="StoreDesk" width={200} height={42} className="mx-auto h-10 w-auto" />
+          <h2 className="mt-6 text-3xl font-bold tracking-tight">Talk to us about a store license</h2>
+          <p className="mt-4 text-[var(--muted)]">
             Trials and custom support end-dates are set per store. Email{" "}
-            <a className="text-[var(--sd-mint)] underline" href={`mailto:${SITE.email}`}>
+            <a className="font-semibold text-[var(--sd-blue)] underline" href={`mailto:${SITE.email}`}>
               {SITE.email}
             </a>
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link
               href="/contact"
-              className="rounded-full bg-white px-6 py-3 text-sm font-bold text-[#0E43D8]"
+              className="rounded-full bg-[var(--sd-blue)] px-6 py-3 text-sm font-bold text-white hover:bg-[var(--sd-blue-shadow)]"
             >
               Contact
             </Link>
-            <Link href="/how-it-works" className="rounded-full border border-white/30 px-6 py-3 text-sm font-bold">
+            <Link
+              href="/how-it-works"
+              className="rounded-full border border-[var(--border)] bg-white px-6 py-3 text-sm font-bold"
+            >
               How it works
             </Link>
           </div>
