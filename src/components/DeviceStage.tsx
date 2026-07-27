@@ -32,7 +32,7 @@ export function LaptopMock() {
                 alt=""
                 width={36}
                 height={36}
-                className="mb-2 h-9 w-9 rounded-lg object-cover ring-1 ring-white/30"
+                className="mb-2 h-9 w-9 rounded-lg bg-white object-cover p-0.5"
               />
               {[
                 { l: "Price Book", on: true },
@@ -136,7 +136,7 @@ export function PhoneMock() {
                 alt=""
                 width={22}
                 height={22}
-                className="h-[22px] w-[22px] rounded object-cover"
+                className="h-[22px] w-[22px] rounded bg-white object-cover"
               />
               <div>
                 <div className="text-[10px] font-bold leading-tight text-[var(--foreground)]">StoreDesk Mobile</div>

@@ -39,7 +39,7 @@ export function MarketingShell({
             alt=""
             width={180}
             height={38}
-            className="hidden h-9 w-auto shrink-0 rounded-lg bg-white/90 object-contain p-1 shadow-sm md:block"
+            className="hidden h-9 w-auto shrink-0 rounded-lg bg-white object-contain p-1.5 shadow-sm md:block"
           />
         </div>
       </div>

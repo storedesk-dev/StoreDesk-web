@@ -206,13 +206,15 @@ export function LandingPage() {
 
       <section ref={parallaxRef} className="relative overflow-hidden border-t border-[var(--border)] sd-section-mix py-24">
         <motion.div style={{ y }} className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.1]">
-          <Image
-            src="/brand/logo-lockup-horizontal.jpg"
-            alt=""
-            width={420}
-            height={90}
-            className="h-20 w-auto object-contain md:h-24"
-          />
+          <div className="rounded-xl bg-white p-3">
+            <Image
+              src="/brand/logo-lockup-horizontal.jpg"
+              alt=""
+              width={420}
+              height={90}
+              className="h-20 w-auto object-contain md:h-24"
+            />
+          </div>
         </motion.div>
         <div className="relative mx-auto max-w-3xl rounded-3xl border border-white/60 bg-white/70 px-8 py-10 text-center shadow-lg shadow-blue-500/10 backdrop-blur-sm">
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Not an inventory system.</h2>
@@ -258,7 +260,7 @@ export function LandingPage() {
             alt="StoreDesk"
             width={200}
             height={42}
-            className="mx-auto h-10 w-auto object-contain"
+            className="mx-auto h-10 w-auto rounded-lg bg-white object-contain p-2"
           />
           <h2 className="mt-6 text-3xl font-bold tracking-tight">Ready to set up a store?</h2>
           <p className="mt-4 text-[var(--muted)]">

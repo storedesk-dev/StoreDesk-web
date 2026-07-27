@@ -20,10 +20,8 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b border-white/40 shadow-sm shadow-blue-500/10 backdrop-blur-xl ${
-        solid
-          ? "bg-gradient-to-r from-white/95 via-[#eef4ff]/95 to-[#e8faf3]/95"
-          : "bg-gradient-to-r from-white/90 via-[#eef4ff]/85 to-[#e8faf3]/90"
+      className={`sticky top-0 z-50 border-b border-[var(--border)] bg-white shadow-sm shadow-blue-500/10 ${
+        solid ? "" : "backdrop-blur-xl"
       }`}
     >
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#1A63F4]/50 to-[#00A87B]/50" />
@@ -35,7 +33,7 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
             width={200}
             height={42}
             priority
-            className="h-9 w-auto object-contain"
+            className="h-9 w-auto rounded bg-white object-contain p-1"
           />
         </Link>
 
@@ -143,7 +141,7 @@ export function SiteFooter() {
             alt={SITE.name}
             width={160}
             height={34}
-            className="mb-3 h-8 w-auto rounded bg-white/95 object-contain p-1"
+            className="mb-3 h-8 w-auto rounded bg-white object-contain p-1.5"
           />
           <p className="max-w-sm text-sm text-white/85">{SITE.tagline}</p>
         </div>

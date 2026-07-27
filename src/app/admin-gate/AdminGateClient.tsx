@@ -44,7 +44,7 @@ export default function AdminGateClient() {
           alt="StoreDesk"
           width={160}
           height={34}
-          className="h-8 w-auto object-contain"
+          className="h-8 w-auto rounded bg-white object-contain p-1"
         />
         <h1 className="mt-5 text-lg font-bold tracking-tight">Admin</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Enter password to continue.</p>
