@@ -5,7 +5,7 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const authed = await isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value);
 
-  if (pathname.startsWith("/api/stores")) {
+  if (pathname.startsWith("/api/stores") || pathname.startsWith("/api/v1/admin")) {
     if (!authed) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -26,5 +26,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/stores/:path*"]
+  matcher: ["/admin/:path*", "/api/stores/:path*", "/api/v1/admin/:path*"]
 };

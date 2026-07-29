@@ -7,7 +7,6 @@ export type StoreRecord = {
   _id: string;
   name: string;
   storeId: string;
-  agentKey: string;
   status: StoreStatus;
   entitlements: string[];
   licensePlan: LicensePlan;
@@ -32,10 +31,6 @@ function nowIso() {
 
 export function newStoreId(): string {
   return `SD-${randomBytes(3).toString("hex").toUpperCase()}`;
-}
-
-export function newAgentKey(): string {
-  return `sk_${randomBytes(24).toString("hex")}`;
 }
 
 /** Default support end: trial 30d, standard 365d, custom requires explicit date. */
@@ -70,7 +65,6 @@ export function createStoreFields(input: CreateStoreInput): Omit<StoreRecord, "_
   return {
     name: input.name.trim(),
     storeId: newStoreId(),
-    agentKey: newAgentKey(),
     status: "active",
     entitlements: ["desktop", "mobile", "edge"],
     licensePlan: input.licensePlan,
@@ -86,7 +80,6 @@ export function toStoreRecord(doc: {
   _id: { toString(): string };
   name: string;
   storeId: string;
-  agentKey: string;
   status: string;
   entitlements?: string[];
   licensePlan?: string;
@@ -105,7 +98,6 @@ export function toStoreRecord(doc: {
     _id: doc._id.toString(),
     name: doc.name,
     storeId: doc.storeId,
-    agentKey: doc.agentKey,
     status: doc.status as StoreStatus,
     entitlements: doc.entitlements ?? [],
     licensePlan: (doc.licensePlan as LicensePlan) || "trial",
@@ -143,7 +135,7 @@ export const memoryStore = {
   update(
     id: string,
     patch: Partial<
-      Pick<StoreRecord, "name" | "notes" | "status" | "entitlements" | "agentKey" | "licensePlan" | "supportEndsAt">
+      Pick<StoreRecord, "name" | "notes" | "status" | "entitlements" | "licensePlan" | "supportEndsAt">
     >
   ): StoreRecord | undefined {
     const row = bag().find((s) => s._id === id);

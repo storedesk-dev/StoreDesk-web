@@ -4,7 +4,8 @@ const StoreSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
     storeId: { type: String, required: true, unique: true, index: true },
-    agentKey: { type: String, required: true },
+    // Legacy field retained only for migration; it is never selected or returned.
+    agentKey: { type: String, select: false },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
     entitlements: { type: [String], default: ["desktop", "mobile", "edge"] },
     licensePlan: { type: String, enum: ["trial", "standard", "custom"], default: "trial" },
