@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.storedesk",
+      "sha256_cert_fingerprints": [
+        "84:A7:58:BD:3F:BA:38:33:EE:98:2E:D7:B4:96:65:12:3D:7E:55:AF:2F:9C:3A:2E:94:6F:BF:29:D1:31:A7:2A"
+      ]
+    }
+  }
+]
