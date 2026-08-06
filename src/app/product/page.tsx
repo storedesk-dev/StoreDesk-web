@@ -55,11 +55,25 @@ const features = [
 export default function ProductPage() {
   return (
     <MarketingShell eyebrow="Product" title="Everything at the counter — built for real store operations">
-      <div className="flex flex-wrap items-center gap-4">
-        <VerifoneBadge />
-        <p className="max-w-xl text-[var(--muted)]">
-          StoreDesk runs on your store computer and mobile devices — connecting live register items with wholesale vendor costs you control.
-        </p>
+      <div className="mt-8 grid items-center gap-6 rounded-2xl border border-[var(--border)] bg-gradient-to-r from-slate-900 via-[#0B1F3A] to-slate-900 p-6 text-white md:grid-cols-[180px_1fr]">
+        <div className="flex justify-center">
+          <div className="relative h-24 w-36 overflow-hidden rounded-xl border border-white/20 bg-white/10 p-2 shadow-xl backdrop-blur-md">
+            <img
+              src="/Verifone image.png"
+              alt="Verifone Commander POS"
+              className="h-full w-full object-contain"
+            />
+          </div>
+        </div>
+        <div>
+          <span className="inline-flex rounded-full bg-[#1A63F4]/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#4f8cff]">
+            Hardware Integration
+          </span>
+          <h2 className="mt-1 text-xl font-bold md:text-2xl">Read-Only Verifone® Commander Sync</h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-300">
+            Safely streams live vPLUs, ruby reports, and register transaction sets without modifying POS register configurations or risking register uptime.
+          </p>
+        </div>
       </div>
 
       <div className="mt-10">

@@ -210,6 +210,32 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* Verifone Commander Hardware Spotlight */}
+      <section className="border-b border-[var(--border)] bg-gradient-to-r from-slate-900 via-[#0B1F3A] to-slate-900 py-14 text-white">
+        <div className="mx-auto grid max-w-6xl items-center gap-8 px-6 md:grid-cols-[220px_1fr]">
+          <div className="flex justify-center">
+            <div className="relative h-28 w-44 overflow-hidden rounded-2xl border border-white/20 bg-white/10 p-3 shadow-2xl backdrop-blur-md">
+              <Image
+                src="/Verifone image.png"
+                alt="Verifone Commander POS System"
+                width={200}
+                height={120}
+                className="h-full w-full object-contain"
+              />
+            </div>
+          </div>
+          <div>
+            <span className="inline-flex rounded-full bg-[#1A63F4]/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#4f8cff]">
+              Hardware Compatible
+            </span>
+            <h2 className="mt-2 text-2xl font-bold md:text-3xl">Seamless Verifone® Commander Integration</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
+              Read-only register integration continuously syncs PLU items, transaction receipts, and daily sales reports. Zero risk to register configuration or cash register performance.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="relative border-t border-[var(--border)] sd-section-blue">
         <div className="mx-auto grid max-w-6xl md:grid-cols-[280px_1fr]">
           <div className="hidden md:block">
