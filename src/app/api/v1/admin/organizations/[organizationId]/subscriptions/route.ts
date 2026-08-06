@@ -15,7 +15,10 @@ export async function POST(req: Request, ctx: Ctx) {
       entitlementDays?: number;
     };
     if (!body.plan) return NextResponse.json({ error: "plan is required" }, { status: 400 });
-    const subscription = await createSubscription(admin, organizationId, body);
+    const subscription = await createSubscription(admin, organizationId, {
+      ...body,
+      plan: body.plan
+    });
     return NextResponse.json({ subscription }, { status: 201 });
   } catch (error) {
     return jsonError(error);
