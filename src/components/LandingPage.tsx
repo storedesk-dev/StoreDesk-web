@@ -16,15 +16,16 @@ import {
   Server,
   Sparkles,
   TrendingUp,
-  ArrowRight
+  ArrowRight,
+  CheckCircle2
 } from "lucide-react";
 
-/** Rotating words for hero dynamic flipper */
+/** Rotating words for hero focus pill */
 const FLIP_WORDS = [
-  "warehouse inventory.",
-  "stock counters.",
-  "generic retail SaaS.",
-  "complex ERPs."
+  "No stock counts required",
+  "Verifone Commander read-only",
+  "Wholesale vendor cost overlays",
+  "Instant floor UPC scanning"
 ];
 
 /** 6 Validated App Screens mapped from project wireframes */
@@ -136,7 +137,6 @@ function AnimatedCounter({ value, prefix = "$", decimals = 2 }: { value: number;
     function update(now: number) {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setDisplayValue(start + eased * (value - start));
 
@@ -193,7 +193,7 @@ export function LandingPage() {
   useEffect(() => {
     const timer = setInterval(() => {
       setFlipIndex((prev) => (prev + 1) % FLIP_WORDS.length);
-    }, 2800);
+    }, 3000);
     return () => clearInterval(timer);
   }, []);
 
@@ -202,13 +202,16 @@ export function LandingPage() {
       {/* 1. HEADER / GLOBAL NAVIGATION */}
       <SiteHeader />
 
-      {/* 2. HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#F0F8FF] via-[#F8FAFC] to-white pb-20 pt-10">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 lg:grid-cols-2 lg:pb-12">
+      {/* 2. HERO SECTION - Rich Polished Background Mesh */}
+      <section className="relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-100/60 via-[#F8FAFC] to-white pb-20 pt-10">
+        {/* Decorative Grid Overlay for Depth */}
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#0b1f4d08_1px,transparent_1px),linear-gradient(to_bottom,#0b1f4d08_1px,transparent_1px)] bg-[size:24px_24px]" />
+
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 lg:grid-cols-2 lg:pb-12">
           {/* Left Column - 50% */}
           <div>
             <motion.div
-              className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#00B36B]/10 px-3.5 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[#00B36B]"
+              className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#00B36B]/15 px-3.5 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[#00B36B]"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
@@ -219,26 +222,16 @@ export function LandingPage() {
               CONVENIENCE · GAS · C-STORE MANAGEMENT
             </motion.div>
 
+            {/* Stable Non-Wobbling Headline */}
             <motion.h1
-              className="text-4xl font-extrabold tracking-tight text-[#0B1F4D] sm:text-5xl lg:text-[3.25rem] lg:leading-[1.1]"
+              className="text-4xl font-extrabold tracking-tight text-[#0B1F4D] sm:text-5xl lg:text-[3.25rem] lg:leading-[1.15]"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
             >
-              Built for store operators — not{" "}
-              <span className="relative inline-block text-[#00B36B]">
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={FLIP_WORDS[flipIndex]}
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -14 }}
-                    transition={{ duration: 0.25 }}
-                    className="inline-block"
-                  >
-                    {FLIP_WORDS[flipIndex]}
-                  </motion.span>
-                </AnimatePresence>
+              Built for store operators —{" "}
+              <span className="bg-gradient-to-r from-[#00B36B] via-[#00A87B] to-[#1D4ED8] bg-clip-text text-transparent">
+                not generic retail SaaS.
               </span>
             </motion.h1>
 
@@ -251,9 +244,33 @@ export function LandingPage() {
               Manage vendor pricing, compare wholesale costs, calculate shelf prices, and inspect register transactions in real-time from your back-office computer and store devices.
             </motion.p>
 
+            {/* Dynamic Focus Feature Pill (Fixed Height to prevent any layout shift) */}
+            <motion.div
+              className="mt-4 flex h-8 items-center gap-2 text-xs font-bold text-[#00B36B]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.11 }}
+            >
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-[#00B36B]" />
+              <div className="relative overflow-hidden h-5 w-64">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={FLIP_WORDS[flipIndex]}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute inset-0 truncate"
+                  >
+                    {FLIP_WORDS[flipIndex]}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+            </motion.div>
+
             {/* Live Ticker Metric Spotlight */}
             <motion.div
-              className="mt-5 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2 shadow-sm"
+              className="mt-4 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white/90 px-3.5 py-2 shadow-sm backdrop-blur-sm"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12 }}
@@ -304,24 +321,9 @@ export function LandingPage() {
             </motion.div>
           </div>
 
-          {/* Right Column - 50% */}
+          {/* Right Column - 50% High-End 3D Device Stage */}
           <div className="flex flex-col items-center justify-center">
             <DeviceStage />
-          </div>
-        </div>
-
-        {/* Hero Banner Component with Emerald Glow */}
-        <div className="relative mx-auto mt-6 max-w-6xl px-6">
-          <div className="pointer-events-none absolute -inset-4 -z-10 rounded-3xl bg-[#00B36B]/20 blur-3xl" />
-          <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-2 shadow-2xl">
-            <Image
-              src="/screenshots/store-banner.png"
-              alt="StoreDesk Store Operations Banner"
-              width={1200}
-              height={400}
-              className="h-auto w-full rounded-xl object-cover"
-              priority
-            />
           </div>
         </div>
       </section>
@@ -444,7 +446,7 @@ export function LandingPage() {
             <span className="inline-flex rounded-full bg-[#00B36B]/15 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[#00B36B]">
               SYSTEM TOPOGRAPHY
             </span>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#0B1F4D] md:text-4xl">
+            <h2 className="mt-3 text-[#0B1F4D] text-3xl font-extrabold tracking-tight md:text-4xl">
               Modern Event-Driven Technology Stack
             </h2>
           </div>
