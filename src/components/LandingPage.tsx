@@ -20,7 +20,14 @@ import {
   CheckCircle2,
   ShieldCheck,
   Zap,
-  BarChart3
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Smartphone,
+  Scan,
+  Receipt,
+  Search,
+  DollarSign
 } from "lucide-react";
 
 /** Rotating words for hero focus pill */
@@ -34,40 +41,58 @@ const FLIP_WORDS = [
 /** 6 Validated App Screens mapped from project wireframes */
 const validatedScreens = [
   {
+    id: "login",
     src: "/screenshots/mobile-app-1.jpeg",
     title: "StoreDesk Login",
-    desc: "Authentication screen for the desktop & mobile app",
-    tag: "Core UI"
+    subtitle: "Secure Store Authentication",
+    desc: "Authentication screen for store staff and managers with organization-provisioned AppUser credentials.",
+    tag: "Core UI",
+    icon: Smartphone
   },
   {
+    id: "analytics",
     src: "/screenshots/mobile-app-5.jpeg",
     title: "Sales Tax & Analytics",
-    desc: "Dashboard featuring sales breakdowns & live transaction feed",
-    tag: "Analytics"
+    subtitle: "Live Shift & Category Feed",
+    desc: "Dashboard featuring sales breakdowns, hourly trends, category breakdown, and live shift transaction feed.",
+    tag: "Analytics",
+    icon: BarChart3
   },
   {
+    id: "sync",
     src: "/screenshots/mobile-app-6.jpeg",
     title: "Transaction & Register Sync",
-    desc: "Detailed view of specific transaction line items & subtotal",
-    tag: "Live Feed"
+    subtitle: "Real-time Receipt Breakdown",
+    desc: "Detailed view of specific cash register transactions, line items, taxes, and subtotal calculation.",
+    tag: "Live Feed",
+    icon: Receipt
   },
   {
+    id: "scanner",
     src: "/screenshots/mobile-app-2.jpeg",
     title: "Barcode Scanner & Search",
-    desc: "Price Book catalog with search bar & UPC scan trigger",
-    tag: "Scan First"
+    desc: "Price Book catalog with instant UPC camera scanner trigger and fast search by name, brand, or department.",
+    subtitle: "Instant Camera Lookup",
+    tag: "Scan First",
+    icon: Scan
   },
   {
+    id: "details",
     src: "/screenshots/mobile-app-3.jpeg",
-    title: "Product Details & Price Comparison",
-    desc: "Live PLU details showing selling price, dept & tax categories",
-    tag: "Price Book"
+    title: "Product Details & Comparison",
+    subtitle: "PLU & Vendor Cost Overlay",
+    desc: "Live PLU details showing selling price, department tax categories, unit size, and wholesale supplier cost.",
+    tag: "Price Book",
+    icon: Search
   },
   {
+    id: "vendor",
     src: "/screenshots/mobile-app-4.jpeg",
     title: "Vendor Prices & Cost Breakdown",
-    desc: "Cost analysis overlay comparing retail vs local vendor costs",
-    tag: "Margin Control"
+    subtitle: "True Margin Transparency",
+    desc: "Cost analysis overlay comparing retail prices against local vendor costs to calculate true profit margins.",
+    tag: "Margin Control",
+    icon: DollarSign
   }
 ];
 
@@ -189,9 +214,204 @@ function SpotlightCard({ children, className = "" }: { children: React.ReactNode
   );
 }
 
+/** Interactive Single 3D Phone Circular Carousel Component */
+function MobileShowcaseCarousel() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+
+  // Auto-play interval cycling every 3.5 seconds
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % validatedScreens.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [isAutoPlaying]);
+
+  const activeScreen = validatedScreens[activeIndex];
+
+  function handlePrev() {
+    setIsAutoPlaying(false);
+    setActiveIndex((prev) => (prev - 1 + validatedScreens.length) % validatedScreens.length);
+  }
+
+  function handleNext() {
+    setIsAutoPlaying(false);
+    setActiveIndex((prev) => (prev + 1) % validatedScreens.length);
+  }
+
+  function handleSelect(index: number) {
+    setIsAutoPlaying(false);
+    setActiveIndex(index);
+  }
+
+  return (
+    <div
+      className="mx-auto mt-12 grid max-w-6xl items-center gap-10 px-6 lg:grid-cols-2"
+      onMouseEnter={() => setIsAutoPlaying(false)}
+      onMouseLeave={() => setIsAutoPlaying(true)}
+    >
+      {/* 3D Phone Model Display with Smooth Image Carousel */}
+      <div className="relative flex flex-col items-center justify-center">
+        {/* Glow backdrop */}
+        <div className="pointer-events-none absolute h-72 w-72 rounded-full bg-gradient-to-tr from-[#00B36B]/20 via-[#1D4ED8]/20 to-sky-400/20 blur-3xl" />
+
+        <div className="relative z-10 w-[270px] sm:w-[290px] perspective-[1000px]">
+          <div className="relative rounded-[3.2rem] border-[9px] border-slate-900 bg-slate-950 p-1.5 shadow-[0_25px_60px_-15px_rgba(11,31,77,0.3)] ring-2 ring-white/20">
+            {/* Side Hardware Buttons */}
+            <div className="absolute -left-[13px] top-24 h-10 w-[4px] rounded-l-md bg-slate-800" />
+            <div className="absolute -left-[13px] top-38 h-10 w-[4px] rounded-l-md bg-slate-800" />
+            <div className="absolute -right-[13px] top-32 h-14 w-[4px] rounded-r-md bg-slate-800" />
+
+            <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-950">
+              {/* Status Notch */}
+              <div className="relative z-20 bg-slate-900/90 px-4 pb-1 pt-2.5 backdrop-blur-md">
+                <div className="absolute left-1/2 top-2 h-4 w-20 -translate-x-1/2 rounded-full bg-slate-950 flex items-center justify-end px-2">
+                  <div className="h-2 w-2 rounded-full bg-slate-800 ring-1 ring-slate-700" />
+                </div>
+                <div className="flex items-center justify-between text-[8px] font-bold text-slate-300">
+                  <span>9:41</span>
+                  <span>StoreDesk · 5G</span>
+                </div>
+              </div>
+
+              {/* Dynamic Image Transition inside Phone Container */}
+              <div className="relative h-[480px] w-full overflow-hidden bg-slate-900">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeScreen.id}
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.03 }}
+                    transition={{ duration: 0.35, ease: "easeInOut" }}
+                    className="absolute inset-0"
+                  >
+                    <Image
+                      src={activeScreen.src}
+                      alt={activeScreen.title}
+                      fill
+                      className="object-cover object-top"
+                      priority
+                    />
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Glass reflection overlay */}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent" />
+              </div>
+
+              {/* Bottom Home Bar */}
+              <div className="relative z-20 flex justify-center bg-slate-950 py-1.5">
+                <div className="h-1 w-24 rounded-full bg-slate-700" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Carousel Navigation Arrows */}
+        <div className="mt-6 flex items-center gap-4">
+          <button
+            onClick={handlePrev}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:border-[#1D4ED8] hover:text-[#1D4ED8]"
+            aria-label="Previous Screen"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          {/* Indicators */}
+          <div className="flex gap-2">
+            {validatedScreens.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => handleSelect(i)}
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  i === activeIndex ? "w-8 bg-[#1D4ED8]" : "w-2.5 bg-slate-300 hover:bg-slate-400"
+                }`}
+                aria-label={`Go to screen ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          <button
+            onClick={handleNext}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:border-[#1D4ED8] hover:text-[#1D4ED8]"
+            aria-label="Next Screen"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Screen Selector Pills & Active Feature Spotlight */}
+      <div className="space-y-4">
+        <div className="mb-2">
+          <span className="inline-flex rounded-full bg-[#00B36B]/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#00B36B]">
+            INTERACTIVE APP PREVIEW
+          </span>
+          <h3 className="mt-2 text-2xl font-extrabold text-[#0B1F4D] sm:text-3xl">
+            {activeScreen.title}
+          </h3>
+          <p className="mt-1 text-sm font-semibold text-[#1D4ED8]">
+            {activeScreen.subtitle}
+          </p>
+        </div>
+
+        {/* Active Screen Card Details */}
+        <motion.div
+          key={activeScreen.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="rounded-2xl border border-slate-300 bg-slate-50 p-6 shadow-sm"
+        >
+          <p className="text-base font-medium leading-relaxed text-slate-800">
+            {activeScreen.desc}
+          </p>
+        </motion.div>
+
+        {/* Screen Selector Grid */}
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {validatedScreens.map((screen, idx) => {
+            const Icon = screen.icon;
+            const isSelected = idx === activeIndex;
+            return (
+              <button
+                key={screen.id}
+                onClick={() => handleSelect(idx)}
+                className={`flex items-center gap-3 rounded-xl border p-3 text-left transition duration-200 ${
+                  isSelected
+                    ? "border-[#1D4ED8] bg-[#1D4ED8] text-white shadow-md"
+                    : "border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <span
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-[#0B1F4D]"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold">{screen.title}</p>
+                  <p
+                    className={`truncate text-[10px] ${
+                      isSelected ? "text-white/80" : "text-slate-500"
+                    }`}
+                  >
+                    {screen.tag}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LandingPage() {
   const [flipIndex, setFlipIndex] = useState(0);
-  const [isMarqueePaused, setIsMarqueePaused] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -403,57 +623,19 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 4. APPLICATION INTERFACE (Background: White with Marquee) */}
+      {/* 4. APPLICATION INTERFACE (Single 3D Phone Showcase Carousel) */}
       <section className="bg-white py-24 overflow-hidden">
         <div className="mx-auto max-w-6xl px-6 text-center">
           <h2 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D] md:text-4xl">
             Designed for speed at the counter & on the floor
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-base font-medium text-slate-700">
-            Explore the key validated screens of StoreDesk — featuring the core Mobile Sales Tax & Analytics Dashboard, Price Book catalog, and real-time transaction sync.
+            Explore the key validated screens of StoreDesk — featuring live register analytics, barcode scanning, price book catalog, and margin overlays.
           </p>
         </div>
 
-        {/* Interactive Continuous Marquee Carousel with Pause on Hover */}
-        <div
-          className="mt-12 flex w-full overflow-x-auto px-6 pb-6 pt-2 scrollbar-none"
-          onMouseEnter={() => setIsMarqueePaused(true)}
-          onMouseLeave={() => setIsMarqueePaused(false)}
-        >
-          <motion.div
-            className="flex gap-6"
-            animate={isMarqueePaused ? false : { x: ["0%", "-50%"] }}
-            transition={{ duration: 25, ease: "linear", repeat: Infinity }}
-          >
-            {[...validatedScreens, ...validatedScreens].map((screen, idx) => (
-              <div
-                key={`${screen.title}-${idx}`}
-                className="group relative w-[280px] shrink-0 rounded-2xl border border-slate-300 bg-white p-3.5 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#1D4ED8] hover:shadow-xl"
-              >
-                <div className="relative overflow-hidden rounded-xl bg-slate-900">
-                  <Image
-                    src={screen.src}
-                    alt={screen.title}
-                    width={440}
-                    height={900}
-                    className="h-auto w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  {/* Glassmorphism Hover Overlay */}
-                  <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 backdrop-blur-[2px]">
-                    <span className="inline-flex w-fit rounded-full bg-[#00B36B] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
-                      {screen.tag}
-                    </span>
-                    <span className="mt-1 text-xs font-extrabold text-white">{screen.title}</span>
-                  </div>
-                </div>
-                <div className="p-2.5">
-                  <h3 className="text-sm font-bold text-[#0B1F4D]">{screen.title}</h3>
-                  <p className="mt-0.5 text-xs font-medium text-slate-600 leading-snug">{screen.desc}</p>
-                </div>
-              </div>
-            ))}
-          </motion.div>
-        </div>
+        {/* Single 3D Phone Circular Showcase Carousel */}
+        <MobileShowcaseCarousel />
       </section>
 
       {/* 5. ARCHITECTURE OVERVIEW (Background: Light Ice-Blue #F0F8FF) */}
