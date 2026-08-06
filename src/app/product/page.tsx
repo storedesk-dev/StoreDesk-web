@@ -58,9 +58,11 @@ export default function ProductPage() {
       <div className="mt-8 grid items-center gap-6 rounded-2xl border border-[var(--border)] bg-gradient-to-r from-slate-900 via-[#0B1F3A] to-slate-900 p-6 text-white md:grid-cols-[180px_1fr]">
         <div className="flex justify-center">
           <div className="relative h-24 w-36 overflow-hidden rounded-xl border border-white/20 bg-white/10 p-2 shadow-xl backdrop-blur-md">
-            <img
+            <Image
               src="/Verifone image.png"
               alt="Verifone Commander POS"
+              width={160}
+              height={100}
               className="h-full w-full object-contain"
             />
           </div>
