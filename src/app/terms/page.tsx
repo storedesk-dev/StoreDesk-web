@@ -11,8 +11,7 @@ export default function TermsPage() {
         
         <h2 className="text-xl font-bold text-[var(--ink)]">1. Core Functionality</h2>
         <p>
-          StoreDesk is engineered exclusively for **margin tracking, invoice extraction, and price book management**. 
-          <strong>StoreDesk is explicitly not a stock-count or inventory tracking system.</strong> We do not track stock quantities, warehouse locations, or low-stock alerts.
+          StoreDesk is engineered exclusively for **margin tracking, wholesale cost comparison, and price book management**.
         </p>
 
         <h2 className="text-xl font-bold text-[var(--ink)]">2. POS Integrations</h2>

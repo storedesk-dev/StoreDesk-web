@@ -41,7 +41,7 @@ export default function AboutPage() {
             </div>
             <p className="text-[var(--muted)] leading-relaxed">
               Convenience store owners deal with thousands of items, rising supplier prices, and stacks of paper invoices. 
-              What they need is a clear system to track cost truth, calculate proper selling prices, and scan barcodes on the floor — without complex warehouse software.
+              What they need is a clear system to track cost truth, calculate proper selling prices, and scan barcodes on the floor.
             </p>
             <p className="mt-4 text-[var(--muted)] leading-relaxed">
               StoreDesk runs on your store computer with a desktop dashboard for management and a fast mobile app for floor staff — keeping all your pricing data fast, local, and accurate.
@@ -95,7 +95,9 @@ export default function AboutPage() {
             <li className="flex items-center gap-2">
               <Lock className="h-4 w-4 text-[var(--sd-blue)]" /> Human review of vendor invoices before updating prices
             </li>
-            <li className="flex items-center gap-2">No stock count clutter or warehouse tracking</li>
+            <li className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-[var(--sd-blue)]" /> Dedicated price book and supplier cost comparison
+            </li>
             <li className="flex items-center gap-2">Fast barcode scanning for floor staff</li>
           </ul>
           <Link href="/how-it-works" className="mt-6 inline-block text-sm font-bold text-[var(--sd-blue)]">
