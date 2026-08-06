@@ -4,36 +4,49 @@ import { SITE, contactMailto } from "@/lib/site";
 export default function PrivacyPage() {
   return (
     <MarketingShell eyebrow="Legal" title="Privacy Policy">
-      <div className="prose max-w-3xl space-y-4 text-[var(--muted)]">
-        <h2 className="text-xl font-bold text-[var(--ink)]">Our Hybrid Architecture</h2>
-        <p>
-          StoreDesk operates on a unique <strong>Hybrid Edge Architecture</strong> to maximize reliability and security. 
-          The core system, <strong>StoreDesk Worker</strong>, runs directly on your store&apos;s back-office PC. 
-        </p>
-        <p>
-          Your historical shift summaries, analytics, and integration settings are securely synced to our cloud database (MongoDB Atlas) 
-          so you can access them instantly via the StoreDesk Mobile app, even if your store loses internet. 
-        </p>
-        
-        <h2 className="text-xl font-bold text-[var(--ink)]">Live Data Tunneling</h2>
-        <p>
-          To ensure 100% accuracy, live register data (like scanning a barcode to check a price, or viewing the active unclosed shift) 
-          is <strong>never cached in the cloud</strong>. Instead, the <strong>StoreDesk Cloud Hub</strong> securely tunnels your request 
-          directly to your local store PC in real-time.
-        </p>
+      <div className="prose max-w-3xl space-y-6 text-[var(--muted)]">
+        <section className="space-y-2">
+          <h2 className="text-xl font-bold text-[var(--ink)]">Overview</h2>
+          <p>
+            StoreDesk Web’s marketing site does not require an account. Internal admin tools are password-gated for the StoreDesk team.
+          </p>
+        </section>
 
-        <h2 className="text-xl font-bold text-[var(--ink)]">Authentication & AppUsers</h2>
-        <p>
-          Access to your store data is strictly gated by <strong>Organization AppUsers</strong>. When you purchase a StoreDesk license, 
-          you manage which email accounts have access to your organization. Legacy device pairing codes are no longer used.
-        </p>
+        <section className="space-y-2">
+          <h2 className="text-xl font-bold text-[var(--ink)]">Local-First Store Data Architecture</h2>
+          <p>
+            In the store, catalog and ops data are intended to stay on the backoffice PC running StoreDesk Worker. 
+            StoreDesk Desktop and Mobile talk only to that local Worker — not to a shared cloud product database.
+          </p>
+        </section>
 
-        <p className="pt-8 border-t border-[var(--border)] mt-8">
-          Questions about data security?{" "}
-          <a href={contactMailto()} className="font-semibold text-[var(--sd-blue)] hover:underline">
-            {SITE.email}
-          </a>
-        </p>
+        <section className="space-y-2">
+          <h2 className="text-xl font-bold text-[var(--ink)]">Mobile App Permissions & Privacy</h2>
+          <p>
+            StoreDesk Mobile requests minimal device permissions necessary strictly for store operation:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong>Camera Permission:</strong> Used exclusively for scanning product UPC barcodes, QR codes, and vendor invoice items in real time.
+            </li>
+            <li>
+              <strong>Media & Photos Permission:</strong> Used solely when a user explicitly chooses to select a stored barcode photo or vendor invoice image from device storage.
+            </li>
+          </ul>
+          <p>
+            StoreDesk does not track users, does not use advertising identifiers (AD_ID), and does not sell or share personal data with third parties.
+          </p>
+        </section>
+
+        <section className="pt-6 border-t border-[var(--border)]">
+          <h2 className="text-xl font-bold text-[var(--ink)]">Contact Us</h2>
+          <p className="mt-2">
+            For any questions or privacy inquiries, please contact us at:{" "}
+            <a href={contactMailto()} className="font-semibold text-[var(--sd-blue)] hover:underline">
+              {SITE.email}
+            </a>
+          </p>
+        </section>
       </div>
     </MarketingShell>
   );

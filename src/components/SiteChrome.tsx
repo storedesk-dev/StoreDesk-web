@@ -67,12 +67,6 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
 
         <div className="hidden items-center gap-2 md:flex">
           <a
-            href={SITE.github}
-            className="rounded-full border border-[var(--border)] bg-white/80 px-3 py-1.5 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--sd-blue)] hover:text-[var(--sd-blue)]"
-          >
-            GitHub
-          </a>
-          <a
             href={contactMailto({ subject: "StoreDesk inquiry" })}
             className="rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3.5 py-1.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:brightness-105"
           >
