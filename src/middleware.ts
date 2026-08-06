@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE, isValidAdminCookie } from "@/lib/admin-auth";
+
+export const ADMIN_COOKIE = "sd_session";
+
+function isValidAdminCookie(cookieValue: string | undefined): boolean {
+  return Boolean(cookieValue?.startsWith("ses_") && cookieValue.includes("."));
+}
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const authed = await isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value);
+  const authed = isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value);
 
   if (pathname.startsWith("/api/stores") || pathname.startsWith("/api/v1/admin")) {
     if (!authed) {
