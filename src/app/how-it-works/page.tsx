@@ -45,8 +45,8 @@ const steps = [
     icon: MonitorSmartphone
   },
   {
-    title: "Pair StoreDesk Mobile",
-    detail: "Phone joins the store Wi‑Fi and uses the backoffice PC’s LAN IP to reach Worker.",
+    title: "Sign in & Connect StoreDesk Mobile",
+    detail: "Sign in with your Organization AppUser, join store Wi‑Fi, and connect directly to the backoffice PC’s Worker API.",
     icon: Smartphone
   },
   {

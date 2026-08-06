@@ -33,23 +33,32 @@ const steps = [
   {
     n: "01",
     title: "Run Worker on the backoffice PC",
-    body: "Start StoreDesk Worker locally (port 4310). It is the backend for Desktop, Mobile, and Commander reads."
+    body: "Start StoreDesk Worker locally (port 4000/4310). It is the edge backend for Desktop, Mobile, and Commander reads."
   },
   {
     n: "02",
-    title: "Open StoreDesk Desktop",
-    body: "The Electron app connects to Worker on the same PC for Price Book, costs, reports, and invoice review."
+    title: "Sign in with Organization AppUser",
+    body: "Desktop and Mobile sign in using secure AppUser credentials provisioned when your store license is created."
   },
   {
     n: "03",
-    title: "Pair StoreDesk Mobile",
-    body: "Install the phone app, join store Wi‑Fi, and point it at the backoffice PC’s LAN address."
+    title: "Connect StoreDesk Mobile",
+    body: "Join the store Wi-Fi network and connect StoreDesk Mobile directly to the backoffice PC's local IP address."
   },
   {
     n: "04",
     title: "Operate daily",
-    body: "Scan, compare costs, review invoices, and save confirmed vendor prices — not stock counts."
+    body: "Scan barcodes, compare vendor costs, view true per-unit margins, and save confirmed prices."
   }
+];
+
+const mobileScreenshots = [
+  { src: "/screenshots/mobile-app-1.jpeg", alt: "StoreDesk Mobile Login & Dashboard" },
+  { src: "/screenshots/mobile-app-2.jpeg", alt: "Barcode Scanner & Search" },
+  { src: "/screenshots/mobile-app-3.jpeg", alt: "Product Details & Price Comparison" },
+  { src: "/screenshots/mobile-app-4.jpeg", alt: "Vendor Prices & Cost Breakdown" },
+  { src: "/screenshots/mobile-app-5.jpeg", alt: "Sales Tax & Analytics" },
+  { src: "/screenshots/mobile-app-6.jpeg", alt: "Transaction & Commander Sync" }
 ];
 
 export function LandingPage() {
@@ -201,6 +210,39 @@ export function LandingPage() {
           <Link href="/product" className="text-sm font-bold text-[var(--sd-blue)] hover:underline">
             Full product tour →
           </Link>
+        </div>
+      </section>
+
+      <section className="border-t border-[var(--border)] bg-gradient-to-b from-white via-slate-50 to-[#eef4ff] py-20">
+        <div className="mx-auto max-w-6xl px-6 text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">StoreDesk Mobile</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Designed for speed on the store floor</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[var(--muted)]">
+            Scan barcodes, check best vendor prices, inspect sales tax analytics, and verify Commander transactions directly from your phone.
+          </p>
+        </div>
+        <div className="mt-12 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-6 md:justify-center">
+          {mobileScreenshots.map((screen, idx) => (
+            <motion.div
+              key={screen.src}
+              className="group relative w-[220px] shrink-0 snap-center rounded-3xl border-4 border-slate-900 bg-slate-900 shadow-xl transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/20"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.08 }}
+            >
+              <div className="relative overflow-hidden rounded-[1.3rem] bg-black">
+                <Image
+                  src={screen.src}
+                  alt={screen.alt}
+                  width={440}
+                  height={900}
+                  className="h-auto w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+              <p className="mt-2 px-2 pb-2 text-center text-xs font-semibold text-white/90">{screen.alt}</p>
+            </motion.div>
+          ))}
         </div>
       </section>
 
