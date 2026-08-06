@@ -8,57 +8,119 @@ import { DeviceStage } from "@/components/DeviceStage";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
 import { SITE, contactMailto } from "@/lib/site";
-import { HardDrive, Laptop, Server, Smartphone } from "lucide-react";
+import {
+  Database,
+  Globe,
+  HardDrive,
+  Laptop,
+  Server
+} from "lucide-react";
 
 const pillars = [
   {
-    title: "Store Engine",
-    body: "Runs quietly on your store back-office computer to keep prices and store records private and fast."
+    title: "Edge Engine",
+    body: "Runs locally on your store PC to process store catalog data, vendor costs, and POS register feeds instantly."
   },
   {
     title: "StoreDesk Desktop",
-    body: "Admin dashboard to manage vendor price lists, compare supplier costs, review invoices, and set shelf prices."
+    body: "Primary Electron command center for managers to review price books, analyze margins, and compare supplier costs."
   },
   {
     title: "StoreDesk Mobile",
-    body: "Floor app for scanning barcodes, searching items, viewing best supplier costs, and checking margin suggestions on the go."
+    body: "Floor companion app for scanning UPC barcodes, checking supplier costs, and viewing real-time register receipts."
   },
   {
     title: "Local & Private",
-    body: "Store records stay securely on your store computer, ensuring your price book is always accessible even if internet drops."
+    body: "Store records stay securely on your back-office computer. Operates reliably even during internet outages."
   }
 ];
 
 const steps = [
   {
     n: "01",
-    title: "Install StoreDesk",
-    body: "Set up StoreDesk on your store computer in minutes."
+    title: "Install Store Engine",
+    body: "Set up StoreDesk locally on your store back-office PC in minutes."
   },
   {
     n: "02",
-    title: "Create Store Accounts",
-    body: "Provide your store staff secure user logins to access store pricing."
+    title: "Sign In & Provision Accounts",
+    body: "Log in with secure organization accounts provisioned for your store."
   },
   {
     n: "03",
-    title: "Open StoreDesk Mobile",
-    body: "Scan shelf barcodes anywhere in the store using your phone."
+    title: "Connect Floor Devices",
+    body: "Scan barcodes anywhere on the floor over store Wi-Fi."
   },
   {
     n: "04",
     title: "Compare & Set Prices",
-    body: "Instantly compare supplier prices and set profitable register prices."
+    body: "Instantly compare supplier costs against retail prices to protect profit margins."
   }
 ];
 
-const mobileScreenshots = [
-  { src: "/screenshots/mobile-app-1.jpeg", alt: "StoreDesk Mobile Login & Dashboard" },
-  { src: "/screenshots/mobile-app-2.jpeg", alt: "Barcode Scanner & Search" },
-  { src: "/screenshots/mobile-app-3.jpeg", alt: "Product Details & Price Comparison" },
-  { src: "/screenshots/mobile-app-4.jpeg", alt: "Vendor Prices & Cost Breakdown" },
-  { src: "/screenshots/mobile-app-5.jpeg", alt: "Sales Tax & Analytics" },
-  { src: "/screenshots/mobile-app-6.jpeg", alt: "Transaction & Register Sync" }
+/** 6 Validated App Screens mapped from project designs */
+const validatedScreens = [
+  {
+    src: "/screenshots/mobile-app-1.jpeg",
+    title: "StoreDesk Login",
+    desc: "Secure authentication for store staff and managers"
+  },
+  {
+    src: "/screenshots/mobile-app-5.jpeg",
+    title: "Sales Tax & Analytics",
+    desc: "Dashboard with live category sales & tax breakdowns"
+  },
+  {
+    src: "/screenshots/mobile-app-6.jpeg",
+    title: "Transaction & Register Sync",
+    desc: "Detailed receipt view with line items & subtotal"
+  },
+  {
+    src: "/screenshots/mobile-app-2.jpeg",
+    title: "Barcode Scanner & Search",
+    desc: "Price Book catalog with search & UPC scan trigger"
+  },
+  {
+    src: "/screenshots/mobile-app-3.jpeg",
+    title: "Product Details & Price Comparison",
+    desc: "Live PLU details, margin overlays & retail price"
+  },
+  {
+    src: "/screenshots/mobile-app-4.jpeg",
+    title: "Vendor Prices & Cost Breakdown",
+    desc: "Cost comparison comparing retail vs supplier cost"
+  }
+];
+
+const techStack = [
+  {
+    name: "Electron & React",
+    role: "Desktop Command Center",
+    desc: "Cross-platform desktop application built for high-speed store management.",
+    icon: Laptop,
+    badge: "Desktop App"
+  },
+  {
+    name: "Node.js & Express",
+    role: "Local Edge Agent",
+    desc: "High-performance store PC service reading directly from Verifone Commander.",
+    icon: Server,
+    badge: "Edge Agent"
+  },
+  {
+    name: "GCP Cloud Run & WebSockets",
+    role: "Real-Time Cloud Hub",
+    desc: "Event-driven WebSocket relay server maintaining dynamic store telemetry rooms.",
+    icon: Globe,
+    badge: "Cloud Hub"
+  },
+  {
+    name: "Next.js & MongoDB",
+    role: "Web Portal & Admin",
+    desc: "Vercel-hosted control plane for license generation and security management.",
+    icon: Database,
+    badge: "Web Portal"
+  }
 ];
 
 export function LandingPage() {
@@ -71,14 +133,14 @@ export function LandingPage() {
       <div className="relative overflow-hidden sd-hero-wash">
         <SiteHeader />
 
-        <section className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-6 pb-20 pt-10 lg:grid-cols-2 lg:pb-24">
+        <section className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-6 pb-16 pt-10 lg:grid-cols-2 lg:pb-20">
           <div>
             <motion.p
               className="mb-3 inline-flex rounded-full bg-gradient-to-r from-[#1A63F4]/15 to-[#00A87B]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-blue)]"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              Convenience · Gas · C-store operations
+              Convenience · Gas · C-Store Management
             </motion.p>
             <motion.h1
               className="text-4xl font-bold tracking-tight text-[var(--foreground)] sm:text-5xl lg:text-[3.25rem] lg:leading-[1.1]"
@@ -94,7 +156,7 @@ export function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              Manage vendor pricing, compare wholesale costs, calculate shelf prices, and look up register items instantly from your store computer and mobile phones.
+              Manage vendor pricing, compare wholesale costs, calculate shelf prices, and inspect register transactions in real-time from your back-office computer and store devices.
             </motion.p>
             <motion.div
               className="mt-5 flex flex-wrap items-center gap-3"
@@ -105,7 +167,7 @@ export function LandingPage() {
               <VerifoneBadge />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-white/90 px-3 py-2 text-xs font-semibold text-[var(--muted)] shadow-sm">
                 <HardDrive className="h-3.5 w-3.5 text-[var(--sd-green)]" />
-                Back-office PC · Instant Access
+                Back-office PC · Real-time Relay
               </span>
             </motion.div>
             <motion.div
@@ -132,27 +194,43 @@ export function LandingPage() {
         </section>
       </div>
 
+      {/* Prominent Hero Banner */}
+      <section className="border-y border-[var(--border)] bg-slate-900 py-6">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-2 shadow-2xl">
+            <Image
+              src="/screenshots/store-banner.png"
+              alt="StoreDesk Store Operations Banner"
+              width={1200}
+              height={400}
+              className="h-auto w-full rounded-xl object-cover"
+              priority
+            />
+          </div>
+        </div>
+      </section>
+
       <section className="relative border-t border-[var(--border)] sd-section-blue">
         <div className="mx-auto grid max-w-6xl md:grid-cols-[280px_1fr]">
           <div className="hidden md:block">
             <div className="sticky top-24 px-6 py-24">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">The Purpose</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">Core Purpose</p>
               <h2 className="mt-3 text-3xl font-bold tracking-tight">Why StoreDesk exists</h2>
             </div>
           </div>
           <div className="space-y-16 px-6 py-16 md:border-l md:border-[var(--border)] md:px-12 md:py-20">
             {[
               {
-                t: "Never lose margin to rising supplier costs",
-                b: "Retail prices live on your cash register while wholesale costs live in vendor invoices. StoreDesk connects those two worlds so your profit margins are clear."
+                t: "Protect profit margins against rising costs",
+                b: "Retail prices live on your cash register while wholesale costs live in vendor invoices. StoreDesk connects those two worlds so true per-unit profit margins are transparent."
               },
               {
-                t: "Your store computer is the hub",
-                b: "Manage everything directly from your store computer with mobile phones connected seamlessly over store Wi-Fi."
+                t: "Read-only POS register integration",
+                b: "Integrates safely with Verifone Commander via read-only register streams (vPLUs, vrubyrept, vtransset). Zero risk to register configurations."
               },
               {
-                t: "Fast floor scanning",
-                b: "StoreDesk Mobile is built for floor scanning and instant answers: best supplier, cost per item, and suggested retail price."
+                t: "Fast floor access & scan lookup",
+                b: "Scan barcodes anywhere in the store to instantly inspect wholesale cost per item, department tax breakdown, and suggested retail price."
               }
             ].map((block, i) => (
               <motion.article
@@ -170,24 +248,86 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* Screen Mockups Gallery */}
+      <section className="border-t border-[var(--border)] bg-gradient-to-b from-white via-slate-50 to-[#eef4ff] py-20">
+        <div className="mx-auto max-w-6xl px-6 text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">Application Interface</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Designed for speed at the counter & on the floor</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[var(--muted)]">
+            Explore the key screens of StoreDesk — from secure sign-in to sales analytics, register sync, barcode search, and vendor price comparison.
+          </p>
+        </div>
+        <div className="mt-12 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-6 lg:grid lg:grid-cols-3 lg:gap-8 lg:overflow-visible">
+          {validatedScreens.map((screen, idx) => (
+            <motion.div
+              key={screen.title}
+              className="group relative shrink-0 snap-center rounded-2xl border border-[var(--border)] bg-white p-3 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl lg:w-auto"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.06 }}
+            >
+              <div className="relative overflow-hidden rounded-xl bg-slate-900">
+                <Image
+                  src={screen.src}
+                  alt={screen.title}
+                  width={440}
+                  height={900}
+                  className="h-auto w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+              <div className="p-3">
+                <h3 className="text-base font-bold text-[var(--foreground)]">{screen.title}</h3>
+                <p className="mt-1 text-xs text-[var(--muted)]">{screen.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* Product Stack & Tech Architecture */}
+      <section className="border-t border-[var(--border)] bg-white py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="flex flex-col items-center text-center">
+            <span className="inline-flex rounded-full bg-[#1A63F4]/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--sd-blue)]">
+              System Topography
+            </span>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">Modern Event-Driven Technology Stack</h2>
+            <p className="mt-3 max-w-2xl text-sm text-[var(--muted)]">
+              StoreDesk combines local store edge reliability with GCP Cloud Run WebSocket relaying for secure, real-time store monitoring.
+            </p>
+          </div>
+
+          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {techStack.map((tech) => {
+              const Icon = tech.icon;
+              return (
+                <div
+                  key={tech.name}
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-sm transition hover:border-[var(--sd-blue)] hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex rounded-xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] p-2.5 text-white shadow-sm">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-bold text-[var(--sd-blue)] ring-1 ring-[var(--border)]">
+                      {tech.badge}
+                    </span>
+                  </div>
+                  <h3 className="mt-4 text-base font-bold text-[var(--foreground)]">{tech.name}</h3>
+                  <p className="text-xs font-semibold text-[var(--sd-blue)]">{tech.role}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--muted)]">{tech.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       <section className="border-t border-[var(--border)] sd-section-green py-16">
         <div className="mx-auto max-w-6xl px-6">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">What you run</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Four simple tools. One complete store system.</h2>
-          <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold text-[var(--muted)]">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-[var(--border)]">
-              <Server className="h-4 w-4 text-[var(--sd-blue)]" /> Store Engine
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-[var(--border)]">
-              <Laptop className="h-4 w-4 text-[var(--sd-blue)]" /> Desktop Dashboard
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-[var(--border)]">
-              <Smartphone className="h-4 w-4 text-[var(--sd-blue)]" /> Mobile App
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-[var(--border)]">
-              <HardDrive className="h-4 w-4 text-[var(--sd-green)]" /> Store Computer
-            </span>
-          </div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">Architecture Overview</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Four interconnected modules. One store system.</h2>
         </div>
         <div className="mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-4 md:mx-auto md:max-w-6xl">
           {pillars.map((p, i) => (
@@ -205,44 +345,6 @@ export function LandingPage() {
             </motion.article>
           ))}
         </div>
-        <div className="mx-auto mt-8 max-w-6xl px-6">
-          <Link href="/product" className="text-sm font-bold text-[var(--sd-blue)] hover:underline">
-            Full product features →
-          </Link>
-        </div>
-      </section>
-
-      <section className="border-t border-[var(--border)] bg-gradient-to-b from-white via-slate-50 to-[#eef4ff] py-20">
-        <div className="mx-auto max-w-6xl px-6 text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">StoreDesk Mobile</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Designed for speed on the store floor</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[var(--muted)]">
-            Scan barcodes, check best vendor prices, inspect sales tax analytics, and verify register transactions directly from your phone.
-          </p>
-        </div>
-        <div className="mt-12 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-6 md:justify-center">
-          {mobileScreenshots.map((screen, idx) => (
-            <motion.div
-              key={screen.src}
-              className="group relative w-[220px] shrink-0 snap-center rounded-3xl border-4 border-slate-900 bg-slate-900 shadow-xl transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/20"
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.08 }}
-            >
-              <div className="relative overflow-hidden rounded-[1.3rem] bg-black">
-                <Image
-                  src={screen.src}
-                  alt={screen.alt}
-                  width={440}
-                  height={900}
-                  className="h-auto w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-              </div>
-              <p className="mt-2 px-2 pb-2 text-center text-xs font-semibold text-white/90">{screen.alt}</p>
-            </motion.div>
-          ))}
-        </div>
       </section>
 
       <section ref={parallaxRef} className="relative overflow-hidden border-t border-[var(--border)] sd-section-mix py-24">
@@ -258,7 +360,7 @@ export function LandingPage() {
         <div className="relative mx-auto max-w-3xl rounded-3xl border border-white/60 bg-white/70 px-8 py-10 text-center shadow-lg shadow-blue-500/10 backdrop-blur-sm">
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Not an inventory system.</h2>
           <p className="mt-5 text-lg leading-relaxed text-[var(--muted)]">
-            No inventory counts. No stock tracking. No complicated warehouse setups. StoreDesk is built purely for pricing, vendors, costs, and store management.
+            No stock quantity limits. No inventory count tracking. No warehouse locations. StoreDesk is built exclusively for price book management, vendor cost overlays, and margin transparency.
           </p>
         </div>
       </section>
@@ -285,9 +387,6 @@ export function LandingPage() {
               </motion.li>
             ))}
           </ol>
-          <Link href="/how-it-works" className="mt-8 inline-block text-sm font-bold text-[var(--sd-blue)]">
-            Full walkthrough →
-          </Link>
         </div>
       </section>
 
@@ -302,7 +401,7 @@ export function LandingPage() {
           />
           <h2 className="mt-6 text-3xl font-bold tracking-tight">Ready to set up your store?</h2>
           <p className="mt-4 text-[var(--muted)]">
-            Get in touch to bring StoreDesk to your store computer and mobile phones. Email{" "}
+            Get in touch to bring StoreDesk to your store back-office computer and devices. Email{" "}
             <a className="font-semibold text-[var(--sd-blue)] underline" href={contactMailto()}>
               {SITE.email}
             </a>
