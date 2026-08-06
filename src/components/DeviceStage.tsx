@@ -20,8 +20,8 @@ export function LaptopMock() {
             <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-            <div className="ml-2 flex h-6 flex-1 items-center rounded-md bg-white px-2.5 text-[10px] text-[var(--muted)] ring-1 ring-[var(--border)]">
-              localhost:4310 · Price Book
+            <div className="ml-2 flex h-6 flex-1 items-center rounded-md bg-white px-2.5 text-[10px] font-medium text-[var(--muted)] ring-1 ring-[var(--border)]">
+              StoreDesk · Price Book Dashboard
             </div>
           </div>
 
@@ -36,10 +36,10 @@ export function LaptopMock() {
               />
               {[
                 { l: "Price Book", on: true },
-                { l: "Cost", on: false },
+                { l: "Cost Analysis", on: false },
                 { l: "Reports", on: false },
                 { l: "Invoices", on: false },
-                { l: "Mobile", on: false }
+                { l: "Mobile Access", on: false }
               ].map((item) => (
                 <div
                   key={item.l}
@@ -55,8 +55,8 @@ export function LaptopMock() {
             <div className="flex flex-col gap-2.5 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-[11px] font-bold text-[var(--foreground)]">Price Book</div>
-                  <div className="text-[9px] text-[var(--muted)]">Live Commander · vendor costs</div>
+                  <div className="text-[11px] font-bold text-[var(--foreground)]">Price Book & Costs</div>
+                  <div className="text-[9px] text-[var(--muted)]">Live Register · Wholesale Vendor Costs</div>
                 </div>
                 <div className="rounded-md bg-[var(--sd-blue)] px-2.5 py-1 text-[9px] font-bold text-white">Refresh</div>
               </div>
@@ -73,15 +73,15 @@ export function LaptopMock() {
               <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-white">
                 <div className="grid grid-cols-[1.4fr_0.55fr_0.7fr_0.55fr] gap-1 border-b border-[var(--border)] bg-slate-50 px-2 py-1.5 text-[8px] font-bold uppercase tracking-wide text-[var(--muted)]">
                   <span>Item</span>
-                  <span>Sell</span>
-                  <span>Best vendor</span>
+                  <span>Retail</span>
+                  <span>Best Vendor</span>
                   <span>Cost</span>
                 </div>
                 {[
                   ["Coca-Cola 12pk 12oz", "$12.99", "Costco", "$8.99"],
                   ["Red Bull 24pk 8.4oz", "$54.99", "Costco", "$38.99"],
-                  ["Marlboro Gold carton", "$89.99", "Local", "$72.40"],
-                  ["Doritos Nacho 9.25oz", "$5.49", "Sams", "$3.80"]
+                  ["Marlboro Gold carton", "$89.99", "Local Distributor", "$72.40"],
+                  ["Doritos Nacho 9.25oz", "$5.49", "Sam's Club", "$3.80"]
                 ].map(([name, sell, vendor, cost]) => (
                   <div
                     key={name}
@@ -140,17 +140,17 @@ export function PhoneMock() {
               />
               <div>
                 <div className="text-[10px] font-bold leading-tight text-[var(--foreground)]">StoreDesk Mobile</div>
-                <div className="text-[8px] text-[var(--sd-green)]">Connected · Worker</div>
+                <div className="text-[8px] text-[var(--sd-green)]">Store Connected</div>
               </div>
             </div>
 
             <div className="rounded-2xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] p-3 text-white shadow-md">
-              <div className="text-[8px] uppercase tracking-wider text-white/80">Scan result</div>
+              <div className="text-[8px] uppercase tracking-wider text-white/80">Scan Result</div>
               <div className="mt-0.5 text-[12px] font-bold">Coca-Cola</div>
               <div className="text-[9px] text-white/85">12 Pack · 12 oz cans</div>
               <div className="mt-2.5 flex items-end justify-between">
                 <div>
-                  <div className="text-[8px] uppercase tracking-wider text-white/75">Best vendor</div>
+                  <div className="text-[8px] uppercase tracking-wider text-white/75">Best Vendor</div>
                   <div className="text-[13px] font-extrabold leading-tight">Costco</div>
                 </div>
                 <div className="text-right">
@@ -172,7 +172,7 @@ export function PhoneMock() {
             </div>
 
             <div className="rounded-xl bg-[var(--sd-blue)] py-2 text-center text-[10px] font-bold text-white">
-              Scan barcode
+              Scan Barcode
             </div>
           </div>
         </div>

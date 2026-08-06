@@ -15,58 +15,58 @@ import {
 } from "lucide-react";
 
 const ARCH = `flowchart TB
-  subgraph Backoffice["Backoffice PC"]
-    WORK["StoreDesk Worker<br/>:4310 backend"]
-    DESK["StoreDesk Desktop<br/>Electron"]
-    MONGO[("Local database")]
-    CMD["Verifone<br/>Commander"]
-    DESK --> WORK
-    WORK --> MONGO
-    WORK --> CMD
+  subgraph StorePC["Store Computer"]
+    ENGINE["StoreDesk Engine<br/>Store Back Office"]
+    DESK["StoreDesk Desktop<br/>Admin App"]
+    RECORDS[("Store Records")]
+    REGISTER["Cash Register<br/>Point of Sale"]
+    DESK --> ENGINE
+    ENGINE --> RECORDS
+    ENGINE --> REGISTER
   end
 
-  MOB["StoreDesk Mobile<br/>phone on store Wi‑Fi"]
-  MOB -->|LAN → Worker| WORK`;
+  MOB["StoreDesk Mobile<br/>Floor Phones (Store Wi‑Fi)"]
+  MOB -->|Store Wi‑Fi| ENGINE`;
 
 const steps = [
   {
-    title: "Run Worker on the backoffice PC",
-    detail: "Worker is your local backend on port 4310. Desktop and Mobile connect here.",
+    title: "Install Store Engine",
+    detail: "Runs quietly on your store computer to keep your store pricing and vendor records local and fast.",
     icon: Download
   },
   {
-    title: "Run StoreDesk Desktop",
-    detail: "Electron connects to Worker for Price Book, Cost Analysis, POS Reports, invoices, and vendors.",
+    title: "Launch StoreDesk Desktop",
+    detail: "Use the desktop dashboard for price books, supplier cost comparisons, sales reports, and invoice reviews.",
     icon: Laptop
   },
   {
-    title: "Connect to Verifone Commander",
-    detail: "Live PLUs and Ruby reports stay on the store network — Worker talks to Commander; phones never do.",
+    title: "Connect Cash Register",
+    detail: "Live register prices stay securely on your store network for maximum speed and data privacy.",
     icon: MonitorSmartphone
   },
   {
-    title: "Sign in & Connect StoreDesk Mobile",
-    detail: "Sign in with your Organization AppUser, join store Wi‑Fi, and connect directly to the backoffice PC’s Worker API.",
+    title: "Sign In on StoreDesk Mobile",
+    detail: "Store staff sign in with secure accounts and connect over store Wi-Fi to scan shelf barcodes anywhere.",
     icon: Smartphone
   },
   {
-    title: "Invoice → review → price",
-    detail: "Extracted lines are never auto-saved as vendor prices. Humans confirm first.",
+    title: "Review Invoices & Set Prices",
+    detail: "Extracted invoice line items are reviewed by store management before updating vendor cost history and selling prices.",
     icon: ShieldCheck
   }
 ];
 
 export default function HowItWorksPage() {
   return (
-    <MarketingShell eyebrow="How it works" title="What runs on your backoffice PC">
+    <MarketingShell eyebrow="How it works" title="How StoreDesk powers your store">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="inline-flex rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] p-2.5 text-white shadow-md">
             <HardDrive className="h-6 w-6" />
           </span>
           <div>
-            <p className="text-sm font-bold">Your store. Your PC.</p>
-            <p className="text-xs text-[var(--muted)]">Worker + Desktop + Mobile + local backend</p>
+            <p className="text-sm font-bold">Your Store. Your Computer.</p>
+            <p className="text-xs text-[var(--muted)]">Store Engine + Desktop Dashboard + Mobile App</p>
           </div>
         </div>
         <VerifoneBadge />
@@ -74,10 +74,10 @@ export default function HowItWorksPage() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { icon: Server, label: "Worker", sub: "Backend · :4310" },
-          { icon: Laptop, label: "Desktop", sub: "Electron app" },
-          { icon: Smartphone, label: "Mobile", sub: "Floor scanning" },
-          { icon: HardDrive, label: "Backend", sub: "Local on PC" }
+          { icon: Server, label: "Store Engine", sub: "Back-office core" },
+          { icon: Laptop, label: "Desktop Dashboard", sub: "Admin manager" },
+          { icon: Smartphone, label: "Mobile App", sub: "Floor scanner" },
+          { icon: HardDrive, label: "Store Computer", sub: "Local & private" }
         ].map((card) => {
           const Icon = card.icon;
           return (
@@ -95,9 +95,9 @@ export default function HowItWorksPage() {
         })}
       </div>
 
-      <h2 className="mt-12 text-xl font-bold">System map</h2>
+      <h2 className="mt-12 text-xl font-bold">System Map</h2>
       <p className="mt-1 text-sm text-[var(--muted)]">
-        Everything clients care about lives on the backoffice PC. Mobile reaches Worker over Wi‑Fi only.
+        Your price catalog and store records remain securely on your store computer. Mobile devices connect over your store Wi‑Fi.
       </p>
       <div className="mt-4">
         <MermaidDiagram chart={ARCH} />

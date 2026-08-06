@@ -12,43 +12,43 @@ import { HardDrive, Laptop, Server, Smartphone } from "lucide-react";
 
 const pillars = [
   {
-    title: "StoreDesk Worker",
-    body: "Runs on the backoffice PC as the local backend on port 4310 — Desktop and Mobile connect here."
+    title: "Store Engine",
+    body: "Runs quietly on your store back-office computer to keep prices and store records private and fast."
   },
   {
     title: "StoreDesk Desktop",
-    body: "Electron app for Price Book, Cost Analysis, POS Reports, invoice review, vendors, and price comparison."
+    body: "Admin dashboard to manage vendor price lists, compare supplier costs, review invoices, and set shelf prices."
   },
   {
     title: "StoreDesk Mobile",
-    body: "Scan barcodes, search products, see best vendor cost and suggested sell, upload invoices on store Wi‑Fi."
+    body: "Floor app for scanning barcodes, searching items, viewing best supplier costs, and checking margin suggestions on the go."
   },
   {
-    title: "Local backend",
-    body: "Catalog and Commander access stay on the store PC. Phones talk only to Worker — never to the database."
+    title: "Local & Private",
+    body: "Store records stay securely on your store computer, ensuring your price book is always accessible even if internet drops."
   }
 ];
 
 const steps = [
   {
     n: "01",
-    title: "Run Worker on the backoffice PC",
-    body: "Start StoreDesk Worker locally (port 4000/4310). It is the edge backend for Desktop, Mobile, and Commander reads."
+    title: "Install StoreDesk",
+    body: "Set up StoreDesk on your store computer in minutes."
   },
   {
     n: "02",
-    title: "Sign in with Organization AppUser",
-    body: "Desktop and Mobile sign in using secure AppUser credentials provisioned when your store license is created."
+    title: "Create Store Accounts",
+    body: "Provide your store staff secure user logins to access store pricing."
   },
   {
     n: "03",
-    title: "Connect StoreDesk Mobile",
-    body: "Join the store Wi-Fi network and connect StoreDesk Mobile directly to the backoffice PC's local IP address."
+    title: "Open StoreDesk Mobile",
+    body: "Scan shelf barcodes anywhere in the store using your phone."
   },
   {
     n: "04",
-    title: "Operate daily",
-    body: "Scan barcodes, compare vendor costs, view true per-unit margins, and save confirmed prices."
+    title: "Compare & Set Prices",
+    body: "Instantly compare supplier prices and set profitable register prices."
   }
 ];
 
@@ -58,7 +58,7 @@ const mobileScreenshots = [
   { src: "/screenshots/mobile-app-3.jpeg", alt: "Product Details & Price Comparison" },
   { src: "/screenshots/mobile-app-4.jpeg", alt: "Vendor Prices & Cost Breakdown" },
   { src: "/screenshots/mobile-app-5.jpeg", alt: "Sales Tax & Analytics" },
-  { src: "/screenshots/mobile-app-6.jpeg", alt: "Transaction & Commander Sync" }
+  { src: "/screenshots/mobile-app-6.jpeg", alt: "Transaction & Register Sync" }
 ];
 
 export function LandingPage() {
@@ -78,7 +78,7 @@ export function LandingPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              Convenience · Gas · C-store ops
+              Convenience · Gas · C-store operations
             </motion.p>
             <motion.h1
               className="text-4xl font-bold tracking-tight text-[var(--foreground)] sm:text-5xl lg:text-[3.25rem] lg:leading-[1.1]"
@@ -86,7 +86,7 @@ export function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
             >
-              Built for the counter — not the warehouse
+              Built for store operators — not warehouse inventory
             </motion.h1>
             <motion.p
               className="mt-5 max-w-md text-lg leading-relaxed text-[var(--muted)]"
@@ -94,8 +94,7 @@ export function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              Install Worker on the backoffice PC, run Desktop and Mobile against that local backend. Price Book, vendor
-              costs, POS reports, and invoice review for stores on Verifone Commander.
+              Manage vendor pricing, compare wholesale costs, calculate shelf prices, and look up register items instantly from your store computer and mobile phones.
             </motion.p>
             <motion.div
               className="mt-5 flex flex-wrap items-center gap-3"
@@ -106,7 +105,7 @@ export function LandingPage() {
               <VerifoneBadge />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-white/90 px-3 py-2 text-xs font-semibold text-[var(--muted)] shadow-sm">
                 <HardDrive className="h-3.5 w-3.5 text-[var(--sd-green)]" />
-                Backoffice PC · local Worker
+                Back-office PC · Instant Access
               </span>
             </motion.div>
             <motion.div
@@ -137,23 +136,23 @@ export function LandingPage() {
         <div className="mx-auto grid max-w-6xl md:grid-cols-[280px_1fr]">
           <div className="hidden md:block">
             <div className="sticky top-24 px-6 py-24">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">The idea</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">The Purpose</p>
               <h2 className="mt-3 text-3xl font-bold tracking-tight">Why StoreDesk exists</h2>
             </div>
           </div>
           <div className="space-y-16 px-6 py-16 md:border-l md:border-[var(--border)] md:px-12 md:py-20">
             {[
               {
-                t: "C-stores drown in spreadsheets",
-                b: "Sell prices live in Commander. Costs live in invoices. Staff guess margins on the floor. StoreDesk connects those worlds without becoming another inventory-count app."
+                t: "Never lose margin to rising supplier costs",
+                b: "Retail prices live on your cash register while wholesale costs live in vendor invoices. StoreDesk connects those two worlds so your profit margins are clear."
               },
               {
-                t: "Your backoffice PC is the hub",
-                b: "Worker runs once on the office machine. Desktop and phones talk to that local backend — your catalog and Commander link stay in the store."
+                t: "Your store computer is the hub",
+                b: "Manage everything directly from your store computer with mobile phones connected seamlessly over store Wi-Fi."
               },
               {
-                t: "Mobile has to be fast",
-                b: "StoreDesk Mobile is for scanning and answers: best vendor, per-unit cost, suggested sell. Not for typing novels into a tablet."
+                t: "Fast floor scanning",
+                b: "StoreDesk Mobile is built for floor scanning and instant answers: best supplier, cost per item, and suggested retail price."
               }
             ].map((block, i) => (
               <motion.article
@@ -174,19 +173,19 @@ export function LandingPage() {
       <section className="border-t border-[var(--border)] sd-section-green py-16">
         <div className="mx-auto max-w-6xl px-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">What you run</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Four pieces. One store system.</h2>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Four simple tools. One complete store system.</h2>
           <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold text-[var(--muted)]">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-[var(--border)]">
-              <Server className="h-4 w-4 text-[var(--sd-blue)]" /> Worker
+              <Server className="h-4 w-4 text-[var(--sd-blue)]" /> Store Engine
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-[var(--border)]">
-              <Laptop className="h-4 w-4 text-[var(--sd-blue)]" /> Desktop
+              <Laptop className="h-4 w-4 text-[var(--sd-blue)]" /> Desktop Dashboard
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-[var(--border)]">
-              <Smartphone className="h-4 w-4 text-[var(--sd-blue)]" /> Mobile
+              <Smartphone className="h-4 w-4 text-[var(--sd-blue)]" /> Mobile App
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm ring-1 ring-[var(--border)]">
-              <HardDrive className="h-4 w-4 text-[var(--sd-green)]" /> Local backend
+              <HardDrive className="h-4 w-4 text-[var(--sd-green)]" /> Store Computer
             </span>
           </div>
         </div>
@@ -208,7 +207,7 @@ export function LandingPage() {
         </div>
         <div className="mx-auto mt-8 max-w-6xl px-6">
           <Link href="/product" className="text-sm font-bold text-[var(--sd-blue)] hover:underline">
-            Full product tour →
+            Full product features →
           </Link>
         </div>
       </section>
@@ -218,7 +217,7 @@ export function LandingPage() {
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">StoreDesk Mobile</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Designed for speed on the store floor</h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-[var(--muted)]">
-            Scan barcodes, check best vendor prices, inspect sales tax analytics, and verify Commander transactions directly from your phone.
+            Scan barcodes, check best vendor prices, inspect sales tax analytics, and verify register transactions directly from your phone.
           </p>
         </div>
         <div className="mt-12 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-6 md:justify-center">
@@ -259,8 +258,7 @@ export function LandingPage() {
         <div className="relative mx-auto max-w-3xl rounded-3xl border border-white/60 bg-white/70 px-8 py-10 text-center shadow-lg shadow-blue-500/10 backdrop-blur-sm">
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Not an inventory system.</h2>
           <p className="mt-5 text-lg leading-relaxed text-[var(--muted)]">
-            No on-hand counts. No reorder alerts. No warehouse bins. StoreDesk is for prices, vendors, invoices, and the
-            people standing at the register.
+            No inventory counts. No stock tracking. No complicated warehouse setups. StoreDesk is built purely for pricing, vendors, costs, and store management.
           </p>
         </div>
       </section>
@@ -268,7 +266,7 @@ export function LandingPage() {
       <section className="border-t border-[var(--border)] sd-section-blue px-6 py-20">
         <div className="mx-auto max-w-6xl">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-green)]">How it works</p>
-          <h2 className="mt-2 text-3xl font-bold">From install to daily ops</h2>
+          <h2 className="mt-2 text-3xl font-bold">From setup to daily operations</h2>
           <ol className="mt-12 grid gap-5 md:grid-cols-2">
             {steps.map((s, i) => (
               <motion.li
@@ -288,7 +286,7 @@ export function LandingPage() {
             ))}
           </ol>
           <Link href="/how-it-works" className="mt-8 inline-block text-sm font-bold text-[var(--sd-blue)]">
-            Deeper walkthrough →
+            Full walkthrough →
           </Link>
         </div>
       </section>
@@ -302,9 +300,9 @@ export function LandingPage() {
             height={42}
             className="mx-auto h-10 w-auto object-contain"
           />
-          <h2 className="mt-6 text-3xl font-bold tracking-tight">Ready to set up a store?</h2>
+          <h2 className="mt-6 text-3xl font-bold tracking-tight">Ready to set up your store?</h2>
           <p className="mt-4 text-[var(--muted)]">
-            Ask us about Worker install, Desktop, and Mobile for your backoffice PC. Email{" "}
+            Get in touch to bring StoreDesk to your store computer and mobile phones. Email{" "}
             <a className="font-semibold text-[var(--sd-blue)] underline" href={contactMailto()}>
               {SITE.email}
             </a>

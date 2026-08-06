@@ -14,20 +14,20 @@ import {
   ResponsiveContainer,
   Tooltip
 } from "recharts";
-import { GitBranch, HeartHandshake, Lock, Scale, Sparkles, Users } from "lucide-react";
+import { HeartHandshake, Lock, Scale, Sparkles, Users } from "lucide-react";
 
 const PRINCIPLES = [
-  { subject: "Backoffice", score: 98 },
-  { subject: "Review first", score: 92 },
-  { subject: "No stock qty", score: 100 },
-  { subject: "Mobile speed", score: 88 },
-  { subject: "Local Worker", score: 96 },
-  { subject: "Commander", score: 90 }
+  { subject: "Store Computer", score: 98 },
+  { subject: "Review First", score: 92 },
+  { subject: "No Stock Counts", score: 100 },
+  { subject: "Mobile Speed", score: 88 },
+  { subject: "Store Engine", score: 96 },
+  { subject: "Register Sync", score: 90 }
 ];
 
 export default function AboutPage() {
   return (
-    <MarketingShell eyebrow="About" title="Why we built StoreDesk — and who ships it">
+    <MarketingShell eyebrow="About" title="Why we built StoreDesk — for convenience store operators">
       <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-8">
           <motion.section
@@ -37,16 +37,14 @@ export default function AboutPage() {
           >
             <div className="mb-3 flex items-center gap-2 text-[var(--sd-blue)]">
               <Sparkles className="h-5 w-5" />
-              <h2 className="text-lg font-bold text-[var(--foreground)]">Why it was built</h2>
+              <h2 className="text-lg font-bold text-[var(--foreground)]">Why StoreDesk was built</h2>
             </div>
             <p className="text-[var(--muted)] leading-relaxed">
-              Convenience stores already have a POS brain (often Verifone Commander) and a pile of vendor invoices. What
-              they lack is a calm place to reconcile sell price, vendor cost, and mobile lookup — without pretending to
-              be an inventory ERP.
+              Convenience store owners deal with thousands of items, rising supplier prices, and stacks of paper invoices. 
+              What they need is a clear system to track cost truth, calculate proper selling prices, and scan barcodes on the floor — without complex warehouse software.
             </p>
             <p className="mt-4 text-[var(--muted)] leading-relaxed">
-              StoreDesk is what you run on the backoffice PC: Worker (local backend), Electron desktop for daily ops,
-              and StoreDesk Mobile on the floor — all talking to that same store machine.
+              StoreDesk runs on your store computer with a desktop dashboard for management and a fast mobile app for floor staff — keeping all your pricing data fast, local, and accurate.
             </p>
             <div className="mt-5">
               <VerifoneBadge />
@@ -61,32 +59,24 @@ export default function AboutPage() {
           >
             <div className="mb-3 flex items-center gap-2 text-[var(--sd-green)]">
               <Users className="h-5 w-5" />
-              <h2 className="text-lg font-bold text-[var(--foreground)]">Who builds it</h2>
+              <h2 className="text-lg font-bold text-[var(--foreground)]">Get in touch</h2>
             </div>
             <p className="text-[var(--muted)] leading-relaxed">
-              Built by the <strong className="text-[var(--foreground)]">storedesk-dev</strong> team — operators and
-              engineers who care about c-store workflows more than generic SaaS dashboards.
+              Built by convenience store operations specialists who understand retail pricing, vendor invoices, and register management.
             </p>
             <a href={contactMailto()} className="mt-4 inline-flex items-center gap-2 font-semibold text-[var(--sd-blue)] hover:underline">
               <HeartHandshake className="h-4 w-4" />
               {SITE.email}
             </a>
-            <p className="mt-4 flex items-center gap-2 text-sm text-[var(--muted)]">
-              <GitBranch className="h-4 w-4" />
-              Open source components on{" "}
-              <a href={SITE.github} className="underline">
-                GitHub
-              </a>
-            </p>
           </motion.section>
         </div>
 
         <div className="rounded-2xl border border-[var(--border)] bg-white/95 p-5 shadow-md">
           <div className="mb-2 flex items-center gap-2">
             <Scale className="h-5 w-5 text-[var(--sd-blue)]" />
-            <h2 className="font-bold">Principle radar</h2>
+            <h2 className="font-bold">Product Principles</h2>
           </div>
-          <p className="mb-4 text-xs text-[var(--muted)]">How hard we lean into each product rule (illustrative).</p>
+          <p className="mb-4 text-xs text-[var(--muted)]">Our core focus areas for store operations.</p>
           <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={PRINCIPLES} cx="50%" cy="50%" outerRadius="70%">
@@ -100,16 +90,16 @@ export default function AboutPage() {
           </div>
           <ul className="mt-2 space-y-2 text-sm text-[var(--muted)]">
             <li className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-[var(--sd-green)]" /> Worker + data stay on the store PC
+              <Lock className="h-4 w-4 text-[var(--sd-green)]" /> All store records stay securely on your computer
             </li>
             <li className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-[var(--sd-blue)]" /> Invoice review before VendorPrice
+              <Lock className="h-4 w-4 text-[var(--sd-blue)]" /> Human review of vendor invoices before updating prices
             </li>
-            <li className="flex items-center gap-2">No stock quantity features</li>
-            <li className="flex items-center gap-2">Phone talks only to Worker — never the DB</li>
+            <li className="flex items-center gap-2">No stock count clutter or warehouse tracking</li>
+            <li className="flex items-center gap-2">Fast barcode scanning for floor staff</li>
           </ul>
           <Link href="/how-it-works" className="mt-6 inline-block text-sm font-bold text-[var(--sd-blue)]">
-            See the architecture →
+            See how it works →
           </Link>
         </div>
       </div>
