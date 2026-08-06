@@ -17,7 +17,10 @@ import {
   Sparkles,
   TrendingUp,
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  ShieldCheck,
+  Zap,
+  BarChart3
 } from "lucide-react";
 
 /** Rotating words for hero focus pill */
@@ -204,7 +207,6 @@ export function LandingPage() {
 
       {/* 2. HERO SECTION - Rich Polished Background Mesh */}
       <section className="relative overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-100/60 via-[#F8FAFC] to-white pb-20 pt-10">
-        {/* Decorative Grid Overlay for Depth */}
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#0b1f4d08_1px,transparent_1px),linear-gradient(to_bottom,#0b1f4d08_1px,transparent_1px)] bg-[size:24px_24px]" />
 
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 lg:grid-cols-2 lg:pb-12">
@@ -236,7 +238,7 @@ export function LandingPage() {
             </motion.h1>
 
             <motion.p
-              className="mt-5 max-w-md text-base leading-relaxed text-slate-600 sm:text-lg"
+              className="mt-5 max-w-md text-base leading-relaxed text-slate-700 font-medium sm:text-lg"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
@@ -244,7 +246,7 @@ export function LandingPage() {
               Manage vendor pricing, compare wholesale costs, calculate shelf prices, and inspect register transactions in real-time from your back-office computer and store devices.
             </motion.p>
 
-            {/* Dynamic Focus Feature Pill (Fixed Height to prevent any layout shift) */}
+            {/* Dynamic Focus Feature Pill */}
             <motion.div
               className="mt-4 flex h-8 items-center gap-2 text-xs font-bold text-[#00B36B]"
               initial={{ opacity: 0 }}
@@ -260,7 +262,7 @@ export function LandingPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute inset-0 truncate"
+                    className="absolute inset-0 truncate font-semibold text-slate-900"
                   >
                     {FLIP_WORDS[flipIndex]}
                   </motion.span>
@@ -270,13 +272,13 @@ export function LandingPage() {
 
             {/* Live Ticker Metric Spotlight */}
             <motion.div
-              className="mt-4 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white/90 px-3.5 py-2 shadow-sm backdrop-blur-sm"
+              className="mt-4 inline-flex items-center gap-3 rounded-xl border border-slate-300 bg-white/90 px-3.5 py-2 shadow-sm backdrop-blur-sm"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12 }}
             >
               <TrendingUp className="h-4 w-4 text-[#00B36B]" />
-              <span className="text-xs font-semibold text-slate-700">
+              <span className="text-xs font-bold text-slate-900">
                 Live Net Shift Sync: <AnimatedCounter value={356.2} />
               </span>
             </motion.div>
@@ -289,13 +291,13 @@ export function LandingPage() {
               transition={{ delay: 0.13 }}
             >
               <VerifoneBadge />
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-900 shadow-sm">
                 <HardDrive className="h-3.5 w-3.5 text-[#00B36B]" />
                 Back-office PC - Real-time Relay
               </span>
             </motion.div>
 
-            {/* Action Row with Tactile Feedback */}
+            {/* Action Row */}
             <motion.div
               className="mt-8 flex flex-wrap gap-3.5"
               initial={{ opacity: 0, y: 12 }}
@@ -328,57 +330,72 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 3. CORE PURPOSE (Solid Navy #0B1F4D) - Sticky Scrollytelling Layout */}
+      {/* 3. CORE PURPOSE (High-Contrast Solid Navy #0B1F4D) */}
       <section className="bg-[#0B1F4D] py-24 text-white">
-        <div className="mx-auto grid max-w-6xl md:grid-cols-[30%_70%]">
-          {/* Left Column - 30% Sticky Scrollytelling */}
+        <div className="mx-auto grid max-w-6xl md:grid-cols-[32%_68%]">
+          {/* Left Column - 32% Sticky Scrollytelling */}
           <div className="px-6 pb-8 md:pb-0">
             <div className="sticky top-28">
-              <div className="mb-2 h-1.5 w-12 rounded-full bg-[#00B36B] shadow-[0_0_10px_#00B36B]" />
-              <h2 className="text-3xl font-extrabold tracking-tight text-white">Why StoreDesk exists</h2>
-              <p className="mt-3 text-sm text-slate-300">
+              <div className="mb-3 h-1.5 w-14 rounded-full bg-[#00B36B] shadow-[0_0_12px_#00B36B]" />
+              <h2 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">Why StoreDesk exists</h2>
+              <p className="mt-3 text-sm font-medium leading-relaxed text-slate-200">
                 Read-only Price Book reference and margin overlays built specifically for convenience stores and gas stations.
               </p>
             </div>
           </div>
 
-          {/* Right Column - 70% Feature Blocks */}
-          <div className="space-y-12 px-6 md:border-l md:border-white/15 md:pl-12">
+          {/* Right Column - 68% High-Contrast Feature Cards */}
+          <div className="space-y-8 px-6 md:border-l md:border-white/20 md:pl-10">
             <motion.article
-              initial={{ opacity: 0.35, y: 20 }}
+              initial={{ opacity: 1, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.6 }}
-              transition={{ duration: 0.4 }}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition duration-300 hover:border-[#00B36B]/50 hover:bg-white/10"
+              viewport={{ once: true }}
+              transition={{ duration: 0.3 }}
+              className="rounded-2xl border border-white/20 bg-slate-900/80 p-7 shadow-xl backdrop-blur-md transition duration-300 hover:border-[#00B36B] hover:bg-slate-900"
             >
-              <h3 className="text-2xl font-bold text-white">Protect profit margins against rising costs</h3>
-              <p className="mt-3 text-base leading-relaxed text-slate-300">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00B36B] text-white font-bold shadow-md">
+                  <ShieldCheck className="h-5 w-5" />
+                </span>
+                <h3 className="text-xl font-extrabold text-white sm:text-2xl">Protect profit margins against rising costs</h3>
+              </div>
+              <p className="mt-4 text-base font-normal leading-relaxed text-slate-100">
                 Retail prices live on your cash register while wholesale costs live in vendor invoices. StoreDesk connects those two worlds so true per-unit profit margins are transparent before changing shelf labels.
               </p>
             </motion.article>
 
             <motion.article
-              initial={{ opacity: 0.35, y: 20 }}
+              initial={{ opacity: 1, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.6 }}
-              transition={{ duration: 0.4 }}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition duration-300 hover:border-[#00B36B]/50 hover:bg-white/10"
+              viewport={{ once: true }}
+              transition={{ duration: 0.3, delay: 0.05 }}
+              className="rounded-2xl border border-white/20 bg-slate-900/80 p-7 shadow-xl backdrop-blur-md transition duration-300 hover:border-[#00B36B] hover:bg-slate-900"
             >
-              <h3 className="text-2xl font-bold text-white">Read-only POS register integration</h3>
-              <p className="mt-3 text-base leading-relaxed text-slate-300">
-                Integrates safely with Verifone Commander via read-only register streams (<code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-[#00B36B]">vPLUs</code>, <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-[#00B36B]">vrubyrept</code>, <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-[#00B36B]">vtransset</code>). Zero risk to register configurations or cash register performance.
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1D4ED8] text-white font-bold shadow-md">
+                  <Zap className="h-5 w-5" />
+                </span>
+                <h3 className="text-xl font-extrabold text-white sm:text-2xl">Read-only POS register integration</h3>
+              </div>
+              <p className="mt-4 text-base font-normal leading-relaxed text-slate-100">
+                Integrates safely with Verifone Commander via read-only register streams (<code className="rounded bg-[#00B36B]/20 px-2 py-0.5 font-mono text-xs font-bold text-[#00FF95] border border-[#00B36B]/40">vPLUs</code>, <code className="rounded bg-[#00B36B]/20 px-2 py-0.5 font-mono text-xs font-bold text-[#00FF95] border border-[#00B36B]/40">vrubyrept</code>, <code className="rounded bg-[#00B36B]/20 px-2 py-0.5 font-mono text-xs font-bold text-[#00FF95] border border-[#00B36B]/40">vtransset</code>). Zero risk to register configurations or cash register performance.
               </p>
             </motion.article>
 
             <motion.article
-              initial={{ opacity: 0.35, y: 20 }}
+              initial={{ opacity: 1, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.6 }}
-              transition={{ duration: 0.4 }}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition duration-300 hover:border-[#00B36B]/50 hover:bg-white/10"
+              viewport={{ once: true }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              className="rounded-2xl border border-white/20 bg-slate-900/80 p-7 shadow-xl backdrop-blur-md transition duration-300 hover:border-[#00B36B] hover:bg-slate-900"
             >
-              <h3 className="text-2xl font-bold text-white">Fast floor access & scan lookup</h3>
-              <p className="mt-3 text-base leading-relaxed text-slate-300">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00B36B] text-white font-bold shadow-md">
+                  <BarChart3 className="h-5 w-5" />
+                </span>
+                <h3 className="text-xl font-extrabold text-white sm:text-2xl">Fast floor access & scan lookup</h3>
+              </div>
+              <p className="mt-4 text-base font-normal leading-relaxed text-slate-100">
                 Scan barcodes anywhere in the store to instantly inspect wholesale cost per item, department tax breakdown, best supplier cost, and suggested retail price.
               </p>
             </motion.article>
@@ -392,8 +409,8 @@ export function LandingPage() {
           <h2 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D] md:text-4xl">
             Designed for speed at the counter & on the floor
           </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-base text-slate-600">
-            Explore the key validated screens of StoreDesk — featuring the core Mobile Login UI, Price Book catalog, and real-time transaction sync.
+          <p className="mx-auto mt-3 max-w-2xl text-base font-medium text-slate-700">
+            Explore the key validated screens of StoreDesk — featuring the core Mobile Sales Tax & Analytics Dashboard, Price Book catalog, and real-time transaction sync.
           </p>
         </div>
 
@@ -411,7 +428,7 @@ export function LandingPage() {
             {[...validatedScreens, ...validatedScreens].map((screen, idx) => (
               <div
                 key={`${screen.title}-${idx}`}
-                className="group relative w-[280px] shrink-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#1D4ED8] hover:shadow-xl"
+                className="group relative w-[280px] shrink-0 rounded-2xl border border-slate-300 bg-white p-3.5 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#1D4ED8] hover:shadow-xl"
               >
                 <div className="relative overflow-hidden rounded-xl bg-slate-900">
                   <Image
@@ -422,16 +439,16 @@ export function LandingPage() {
                     className="h-auto w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                   {/* Glassmorphism Hover Overlay */}
-                  <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 backdrop-blur-[2px]">
+                  <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 backdrop-blur-[2px]">
                     <span className="inline-flex w-fit rounded-full bg-[#00B36B] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
                       {screen.tag}
                     </span>
-                    <span className="mt-1 text-xs font-bold text-white">{screen.title}</span>
+                    <span className="mt-1 text-xs font-extrabold text-white">{screen.title}</span>
                   </div>
                 </div>
                 <div className="p-2.5">
                   <h3 className="text-sm font-bold text-[#0B1F4D]">{screen.title}</h3>
-                  <p className="mt-0.5 text-xs text-slate-500 leading-snug">{screen.desc}</p>
+                  <p className="mt-0.5 text-xs font-medium text-slate-600 leading-snug">{screen.desc}</p>
                 </div>
               </div>
             ))}
@@ -467,16 +484,16 @@ export function LandingPage() {
                   </div>
                   <h3 className="mt-4 text-base font-bold text-[#0B1F4D]">{tech.name}</h3>
                   <p className="text-xs font-semibold text-[#1D4ED8]">{tech.role}</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-600">{tech.desc}</p>
+                  <p className="mt-2 text-xs font-medium leading-relaxed text-slate-700">{tech.desc}</p>
                 </SpotlightCard>
               );
             })}
           </div>
 
           {/* Full Width Callout Box - Notice/Warning Style */}
-          <div className="mx-auto mt-12 max-w-4xl rounded-2xl border border-amber-200 bg-amber-50/90 p-8 text-center shadow-sm">
+          <div className="mx-auto mt-12 max-w-4xl rounded-2xl border border-amber-300 bg-amber-50 p-8 text-center shadow-sm">
             <h3 className="text-2xl font-extrabold text-amber-950">Not an inventory system.</h3>
-            <p className="mt-3 text-sm leading-relaxed text-amber-900/80">
+            <p className="mt-3 text-sm font-medium leading-relaxed text-amber-950/90">
               No stock quantity limits. No inventory count tracking. No warehouse locations. StoreDesk is built exclusively for price book management, vendor cost overlays, and margin transparency.
             </p>
           </div>
@@ -500,7 +517,7 @@ export function LandingPage() {
             {steps.map((s, i) => (
               <motion.div
                 key={s.n}
-                className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#1D4ED8] hover:shadow-md"
+                className="group rounded-2xl border border-slate-300 bg-white p-6 shadow-sm transition hover:border-[#1D4ED8] hover:shadow-md"
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -510,7 +527,7 @@ export function LandingPage() {
                   Step {s.n}
                 </span>
                 <h3 className="mt-3 text-xl font-bold text-[#0B1F4D]">{s.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{s.body}</p>
+                <p className="mt-2 text-sm font-medium leading-relaxed text-slate-700">{s.body}</p>
               </motion.div>
             ))}
           </div>
@@ -526,7 +543,7 @@ export function LandingPage() {
               <Sparkles className="h-6 w-6" />
             </div>
             <h3 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D]">Ready to set up your store?</h3>
-            <p className="mx-auto mt-3 max-w-lg text-sm text-slate-600">
+            <p className="mx-auto mt-3 max-w-lg text-sm font-medium text-slate-700">
               Get in touch to bring StoreDesk to your back-office computer and store devices.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3.5">
@@ -562,10 +579,10 @@ export function LandingPage() {
                 height={40}
                 className="mb-4 h-9 w-auto rounded bg-white p-1 object-contain"
               />
-              <p className="max-w-sm text-xs leading-relaxed text-slate-300">
+              <p className="max-w-sm text-xs font-normal leading-relaxed text-slate-200">
                 Read-only price book management, wholesale vendor cost overlays, and register margin analysis for convenience stores and gas stations.
               </p>
-              <p className="mt-6 text-xs text-slate-400">
+              <p className="mt-6 text-xs text-slate-300">
                 © 2026 StoreDesk. Built for convenience stores & gas stations.
               </p>
             </div>
@@ -573,7 +590,7 @@ export function LandingPage() {
             {/* Center */}
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-[#00B36B]">Explore</h4>
-              <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
+              <ul className="mt-4 space-y-2.5 text-sm text-slate-200">
                 <li>
                   <Link href="/" className="hover:text-white">Home</Link>
                 </li>
@@ -601,7 +618,7 @@ export function LandingPage() {
               >
                 {SITE.email}
               </a>
-              <div className="mt-6 flex gap-4 text-xs text-slate-300">
+              <div className="mt-6 flex gap-4 text-xs text-slate-200">
                 <Link href="/privacy" className="hover:text-white">Privacy Policy</Link>
                 <Link href="/terms" className="hover:text-white">Terms of Service</Link>
               </div>
