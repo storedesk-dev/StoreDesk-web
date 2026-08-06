@@ -1,8 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { MarketingShell } from "@/components/MarketingShell";
 import { VendorCostChart } from "@/components/VendorCostChart";
-import { VerifoneBadge } from "@/components/VerifoneBadge";
 import { motion } from "framer-motion";
 import {
   BarChart3,

@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence, useInView, useMotionValue, useTransform } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { DeviceStage } from "@/components/DeviceStage";
 import { SiteHeader } from "@/components/SiteChrome";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
@@ -13,40 +14,56 @@ import {
   HardDrive,
   Laptop,
   Server,
-  Sparkles
+  Sparkles,
+  TrendingUp,
+  ArrowRight
 } from "lucide-react";
+
+/** Rotating words for hero dynamic flipper */
+const FLIP_WORDS = [
+  "warehouse inventory.",
+  "stock counters.",
+  "generic retail SaaS.",
+  "complex ERPs."
+];
 
 /** 6 Validated App Screens mapped from project wireframes */
 const validatedScreens = [
   {
     src: "/screenshots/mobile-app-1.jpeg",
     title: "StoreDesk Login",
-    desc: "Authentication screen for the desktop & mobile app"
+    desc: "Authentication screen for the desktop & mobile app",
+    tag: "Core UI"
   },
   {
     src: "/screenshots/mobile-app-5.jpeg",
     title: "Sales Tax & Analytics",
-    desc: "Dashboard featuring sales breakdowns & live transaction feed"
+    desc: "Dashboard featuring sales breakdowns & live transaction feed",
+    tag: "Analytics"
   },
   {
     src: "/screenshots/mobile-app-6.jpeg",
     title: "Transaction & Register Sync",
-    desc: "Detailed view of specific transaction line items & subtotal"
+    desc: "Detailed view of specific transaction line items & subtotal",
+    tag: "Live Feed"
   },
   {
     src: "/screenshots/mobile-app-2.jpeg",
     title: "Barcode Scanner & Search",
-    desc: "Price Book catalog with search bar & UPC scan trigger"
+    desc: "Price Book catalog with search bar & UPC scan trigger",
+    tag: "Scan First"
   },
   {
     src: "/screenshots/mobile-app-3.jpeg",
     title: "Product Details & Price Comparison",
-    desc: "Live PLU details showing selling price, dept & tax categories"
+    desc: "Live PLU details showing selling price, dept & tax categories",
+    tag: "Price Book"
   },
   {
     src: "/screenshots/mobile-app-4.jpeg",
     title: "Vendor Prices & Cost Breakdown",
-    desc: "Cost analysis overlay comparing retail vs local vendor costs"
+    desc: "Cost analysis overlay comparing retail vs local vendor costs",
+    tag: "Margin Control"
   }
 ];
 
@@ -104,9 +121,84 @@ const steps = [
   }
 ];
 
-export function LandingPage() {
+/** Animated Number Counter Component */
+function AnimatedCounter({ value, prefix = "$", decimals = 2 }: { value: number; prefix?: string; decimals?: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true });
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (!isInView) return;
+    const start = 0;
+    const duration = 1200; // ms
+    const startTime = performance.now();
+
+    function update(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(start + eased * (value - start));
+
+      if (progress < 1) {
+        requestAnimationFrame(update);
+      }
+    }
+
+    requestAnimationFrame(update);
+  }, [isInView, value]);
+
   return (
-    <div className="min-h-screen bg-white text-[#0B1F4D] antialiased">
+    <span ref={ref} className="font-mono font-bold">
+      {prefix}
+      {displayValue.toFixed(decimals)}
+    </span>
+  );
+}
+
+/** Linear-style Spotlight Card Component */
+function SpotlightCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  function handleMouseMove({ currentTarget, clientX, clientY }: React.MouseEvent) {
+    const { left, top } = currentTarget.getBoundingClientRect();
+    mouseX.set(clientX - left);
+    mouseY.set(clientY - top);
+  }
+
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:border-[#1D4ED8] hover:shadow-md ${className}`}
+      onMouseMove={handleMouseMove}
+    >
+      <motion.div
+        className="pointer-events-none absolute -inset-px rounded-xl opacity-0 transition duration-300 group-hover:opacity-100"
+        style={{
+          background: useTransform(
+            [mouseX, mouseY],
+            ([x, y]) => `radial-gradient(400px circle at ${x}px ${y}px, rgba(0,179,107,0.12), transparent 80%)`
+          )
+        }}
+      />
+      <div className="relative z-10">{children}</div>
+    </div>
+  );
+}
+
+export function LandingPage() {
+  const [flipIndex, setFlipIndex] = useState(0);
+  const [isMarqueePaused, setIsMarqueePaused] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFlipIndex((prev) => (prev + 1) % FLIP_WORDS.length);
+    }, 2800);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-white text-[#0B1F4D] antialiased selection:bg-[#00B36B] selection:text-white">
       {/* 1. HEADER / GLOBAL NAVIGATION */}
       <SiteHeader />
 
@@ -115,21 +207,41 @@ export function LandingPage() {
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 lg:grid-cols-2 lg:pb-12">
           {/* Left Column - 50% */}
           <div>
-            <motion.p
-              className="mb-3 inline-flex rounded-full bg-[#00B36B]/10 px-3.5 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[#00B36B]"
+            <motion.div
+              className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#00B36B]/10 px-3.5 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[#00B36B]"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#00B36B] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#00B36B]" />
+              </span>
               CONVENIENCE · GAS · C-STORE MANAGEMENT
-            </motion.p>
+            </motion.div>
+
             <motion.h1
               className="text-4xl font-extrabold tracking-tight text-[#0B1F4D] sm:text-5xl lg:text-[3.25rem] lg:leading-[1.1]"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
             >
-              Built for store operators — not warehouse inventory.
+              Built for store operators — not{" "}
+              <span className="relative inline-block text-[#00B36B]">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={FLIP_WORDS[flipIndex]}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -14 }}
+                    transition={{ duration: 0.25 }}
+                    className="inline-block"
+                  >
+                    {FLIP_WORDS[flipIndex]}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
             </motion.h1>
+
             <motion.p
               className="mt-5 max-w-md text-base leading-relaxed text-slate-600 sm:text-lg"
               initial={{ opacity: 0, y: 12 }}
@@ -139,12 +251,25 @@ export function LandingPage() {
               Manage vendor pricing, compare wholesale costs, calculate shelf prices, and inspect register transactions in real-time from your back-office computer and store devices.
             </motion.p>
 
-            {/* Badges Flex Row */}
+            {/* Live Ticker Metric Spotlight */}
             <motion.div
-              className="mt-6 flex flex-wrap items-center gap-3"
+              className="mt-5 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2 shadow-sm"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12 }}
+            >
+              <TrendingUp className="h-4 w-4 text-[#00B36B]" />
+              <span className="text-xs font-semibold text-slate-700">
+                Live Net Shift Sync: <AnimatedCounter value={356.2} />
+              </span>
+            </motion.div>
+
+            {/* Badges Flex Row */}
+            <motion.div
+              className="mt-5 flex flex-wrap items-center gap-3"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.13 }}
             >
               <VerifoneBadge />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm">
@@ -153,25 +278,29 @@ export function LandingPage() {
               </span>
             </motion.div>
 
-            {/* Action Row */}
+            {/* Action Row with Tactile Feedback */}
             <motion.div
               className="mt-8 flex flex-wrap gap-3.5"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
             >
-              <Link
-                href="/how-it-works"
-                className="rounded-xl bg-[#1D4ED8] px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-blue-700 hover:shadow-lg"
-              >
-                How it works
-              </Link>
-              <a
-                href={contactMailto({ subject: "StoreDesk setup inquiry" })}
-                className="rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-[#0B1F4D] shadow-sm transition hover:border-[#1D4ED8] hover:text-[#1D4ED8]"
-              >
-                Contact us
-              </a>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
+                <Link
+                  href="/how-it-works"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#1D4ED8] px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-blue-700 hover:shadow-lg"
+                >
+                  How it works <ArrowRight className="h-4 w-4" />
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
+                <a
+                  href={contactMailto({ subject: "StoreDesk setup inquiry" })}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-[#0B1F4D] shadow-sm transition hover:border-[#1D4ED8] hover:text-[#1D4ED8]"
+                >
+                  Contact us
+                </a>
+              </motion.div>
             </motion.div>
           </div>
 
@@ -181,8 +310,9 @@ export function LandingPage() {
           </div>
         </div>
 
-        {/* Hero Banner Component */}
-        <div className="mx-auto mt-6 max-w-6xl px-6">
+        {/* Hero Banner Component with Emerald Glow */}
+        <div className="relative mx-auto mt-6 max-w-6xl px-6">
+          <div className="pointer-events-none absolute -inset-4 -z-10 rounded-3xl bg-[#00B36B]/20 blur-3xl" />
           <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-2 shadow-2xl">
             <Image
               src="/screenshots/store-banner.png"
@@ -196,13 +326,13 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 3. CORE PURPOSE (Solid Navy #0B1F4D) */}
+      {/* 3. CORE PURPOSE (Solid Navy #0B1F4D) - Sticky Scrollytelling Layout */}
       <section className="bg-[#0B1F4D] py-24 text-white">
         <div className="mx-auto grid max-w-6xl md:grid-cols-[30%_70%]">
-          {/* Left Column - 30% Sticky */}
+          {/* Left Column - 30% Sticky Scrollytelling */}
           <div className="px-6 pb-8 md:pb-0">
-            <div className="sticky top-24">
-              <div className="mb-2 h-1.5 w-12 rounded-full bg-[#00B36B]" />
+            <div className="sticky top-28">
+              <div className="mb-2 h-1.5 w-12 rounded-full bg-[#00B36B] shadow-[0_0_10px_#00B36B]" />
               <h2 className="text-3xl font-extrabold tracking-tight text-white">Why StoreDesk exists</h2>
               <p className="mt-3 text-sm text-slate-300">
                 Read-only Price Book reference and margin overlays built specifically for convenience stores and gas stations.
@@ -210,13 +340,14 @@ export function LandingPage() {
             </div>
           </div>
 
-          {/* Right Column - 70% Scrolling list */}
+          {/* Right Column - 70% Feature Blocks */}
           <div className="space-y-12 px-6 md:border-l md:border-white/15 md:pl-12">
             <motion.article
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0.35, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={{ once: false, amount: 0.6 }}
               transition={{ duration: 0.4 }}
+              className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition duration-300 hover:border-[#00B36B]/50 hover:bg-white/10"
             >
               <h3 className="text-2xl font-bold text-white">Protect profit margins against rising costs</h3>
               <p className="mt-3 text-base leading-relaxed text-slate-300">
@@ -225,10 +356,11 @@ export function LandingPage() {
             </motion.article>
 
             <motion.article
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0.35, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: 0.1 }}
+              viewport={{ once: false, amount: 0.6 }}
+              transition={{ duration: 0.4 }}
+              className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition duration-300 hover:border-[#00B36B]/50 hover:bg-white/10"
             >
               <h3 className="text-2xl font-bold text-white">Read-only POS register integration</h3>
               <p className="mt-3 text-base leading-relaxed text-slate-300">
@@ -237,10 +369,11 @@ export function LandingPage() {
             </motion.article>
 
             <motion.article
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0.35, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: 0.2 }}
+              viewport={{ once: false, amount: 0.6 }}
+              transition={{ duration: 0.4 }}
+              className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition duration-300 hover:border-[#00B36B]/50 hover:bg-white/10"
             >
               <h3 className="text-2xl font-bold text-white">Fast floor access & scan lookup</h3>
               <p className="mt-3 text-base leading-relaxed text-slate-300">
@@ -251,43 +384,56 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 4. APPLICATION INTERFACE (Background: White) */}
-      <section className="bg-white py-24">
+      {/* 4. APPLICATION INTERFACE (Background: White with Marquee) */}
+      <section className="bg-white py-24 overflow-hidden">
         <div className="mx-auto max-w-6xl px-6 text-center">
           <h2 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D] md:text-4xl">
             Designed for speed at the counter & on the floor
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-base text-slate-600">
-            Explore the key validated screens of StoreDesk — built for rapid price checks, register sync, and margin analysis.
+            Explore the key validated screens of StoreDesk — featuring the core Mobile Login UI, Price Book catalog, and real-time transaction sync.
           </p>
         </div>
 
-        {/* 6 Screen Cards Grid */}
-        <div className="mx-auto mt-12 grid max-w-6xl gap-6 px-6 sm:grid-cols-2 lg:grid-cols-3">
-          {validatedScreens.map((screen, idx) => (
-            <motion.div
-              key={screen.title}
-              className="group rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:-translate-y-1 hover:border-[#1D4ED8] hover:shadow-md"
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.05 }}
-            >
-              <div className="relative overflow-hidden rounded-xl bg-slate-900">
-                <Image
-                  src={screen.src}
-                  alt={screen.title}
-                  width={440}
-                  height={900}
-                  className="h-auto w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
+        {/* Interactive Continuous Marquee Carousel with Pause on Hover */}
+        <div
+          className="mt-12 flex w-full overflow-x-auto px-6 pb-6 pt-2 scrollbar-none"
+          onMouseEnter={() => setIsMarqueePaused(true)}
+          onMouseLeave={() => setIsMarqueePaused(false)}
+        >
+          <motion.div
+            className="flex gap-6"
+            animate={isMarqueePaused ? false : { x: ["0%", "-50%"] }}
+            transition={{ duration: 25, ease: "linear", repeat: Infinity }}
+          >
+            {[...validatedScreens, ...validatedScreens].map((screen, idx) => (
+              <div
+                key={`${screen.title}-${idx}`}
+                className="group relative w-[280px] shrink-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#1D4ED8] hover:shadow-xl"
+              >
+                <div className="relative overflow-hidden rounded-xl bg-slate-900">
+                  <Image
+                    src={screen.src}
+                    alt={screen.title}
+                    width={440}
+                    height={900}
+                    className="h-auto w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                  {/* Glassmorphism Hover Overlay */}
+                  <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 backdrop-blur-[2px]">
+                    <span className="inline-flex w-fit rounded-full bg-[#00B36B] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                      {screen.tag}
+                    </span>
+                    <span className="mt-1 text-xs font-bold text-white">{screen.title}</span>
+                  </div>
+                </div>
+                <div className="p-2.5">
+                  <h3 className="text-sm font-bold text-[#0B1F4D]">{screen.title}</h3>
+                  <p className="mt-0.5 text-xs text-slate-500 leading-snug">{screen.desc}</p>
+                </div>
               </div>
-              <div className="p-3">
-                <h3 className="text-base font-bold text-[#0B1F4D]">{screen.title}</h3>
-                <p className="mt-1 text-xs text-slate-600">{screen.desc}</p>
-              </div>
-            </motion.div>
-          ))}
+            ))}
+          </motion.div>
         </div>
       </section>
 
@@ -303,15 +449,12 @@ export function LandingPage() {
             </h2>
           </div>
 
-          {/* 4-Column Grid - White Cards, Navy borders, Emerald Icons */}
+          {/* 4-Column Grid with Spotlight Hover Effects */}
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {techStack.map((tech) => {
               const Icon = tech.icon;
               return (
-                <div
-                  key={tech.name}
-                  className="rounded-xl border border-[#0B1F4D]/20 bg-white p-6 shadow-sm transition hover:border-[#1D4ED8] hover:shadow-md"
-                >
+                <SpotlightCard key={tech.name}>
                   <div className="flex items-center justify-between">
                     <span className="inline-flex rounded-xl bg-[#00B36B] p-2.5 text-white shadow-sm">
                       <Icon className="h-5 w-5" />
@@ -323,12 +466,12 @@ export function LandingPage() {
                   <h3 className="mt-4 text-base font-bold text-[#0B1F4D]">{tech.name}</h3>
                   <p className="text-xs font-semibold text-[#1D4ED8]">{tech.role}</p>
                   <p className="mt-2 text-xs leading-relaxed text-slate-600">{tech.desc}</p>
-                </div>
+                </SpotlightCard>
               );
             })}
           </div>
 
-          {/* Full Width Callout Box - Warning/Scope Notice Style */}
+          {/* Full Width Callout Box - Notice/Warning Style */}
           <div className="mx-auto mt-12 max-w-4xl rounded-2xl border border-amber-200 bg-amber-50/90 p-8 text-center shadow-sm">
             <h3 className="text-2xl font-extrabold text-amber-950">Not an inventory system.</h3>
             <p className="mt-3 text-sm leading-relaxed text-amber-900/80">
@@ -355,7 +498,7 @@ export function LandingPage() {
             {steps.map((s, i) => (
               <motion.div
                 key={s.n}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#1D4ED8] hover:shadow-md"
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -377,7 +520,7 @@ export function LandingPage() {
         {/* Floating CTA Card overlapping top edge of Footer */}
         <div className="relative mx-auto max-w-4xl px-6">
           <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-2xl md:p-12">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00B36B] text-white">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00B36B] text-white shadow-md">
               <Sparkles className="h-6 w-6" />
             </div>
             <h3 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D]">Ready to set up your store?</h3>
@@ -385,18 +528,22 @@ export function LandingPage() {
               Get in touch to bring StoreDesk to your back-office computer and store devices.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3.5">
-              <a
-                href={contactMailto({ subject: "StoreDesk Setup Inquiry" })}
-                className="rounded-xl bg-[#1D4ED8] px-7 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-blue-700"
-              >
-                Open email
-              </a>
-              <Link
-                href="/how-it-works"
-                className="rounded-xl border border-slate-300 bg-white px-7 py-3.5 text-sm font-bold text-[#0B1F4D] shadow-sm transition hover:border-[#1D4ED8]"
-              >
-                How it works
-              </Link>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
+                <a
+                  href={contactMailto({ subject: "StoreDesk Setup Inquiry" })}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#1D4ED8] px-7 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-blue-700"
+                >
+                  Open email
+                </a>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
+                <Link
+                  href="/how-it-works"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-7 py-3.5 text-sm font-bold text-[#0B1F4D] shadow-sm transition hover:border-[#1D4ED8]"
+                >
+                  How it works
+                </Link>
+              </motion.div>
             </div>
           </div>
         </div>
