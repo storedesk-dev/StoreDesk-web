@@ -10,7 +10,6 @@ import { VerifoneBadge } from "@/components/VerifoneBadge";
 import { SITE, contactMailto } from "@/lib/site";
 import {
   HardDrive,
-  Sparkles,
   TrendingUp,
   ArrowRight,
   CheckCircle2,
@@ -575,36 +574,36 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 3. CORE PURPOSE (High-Contrast Solid Navy #0B1F4D) */}
-      <section className="bg-[#0B1F4D] py-24 text-white">
+      {/* 3. CORE PURPOSE (Clean Bright Light Background - High Contrast) */}
+      <section className="border-y border-slate-200 bg-slate-50 py-24 text-[#0B1F4D]">
         <div className="mx-auto grid max-w-6xl md:grid-cols-[32%_68%]">
           {/* Left Column - 32% Sticky Scrollytelling */}
           <div className="px-6 pb-8 md:pb-0">
             <div className="sticky top-28">
-              <div className="mb-3 h-1.5 w-14 rounded-full bg-[#00B36B] shadow-[0_0_12px_#00B36B]" />
-              <h2 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">Why StoreDesk exists</h2>
-              <p className="mt-3 text-sm font-medium leading-relaxed text-slate-200">
+              <div className="mb-3 h-1.5 w-14 rounded-full bg-[#00B36B]" />
+              <h2 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D] md:text-4xl">Why StoreDesk exists</h2>
+              <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700">
                 Read-only Price Book reference and margin overlays built specifically for convenience stores and gas stations.
               </p>
             </div>
           </div>
 
-          {/* Right Column - 68% High-Contrast Feature Cards */}
-          <div className="space-y-8 px-6 md:border-l md:border-white/20 md:pl-10">
+          {/* Right Column - 68% High-Contrast White Cards */}
+          <div className="space-y-8 px-6 md:border-l md:border-slate-200 md:pl-10">
             <motion.article
               initial={{ opacity: 1, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.3 }}
-              className="rounded-2xl border border-white/20 bg-slate-900/80 p-7 shadow-xl backdrop-blur-md transition duration-300 hover:border-[#00B36B] hover:bg-slate-900"
+              className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition duration-300 hover:border-[#1D4ED8] hover:shadow-md"
             >
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00B36B] text-white font-bold shadow-md">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00B36B] text-white font-bold shadow-sm">
                   <ShieldCheck className="h-5 w-5" />
                 </span>
-                <h3 className="text-xl font-extrabold text-white sm:text-2xl">Protect profit margins against rising costs</h3>
+                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">Protect profit margins against rising costs</h3>
               </div>
-              <p className="mt-4 text-base font-normal leading-relaxed text-slate-100">
+              <p className="mt-4 text-base font-normal leading-relaxed text-slate-700">
                 Retail prices live on your cash register while wholesale costs live in vendor invoices. StoreDesk connects those two worlds so true per-unit profit margins are transparent before changing shelf labels.
               </p>
             </motion.article>
@@ -614,16 +613,16 @@ export function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.3, delay: 0.05 }}
-              className="rounded-2xl border border-white/20 bg-slate-900/80 p-7 shadow-xl backdrop-blur-md transition duration-300 hover:border-[#00B36B] hover:bg-slate-900"
+              className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition duration-300 hover:border-[#1D4ED8] hover:shadow-md"
             >
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1D4ED8] text-white font-bold shadow-md">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1D4ED8] text-white font-bold shadow-sm">
                   <Zap className="h-5 w-5" />
                 </span>
-                <h3 className="text-xl font-extrabold text-white sm:text-2xl">Read-only POS register integration</h3>
+                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">Read-only POS register integration</h3>
               </div>
-              <p className="mt-4 text-base font-normal leading-relaxed text-slate-100">
-                Integrates safely with Verifone Commander via read-only register streams (<code className="rounded bg-[#00B36B]/20 px-2 py-0.5 font-mono text-xs font-bold text-[#00FF95] border border-[#00B36B]/40">vPLUs</code>, <code className="rounded bg-[#00B36B]/20 px-2 py-0.5 font-mono text-xs font-bold text-[#00FF95] border border-[#00B36B]/40">vrubyrept</code>, <code className="rounded bg-[#00B36B]/20 px-2 py-0.5 font-mono text-xs font-bold text-[#00FF95] border border-[#00B36B]/40">vtransset</code>). Zero risk to register configurations or cash register performance.
+              <p className="mt-4 text-base font-normal leading-relaxed text-slate-700">
+                Integrates safely with Verifone Commander via read-only register streams (<code className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8] border border-slate-200">vPLUs</code>, <code className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8] border border-slate-200">vrubyrept</code>, <code className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8] border border-slate-200">vtransset</code>). Zero risk to register configurations or cash register performance.
               </p>
             </motion.article>
 
@@ -632,15 +631,15 @@ export function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.3, delay: 0.1 }}
-              className="rounded-2xl border border-white/20 bg-slate-900/80 p-7 shadow-xl backdrop-blur-md transition duration-300 hover:border-[#00B36B] hover:bg-slate-900"
+              className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition duration-300 hover:border-[#1D4ED8] hover:shadow-md"
             >
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00B36B] text-white font-bold shadow-md">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00B36B] text-white font-bold shadow-sm">
                   <BarChart3 className="h-5 w-5" />
                 </span>
-                <h3 className="text-xl font-extrabold text-white sm:text-2xl">Fast floor access & scan lookup</h3>
+                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">Fast floor access & scan lookup</h3>
               </div>
-              <p className="mt-4 text-base font-normal leading-relaxed text-slate-100">
+              <p className="mt-4 text-base font-normal leading-relaxed text-slate-700">
                 Scan barcodes anywhere in the store to instantly inspect wholesale cost per item, department tax breakdown, best supplier cost, and suggested retail price.
               </p>
             </motion.article>
@@ -733,100 +732,64 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 7. FOOTER & FLOATING CTA - Distinct High-Contrast Separation */}
-      <div className="relative bg-gradient-to-b from-[#F8FAFC] via-sky-50/50 to-[#0A1633] pb-0 pt-16">
-        {/* Floating CTA Card with High-Contrast Navy/Blue Container */}
-        <div className="relative mx-auto max-w-4xl px-6">
-          <div className="rounded-3xl border-2 border-[#1D4ED8]/30 bg-white p-8 text-center shadow-2xl shadow-blue-950/20 md:p-12">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00B36B] text-white shadow-md">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <h3 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D] sm:text-4xl">
-              Ready to set up your store?
-            </h3>
-            <p className="mx-auto mt-3 max-w-lg text-base font-semibold text-slate-700">
-              Get in touch to bring StoreDesk to your back-office computer and store devices.
+      {/* 7. FOOTER BASE - High-Contrast Deep Solid Navy (#0A1633) */}
+      <footer className="border-t border-slate-800 bg-[#0A1633] px-6 pb-12 pt-16 text-white">
+        <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
+          {/* Left Column */}
+          <div>
+            <Image
+              src="/brand/logo-lockup-horizontal.jpg"
+              alt="StoreDesk"
+              width={180}
+              height={40}
+              className="mb-4 h-9 w-auto rounded bg-white p-1 object-contain shadow-sm"
+            />
+            <p className="max-w-sm text-xs font-normal leading-relaxed text-slate-200">
+              Read-only price book management, wholesale vendor cost overlays, and register margin analysis for convenience stores and gas stations.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
-                <a
-                  href={contactMailto({ subject: "StoreDesk Setup Inquiry" })}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#1D4ED8] px-8 py-4 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700"
-                >
-                  <Mail className="h-4 w-4" /> Open email
-                </a>
-              </motion.div>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
-                <Link
-                  href="/how-it-works"
-                  className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-8 py-4 text-sm font-bold text-[#0B1F4D] shadow-sm transition hover:border-[#1D4ED8] hover:text-[#1D4ED8]"
-                >
-                  How it works
-                </Link>
-              </motion.div>
+            <p className="mt-6 text-xs font-medium text-slate-400">
+              © 2026 StoreDesk. Built for convenience stores & gas stations.
+            </p>
+          </div>
+
+          {/* Center Column - Explore Links */}
+          <div>
+            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#00FF95]">Explore</h4>
+            <ul className="mt-4 space-y-2.5 text-sm font-medium text-slate-100">
+              <li>
+                <Link href="/" className="transition hover:text-[#00FF95]">Home</Link>
+              </li>
+              <li>
+                <Link href="/product" className="transition hover:text-[#00FF95]">Product</Link>
+              </li>
+              <li>
+                <Link href="/how-it-works" className="hover:text-[#00FF95] transition">How it works</Link>
+              </li>
+              <li>
+                <Link href="/about" className="transition hover:text-[#00FF95]">About</Link>
+              </li>
+              <li>
+                <Link href="/contact" className="transition hover:text-[#00FF95]">Contact</Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Right Column - Contact & Legal */}
+          <div>
+            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#00FF95]">Contact</h4>
+            <a
+              href={contactMailto()}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:border-white/40 hover:bg-white/20"
+            >
+              <Mail className="h-4 w-4 text-[#61DAFB]" /> {SITE.email}
+            </a>
+            <div className="mt-6 flex gap-5 text-xs font-medium text-slate-200">
+              <Link href="/privacy" className="transition hover:text-[#00FF95] hover:underline">Privacy Policy</Link>
+              <Link href="/terms" className="transition hover:text-[#00FF95] hover:underline">Terms of Service</Link>
             </div>
           </div>
         </div>
-
-        {/* Footer Base - High-Contrast Deep Solid Navy (#0A1633) */}
-        <footer className="mt-20 border-t border-slate-800 bg-[#0A1633] px-6 pb-12 pt-16 text-white">
-          <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
-            {/* Left Column */}
-            <div>
-              <Image
-                src="/brand/logo-lockup-horizontal.jpg"
-                alt="StoreDesk"
-                width={180}
-                height={40}
-                className="mb-4 h-9 w-auto rounded bg-white p-1 object-contain shadow-sm"
-              />
-              <p className="max-w-sm text-xs font-normal leading-relaxed text-slate-200">
-                Read-only price book management, wholesale vendor cost overlays, and register margin analysis for convenience stores and gas stations.
-              </p>
-              <p className="mt-6 text-xs font-medium text-slate-400">
-                © 2026 StoreDesk. Built for convenience stores & gas stations.
-              </p>
-            </div>
-
-            {/* Center Column - Explore Links */}
-            <div>
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#00FF95]">Explore</h4>
-              <ul className="mt-4 space-y-2.5 text-sm font-medium text-slate-100">
-                <li>
-                  <Link href="/" className="transition hover:text-[#00FF95]">Home</Link>
-                </li>
-                <li>
-                  <Link href="/product" className="transition hover:text-[#00FF95]">Product</Link>
-                </li>
-                <li>
-                  <Link href="/how-it-works" className="transition hover:text-[#00FF95]">How it works</Link>
-                </li>
-                <li>
-                  <Link href="/about" className="transition hover:text-[#00FF95]">About</Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="transition hover:text-[#00FF95]">Contact</Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Right Column - Contact & Legal */}
-            <div>
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#00FF95]">Contact</h4>
-              <a
-                href={contactMailto()}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:border-white/40 hover:bg-white/20"
-              >
-                <Mail className="h-4 w-4 text-[#61DAFB]" /> {SITE.email}
-              </a>
-              <div className="mt-6 flex gap-5 text-xs font-medium text-slate-200">
-                <Link href="/privacy" className="transition hover:text-[#00FF95] hover:underline">Privacy Policy</Link>
-                <Link href="/terms" className="transition hover:text-[#00FF95] hover:underline">Terms of Service</Link>
-              </div>
-            </div>
-          </div>
-        </footer>
-      </div>
+      </footer>
     </div>
   );
 }
