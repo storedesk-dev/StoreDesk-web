@@ -9,11 +9,7 @@ import { SiteHeader } from "@/components/SiteChrome";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
 import { SITE, contactMailto } from "@/lib/site";
 import {
-  Database,
-  Globe,
   HardDrive,
-  Laptop,
-  Server,
   Sparkles,
   TrendingUp,
   ArrowRight,
@@ -29,6 +25,44 @@ import {
   Search,
   DollarSign
 } from "lucide-react";
+
+/** Official Tech Brand SVG Logos */
+function ReactElectronLogo() {
+  return (
+    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="2.2" fill="#61DAFB" />
+      <ellipse cx="12" cy="12" rx="7.5" ry="3" stroke="#61DAFB" strokeWidth="1.5" transform="rotate(30 12 12)" />
+      <ellipse cx="12" cy="12" rx="7.5" ry="3" stroke="#61DAFB" strokeWidth="1.5" transform="rotate(90 12 12)" />
+      <ellipse cx="12" cy="12" rx="7.5" ry="3" stroke="#61DAFB" strokeWidth="1.5" transform="rotate(150 12 12)" />
+    </svg>
+  );
+}
+
+function NodeJsLogo() {
+  return (
+    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L3.5 7v10L12 22l8.5-5V7L12 2z" fill="#5FA04E" opacity="0.2" stroke="#5FA04E" strokeWidth="1.5" />
+      <path d="M12 6.5L6.5 9.75v6.5L12 19.5l5.5-3.25v-6.5L12 6.5z" fill="#5FA04E" />
+    </svg>
+  );
+}
+
+function GcpCloudLogo() {
+  return (
+    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+      <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="#4285F4" />
+    </svg>
+  );
+}
+
+function NextMongoLogo() {
+  return (
+    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l7 9h-1.5l-5.5-7.2v7.2H11z" fill="#0B1F4D" />
+      <path d="M13.5 6.5l3.5 4.5" stroke="#47A248" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 /** Rotating words for hero focus pill */
 const FLIP_WORDS = [
@@ -101,29 +135,33 @@ const techStack = [
     name: "Electron & React",
     role: "Desktop Command Center",
     desc: "Primary command center UI for store managers connecting to local Edge Agent or Cloud Hub.",
-    icon: Laptop,
-    badge: "Desktop App"
+    LogoComponent: ReactElectronLogo,
+    badge: "Desktop App",
+    bgColor: "bg-slate-900"
   },
   {
     name: "Node.js & Express",
     role: "Local Edge Agent",
     desc: "Acts as outbound Edge Agent on local Store PC reading directly from Verifone Commander.",
-    icon: Server,
-    badge: "Edge Agent"
+    LogoComponent: NodeJsLogo,
+    badge: "Edge Agent",
+    bgColor: "bg-emerald-950/20 border-emerald-500/20"
   },
   {
     name: "GCP Cloud Run & WebSockets",
     role: "Real-Time Cloud Hub",
     desc: "Central WebSocket hub maintaining dynamic event-driven rooms keyed by store_id.",
-    icon: Globe,
-    badge: "Cloud Hub"
+    LogoComponent: GcpCloudLogo,
+    badge: "Cloud Hub",
+    bgColor: "bg-blue-950/20 border-blue-500/20"
   },
   {
     name: "Next.js & MongoDB",
     role: "Web Portal & Admin",
     desc: "Vercel-hosted marketing portal and internal company admin for licenses & telemetry.",
-    icon: Database,
-    badge: "Web Portal"
+    LogoComponent: NextMongoLogo,
+    badge: "Web Portal",
+    bgColor: "bg-[#0B1F4D]/10 border-slate-300"
   }
 ];
 
@@ -219,7 +257,6 @@ function MobileShowcaseCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
-  // Auto-play interval cycling every 3.5 seconds
   useEffect(() => {
     if (!isAutoPlaying) return;
     const interval = setInterval(() => {
@@ -253,18 +290,15 @@ function MobileShowcaseCarousel() {
     >
       {/* 3D Phone Model Display with Smooth Image Carousel */}
       <div className="relative flex flex-col items-center justify-center">
-        {/* Glow backdrop */}
         <div className="pointer-events-none absolute h-72 w-72 rounded-full bg-gradient-to-tr from-[#00B36B]/20 via-[#1D4ED8]/20 to-sky-400/20 blur-3xl" />
 
         <div className="relative z-10 w-[270px] sm:w-[290px] perspective-[1000px]">
           <div className="relative rounded-[3.2rem] border-[9px] border-slate-900 bg-slate-950 p-1.5 shadow-[0_25px_60px_-15px_rgba(11,31,77,0.3)] ring-2 ring-white/20">
-            {/* Side Hardware Buttons */}
             <div className="absolute -left-[13px] top-24 h-10 w-[4px] rounded-l-md bg-slate-800" />
             <div className="absolute -left-[13px] top-38 h-10 w-[4px] rounded-l-md bg-slate-800" />
             <div className="absolute -right-[13px] top-32 h-14 w-[4px] rounded-r-md bg-slate-800" />
 
             <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-950">
-              {/* Status Notch */}
               <div className="relative z-20 bg-slate-900/90 px-4 pb-1 pt-2.5 backdrop-blur-md">
                 <div className="absolute left-1/2 top-2 h-4 w-20 -translate-x-1/2 rounded-full bg-slate-950 flex items-center justify-end px-2">
                   <div className="h-2 w-2 rounded-full bg-slate-800 ring-1 ring-slate-700" />
@@ -275,7 +309,6 @@ function MobileShowcaseCarousel() {
                 </div>
               </div>
 
-              {/* Dynamic Image Transition inside Phone Container */}
               <div className="relative h-[480px] w-full overflow-hidden bg-slate-900">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -296,11 +329,9 @@ function MobileShowcaseCarousel() {
                   </motion.div>
                 </AnimatePresence>
 
-                {/* Glass reflection overlay */}
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent" />
               </div>
 
-              {/* Bottom Home Bar */}
               <div className="relative z-20 flex justify-center bg-slate-950 py-1.5">
                 <div className="h-1 w-24 rounded-full bg-slate-700" />
               </div>
@@ -318,7 +349,6 @@ function MobileShowcaseCarousel() {
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          {/* Indicators */}
           <div className="flex gap-2">
             {validatedScreens.map((_, i) => (
               <button
@@ -356,7 +386,6 @@ function MobileShowcaseCarousel() {
           </p>
         </div>
 
-        {/* Active Screen Card Details */}
         <motion.div
           key={activeScreen.id}
           initial={{ opacity: 0, y: 8 }}
@@ -369,7 +398,6 @@ function MobileShowcaseCarousel() {
           </p>
         </motion.div>
 
-        {/* Screen Selector Grid */}
         <div className="grid gap-2.5 sm:grid-cols-2">
           {validatedScreens.map((screen, idx) => {
             const Icon = screen.icon;
@@ -650,15 +678,15 @@ export function LandingPage() {
             </h2>
           </div>
 
-          {/* 4-Column Grid with Spotlight Hover Effects */}
+          {/* 4-Column Grid with Tech Brand SVG Logos */}
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {techStack.map((tech) => {
-              const Icon = tech.icon;
+              const Logo = tech.LogoComponent;
               return (
                 <SpotlightCard key={tech.name}>
                   <div className="flex items-center justify-between">
-                    <span className="inline-flex rounded-xl bg-[#00B36B] p-2.5 text-white shadow-sm">
-                      <Icon className="h-5 w-5" />
+                    <span className="inline-flex rounded-xl bg-[#0B1F4D] p-2.5 text-white shadow-md ring-1 ring-slate-800">
+                      <Logo />
                     </span>
                     <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-[#0B1F4D]">
                       {tech.badge}
@@ -670,14 +698,6 @@ export function LandingPage() {
                 </SpotlightCard>
               );
             })}
-          </div>
-
-          {/* Full Width Callout Box - Notice/Warning Style */}
-          <div className="mx-auto mt-12 max-w-4xl rounded-2xl border border-amber-300 bg-amber-50 p-8 text-center shadow-sm">
-            <h3 className="text-2xl font-extrabold text-amber-950">Not an inventory system.</h3>
-            <p className="mt-3 text-sm font-medium leading-relaxed text-amber-950/90">
-              No stock quantity limits. No inventory count tracking. No warehouse locations. StoreDesk is built exclusively for price book management, vendor cost overlays, and margin transparency.
-            </p>
           </div>
         </div>
       </section>

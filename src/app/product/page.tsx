@@ -105,13 +105,6 @@ export default function ProductPage() {
           );
         })}
       </div>
-
-      <div className="mt-14 rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-orange-50 p-8">
-        <h2 className="text-2xl font-extrabold text-amber-950">Explicitly focused on pricing & profit</h2>
-        <p className="mt-3 text-amber-950/70">
-          Stock counts, inventory adjustments, and warehouse bin tracking are not StoreDesk. We stay 100% focused on price accuracy, supplier costs, and retail profit margins.
-        </p>
-      </div>
     </MarketingShell>
   );
 }
