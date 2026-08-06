@@ -23,7 +23,8 @@ import {
   Scan,
   Receipt,
   Search,
-  DollarSign
+  DollarSign,
+  Mail
 } from "lucide-react";
 
 /** Official Tech Brand SVG Logos */
@@ -136,32 +137,28 @@ const techStack = [
     role: "Desktop Command Center",
     desc: "Primary command center UI for store managers connecting to local Edge Agent or Cloud Hub.",
     LogoComponent: ReactElectronLogo,
-    badge: "Desktop App",
-    bgColor: "bg-slate-900"
+    badge: "Desktop App"
   },
   {
     name: "Node.js & Express",
     role: "Local Edge Agent",
     desc: "Acts as outbound Edge Agent on local Store PC reading directly from Verifone Commander.",
     LogoComponent: NodeJsLogo,
-    badge: "Edge Agent",
-    bgColor: "bg-emerald-950/20 border-emerald-500/20"
+    badge: "Edge Agent"
   },
   {
     name: "GCP Cloud Run & WebSockets",
     role: "Real-Time Cloud Hub",
     desc: "Central WebSocket hub maintaining dynamic event-driven rooms keyed by store_id.",
     LogoComponent: GcpCloudLogo,
-    badge: "Cloud Hub",
-    bgColor: "bg-blue-950/20 border-blue-500/20"
+    badge: "Cloud Hub"
   },
   {
     name: "Next.js & MongoDB",
     role: "Web Portal & Admin",
     desc: "Vercel-hosted marketing portal and internal company admin for licenses & telemetry.",
     LogoComponent: NextMongoLogo,
-    badge: "Web Portal",
-    bgColor: "bg-[#0B1F4D]/10 border-slate-300"
+    badge: "Web Portal"
   }
 ];
 
@@ -736,31 +733,33 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 7. FOOTER & FLOATING CTA */}
-      <div className="relative bg-[#0B1F4D] pt-16">
-        {/* Floating CTA Card overlapping top edge of Footer */}
+      {/* 7. FOOTER & FLOATING CTA - Distinct High-Contrast Separation */}
+      <div className="relative bg-gradient-to-b from-[#F8FAFC] via-sky-50/50 to-[#0A1633] pb-0 pt-16">
+        {/* Floating CTA Card with High-Contrast Navy/Blue Container */}
         <div className="relative mx-auto max-w-4xl px-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-2xl md:p-12">
+          <div className="rounded-3xl border-2 border-[#1D4ED8]/30 bg-white p-8 text-center shadow-2xl shadow-blue-950/20 md:p-12">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00B36B] text-white shadow-md">
               <Sparkles className="h-6 w-6" />
             </div>
-            <h3 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D]">Ready to set up your store?</h3>
-            <p className="mx-auto mt-3 max-w-lg text-sm font-medium text-slate-700">
+            <h3 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D] sm:text-4xl">
+              Ready to set up your store?
+            </h3>
+            <p className="mx-auto mt-3 max-w-lg text-base font-semibold text-slate-700">
               Get in touch to bring StoreDesk to your back-office computer and store devices.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3.5">
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
                 <a
                   href={contactMailto({ subject: "StoreDesk Setup Inquiry" })}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#1D4ED8] px-7 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-blue-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#1D4ED8] px-8 py-4 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700"
                 >
-                  Open email
+                  <Mail className="h-4 w-4" /> Open email
                 </a>
               </motion.div>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}>
                 <Link
                   href="/how-it-works"
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-7 py-3.5 text-sm font-bold text-[#0B1F4D] shadow-sm transition hover:border-[#1D4ED8]"
+                  className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-8 py-4 text-sm font-bold text-[#0B1F4D] shadow-sm transition hover:border-[#1D4ED8] hover:text-[#1D4ED8]"
                 >
                   How it works
                 </Link>
@@ -769,60 +768,60 @@ export function LandingPage() {
           </div>
         </div>
 
-        {/* Footer Base - Deep Navy to Vivid Blue Gradient */}
-        <footer className="mt-16 border-t border-white/10 bg-gradient-to-r from-[#0B1F4D] via-[#0E2866] to-[#1D4ED8] px-6 pb-12 pt-20 text-white">
+        {/* Footer Base - High-Contrast Deep Solid Navy (#0A1633) */}
+        <footer className="mt-20 border-t border-slate-800 bg-[#0A1633] px-6 pb-12 pt-16 text-white">
           <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
-            {/* Left */}
+            {/* Left Column */}
             <div>
               <Image
                 src="/brand/logo-lockup-horizontal.jpg"
                 alt="StoreDesk"
                 width={180}
                 height={40}
-                className="mb-4 h-9 w-auto rounded bg-white p-1 object-contain"
+                className="mb-4 h-9 w-auto rounded bg-white p-1 object-contain shadow-sm"
               />
               <p className="max-w-sm text-xs font-normal leading-relaxed text-slate-200">
                 Read-only price book management, wholesale vendor cost overlays, and register margin analysis for convenience stores and gas stations.
               </p>
-              <p className="mt-6 text-xs text-slate-300">
+              <p className="mt-6 text-xs font-medium text-slate-400">
                 © 2026 StoreDesk. Built for convenience stores & gas stations.
               </p>
             </div>
 
-            {/* Center */}
+            {/* Center Column - Explore Links */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[#00B36B]">Explore</h4>
-              <ul className="mt-4 space-y-2.5 text-sm text-slate-200">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#00FF95]">Explore</h4>
+              <ul className="mt-4 space-y-2.5 text-sm font-medium text-slate-100">
                 <li>
-                  <Link href="/" className="hover:text-white">Home</Link>
+                  <Link href="/" className="transition hover:text-[#00FF95]">Home</Link>
                 </li>
                 <li>
-                  <Link href="/product" className="hover:text-white">Product</Link>
+                  <Link href="/product" className="transition hover:text-[#00FF95]">Product</Link>
                 </li>
                 <li>
-                  <Link href="/how-it-works" className="hover:text-white">How it works</Link>
+                  <Link href="/how-it-works" className="transition hover:text-[#00FF95]">How it works</Link>
                 </li>
                 <li>
-                  <Link href="/about" className="hover:text-white">About</Link>
+                  <Link href="/about" className="transition hover:text-[#00FF95]">About</Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="hover:text-white">Contact</Link>
+                  <Link href="/contact" className="transition hover:text-[#00FF95]">Contact</Link>
                 </li>
               </ul>
             </div>
 
-            {/* Right */}
+            {/* Right Column - Contact & Legal */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[#00B36B]">Contact</h4>
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#00FF95]">Contact</h4>
               <a
                 href={contactMailto()}
-                className="mt-4 block text-sm font-semibold text-white underline decoration-white/30 hover:decoration-white"
+                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:border-white/40 hover:bg-white/20"
               >
-                {SITE.email}
+                <Mail className="h-4 w-4 text-[#61DAFB]" /> {SITE.email}
               </a>
-              <div className="mt-6 flex gap-4 text-xs text-slate-200">
-                <Link href="/privacy" className="hover:text-white">Privacy Policy</Link>
-                <Link href="/terms" className="hover:text-white">Terms of Service</Link>
+              <div className="mt-6 flex gap-5 text-xs font-medium text-slate-200">
+                <Link href="/privacy" className="transition hover:text-[#00FF95] hover:underline">Privacy Policy</Link>
+                <Link href="/terms" className="transition hover:text-[#00FF95] hover:underline">Terms of Service</Link>
               </div>
             </div>
           </div>
