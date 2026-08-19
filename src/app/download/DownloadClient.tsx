@@ -55,9 +55,7 @@ export function DownloadClient() {
             The floor scanner companion app. Walk your store, scan shelf barcodes, check prices, and review profit margins instantly.
           </p>
           <a
-            href="https://github.com/TRUPALIX9/store-desk-mobile/releases/latest"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="https://github.com/TRUPALIX9/store-desk-mobile/releases/download/v0.0.3/app-release.apk"
             className="mt-auto block rounded-lg bg-gradient-to-r from-[#00A87B] to-[#28C88B] px-4 py-3 text-center font-bold text-white shadow-md hover:brightness-105"
           >
             Download Android App (.apk)
