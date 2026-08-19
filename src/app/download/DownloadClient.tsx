@@ -28,9 +28,7 @@ export function DownloadClient() {
             The local store connection and dashboard. Run this on your back-office PC where your Verifone Commander is connected.
           </p>
           <a
-            href="https://github.com/TRUPALIX9/StoreDesk/releases/latest"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="https://github.com/TRUPALIX9/StoreDesk/releases/download/v0.0.1/StoreDesk.Setup.1.0.0.exe"
             className="mt-auto block rounded-lg bg-gradient-to-r from-[#1A63F4] to-[#0E43D8] px-4 py-3 text-center font-bold text-white shadow-md hover:brightness-105"
           >
             Download Windows Setup (.exe)
