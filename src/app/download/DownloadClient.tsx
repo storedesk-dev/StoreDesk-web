@@ -4,6 +4,7 @@ import { MarketingShell } from "@/components/MarketingShell";
 import { Download, Smartphone } from "lucide-react";
 import { motion } from "framer-motion";
 
+export const LATEST_RELEASE_TAG = "v0.0.4";
 export function DownloadClient() {
   return (
     <MarketingShell eyebrow="Downloads" title="Get StoreDesk for your devices">
@@ -28,7 +29,7 @@ export function DownloadClient() {
             The local store connection and dashboard. Run this on your back-office PC where your Verifone Commander is connected.
           </p>
           <a
-            href="https://github.com/TRUPALIX9/StoreDesk/releases/download/v0.0.1/StoreDesk.Setup.1.0.0.exe"
+            href={`https://github.com/TRUPALIX9/StoreDesk/releases/download/${LATEST_RELEASE_TAG}/StoreDesk%20Windows%20Setup.exe`}
             className="mt-auto block rounded-lg bg-gradient-to-r from-[#1A63F4] to-[#0E43D8] px-4 py-3 text-center font-bold text-white shadow-md hover:brightness-105"
           >
             Download Windows Setup (.exe)
@@ -55,7 +56,7 @@ export function DownloadClient() {
             The floor scanner companion app. Walk your store, scan shelf barcodes, check prices, and review profit margins instantly.
           </p>
           <a
-            href="https://github.com/TRUPALIX9/StoreDesk/releases/download/v0.0.1/app-release.apk"
+            href={`https://github.com/TRUPALIX9/StoreDesk/releases/download/${LATEST_RELEASE_TAG}/app-release.apk`}
             className="mt-auto block rounded-lg bg-gradient-to-r from-[#00A87B] to-[#28C88B] px-4 py-3 text-center font-bold text-white shadow-md hover:brightness-105"
           >
             Download Android App (.apk)
