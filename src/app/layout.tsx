@@ -14,7 +14,11 @@ const mono = Source_Code_Pro({
   weight: ["400", "600"]
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://storedesk.dev";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL 
+  ? process.env.NEXT_PUBLIC_SITE_URL 
+  : process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}` 
+    : "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
