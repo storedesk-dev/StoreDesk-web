@@ -1,110 +1,34 @@
-"use client";
+import type { Metadata } from "next";
+import { ProductClient } from "./ProductClient";
 
-import Image from "next/image";
-import { MarketingShell } from "@/components/MarketingShell";
-import { VendorCostChart } from "@/components/VendorCostChart";
-import { motion } from "framer-motion";
-import {
-  BarChart3,
-  FileSearch,
-  HardDrive,
-  Receipt,
-  ScanBarcode,
-  Smartphone
-} from "lucide-react";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://storedesk.dev";
 
-const features = [
-  {
-    title: "Price Book",
-    body: "Live register price list overlaid with vendor wholesale costs. Easily search by product name, UPC barcode, or retail price.",
-    icon: BarChart3,
-    accent: "from-[#1A63F4] to-[#4f8cff]"
+export const metadata: Metadata = {
+  title: "StoreDesk Features — Price Book, Cost Analysis & Mobile Scanner",
+  description:
+    "Explore StoreDesk features: Price Book management, supplier cost comparison, invoice extraction review, StoreDesk Mobile scanning app, and Verifone Commander sync.",
+  keywords: [
+    "StoreDesk features",
+    "StoreDesk Price Book",
+    "StoreDesk Mobile",
+    "StoreDesk Worker",
+    "Verifone Commander backoffice",
+    "convenience store price book",
+    "vendor cost analysis",
+    "c-store barcode scanning"
+  ],
+  alternates: {
+    canonical: `${siteUrl}/product`
   },
-  {
-    title: "Cost & Profit Analysis",
-    body: "Compare retail shelf prices against actual wholesale costs so true profit margins are clear before updating prices.",
-    icon: FileSearch,
-    accent: "from-[#00A87B] to-[#28C88B]"
-  },
-  {
-    title: "Invoice Review",
-    body: "Upload vendor invoices, automatically extract line items, review prices with full human control, and save vendor price history.",
-    icon: Receipt,
-    accent: "from-[#1A63F4] to-[#00A87B]"
-  },
-  {
-    title: "Store Reports",
-    body: "View daily sales tax breakdowns, shift insights, and key register metrics for smooth store management.",
-    icon: HardDrive,
-    accent: "from-[#0E43D8] to-[#1A63F4]"
-  },
-  {
-    title: "StoreDesk Mobile",
-    body: "Scan shelf barcodes, see top supplier prices, view item cost breakdowns, and get suggested retail prices directly from your phone.",
-    icon: Smartphone,
-    accent: "from-[#00A87B] to-[#1A63F4]"
-  },
-  {
-    title: "Scan-First Lookup",
-    body: "Scan any barcode to immediately display wholesale cost per item, pack breakdown, and recommended selling price.",
-    icon: ScanBarcode,
-    accent: "from-[#28C88B] to-[#00A87B]"
+  openGraph: {
+    title: "StoreDesk Features — Price Book, Cost Analysis & Mobile Scanner",
+    description:
+      "Price Book, Cost & Profit Analysis, Invoice Review, Store Reports, StoreDesk Mobile scanning app, and Verifone Commander sync.",
+    url: `${siteUrl}/product`,
+    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.jpg`, width: 1200, height: 400, alt: "StoreDesk Product Features" }]
   }
-];
+};
 
 export default function ProductPage() {
-  return (
-    <MarketingShell eyebrow="Product" title="Everything at the counter — built for real store operations">
-      <div className="mt-8 grid items-center gap-6 rounded-2xl border border-[var(--border)] bg-gradient-to-r from-slate-900 via-[#0B1F3A] to-slate-900 p-6 text-white md:grid-cols-[180px_1fr]">
-        <div className="flex justify-center">
-          <div className="relative h-24 w-36 overflow-hidden rounded-xl border border-white/20 bg-white/10 p-2 shadow-xl backdrop-blur-md">
-            <Image
-              src="/Verifone image.png"
-              alt="Verifone Commander POS"
-              width={160}
-              height={100}
-              className="h-full w-full object-contain"
-            />
-          </div>
-        </div>
-        <div>
-          <span className="inline-flex rounded-full bg-[#1A63F4]/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#4f8cff]">
-            Hardware Integration
-          </span>
-          <h2 className="mt-1 text-xl font-bold md:text-2xl">Read-Only Verifone® Commander Sync</h2>
-          <p className="mt-1 text-xs leading-relaxed text-slate-300">
-            Safely streams live vPLUs, ruby reports, and register transaction sets without modifying POS register configurations or risking register uptime.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-10">
-        <VendorCostChart />
-      </div>
-
-      <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {features.map((f, i) => {
-          const Icon = f.icon;
-          return (
-            <motion.article
-              key={f.title}
-              className="group rounded-2xl border border-[var(--border)] bg-white/95 p-6 shadow-md shadow-blue-500/5 transition hover:-translate-y-0.5 hover:shadow-lg"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <div
-                className={`mb-4 inline-flex rounded-xl bg-gradient-to-br ${f.accent} p-2.5 text-white shadow-sm`}
-              >
-                <Icon className="h-5 w-5" strokeWidth={2.2} />
-              </div>
-              <h2 className="text-lg font-bold">{f.title}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{f.body}</p>
-            </motion.article>
-          );
-        })}
-      </div>
-    </MarketingShell>
-  );
+  return <ProductClient />;
 }

@@ -66,6 +66,12 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
         </LayoutGroup>
 
         <div className="hidden items-center gap-2 md:flex">
+          <Link
+            href="/download"
+            className="rounded-full bg-white px-3.5 py-1.5 text-sm font-bold text-[#1A63F4] shadow-sm ring-1 ring-inset ring-[#1A63F4]/20 hover:bg-[#1A63F4]/5"
+          >
+            Download
+          </Link>
           <a
             href={contactMailto({ subject: "StoreDesk inquiry" })}
             className="rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3.5 py-1.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:brightness-105"
@@ -110,12 +116,19 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
                   </Link>
                 );
               })}
-              <a
-                href={contactMailto({ subject: "StoreDesk inquiry" })}
-                className="mt-1 rounded-xl bg-[var(--surface)] px-3 py-2.5 text-sm font-bold text-[var(--sd-blue)]"
+              <Link
+                href="/download"
+                className="mt-2 block rounded-lg bg-[#1A63F4]/10 px-3 py-2 text-center text-sm font-semibold text-[#1A63F4]"
                 onClick={() => setOpen(false)}
               >
-                Email {SITE.email}
+                Download
+              </Link>
+              <a
+                href={contactMailto({ subject: "StoreDesk inquiry" })}
+                className="mt-2 block rounded-lg bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3 py-2 text-center text-sm font-bold text-white shadow-sm"
+                onClick={() => setOpen(false)}
+              >
+                Email us
               </a>
             </div>
           </motion.nav>
@@ -140,6 +153,9 @@ export function SiteFooter() {
             className="mb-3 h-8 w-auto rounded bg-white/95 object-contain p-1"
           />
           <p className="max-w-sm text-sm text-white/85">{SITE.tagline}</p>
+          <p className="mt-2 text-xs font-medium text-white/75">
+            StoreDesk — Local-First C-Store Backoffice, Price Book &amp; POS Integration.
+          </p>
         </div>
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-white/70">Explore</p>
@@ -165,7 +181,7 @@ export function SiteFooter() {
         </div>
       </div>
       <p className="relative mx-auto mt-10 max-w-6xl text-center text-xs text-white/65">
-        © {new Date().getFullYear()} StoreDesk. Built for convenience stores & gas stations.
+        © {new Date().getFullYear()} StoreDesk. Built for convenience stores &amp; gas stations.
       </p>
     </footer>
   );

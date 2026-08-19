@@ -66,10 +66,11 @@ function NextMongoLogo() {
 
 /** Rotating words for hero focus pill */
 const FLIP_WORDS = [
-  "No stock counts required",
-  "Verifone Commander read-only",
-  "Wholesale vendor cost overlays",
-  "Instant floor UPC scanning"
+  "Compare wholesale vendor costs",
+  "Sync reports into Google Sheets",
+  "Fix prices without touching Commander",
+  "Stop losing money on vendor hikes",
+  "Scan products from the floor"
 ];
 
 /** 6 Validated App Screens mapped from project wireframes */
@@ -132,30 +133,30 @@ const validatedScreens = [
 
 const techStack = [
   {
-    name: "Electron & React",
-    role: "Desktop Command Center",
-    desc: "Primary command center UI for store managers connecting to local Edge Agent or Cloud Hub.",
+    name: "Desktop Dashboard",
+    role: "Command Center",
+    desc: "Primary UI for store managers to manage price updates and compare vendor costs.",
     LogoComponent: ReactElectronLogo,
     badge: "Desktop App"
   },
   {
-    name: "Node.js & Express",
-    role: "Local Edge Agent",
-    desc: "Acts as outbound Edge Agent on local Store PC reading directly from Verifone Commander.",
+    name: "Local Store Connection",
+    role: "Verifone POS Sync",
+    desc: "Connects directly to your Verifone Commander to access and manage your POS data securely.",
     LogoComponent: NodeJsLogo,
-    badge: "Edge Agent"
+    badge: "POS Integration"
   },
   {
-    name: "GCP Cloud Run & WebSockets",
-    role: "Real-Time Cloud Hub",
-    desc: "Central WebSocket hub maintaining dynamic event-driven rooms keyed by store_id.",
+    name: "Cloud Reporting",
+    role: "Google Sheets Sync",
+    desc: "Automatically exports your daily metrics and shift closeouts to shared spreadsheets.",
     LogoComponent: GcpCloudLogo,
-    badge: "Cloud Hub"
+    badge: "Reporting"
   },
   {
-    name: "Next.js & MongoDB",
-    role: "Web Portal & Admin",
-    desc: "Vercel-hosted marketing portal and internal company admin for licenses & telemetry.",
+    name: "Web Portal",
+    role: "Admin Management",
+    desc: "Secure web portal for managing licenses, billing, and multi-store settings.",
     LogoComponent: NextMongoLogo,
     badge: "Web Portal"
   }
@@ -475,9 +476,9 @@ export function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
             >
-              Built for store operators —{" "}
+              Take control of your{" "}
               <span className="bg-gradient-to-r from-[#00B36B] via-[#00A87B] to-[#1D4ED8] bg-clip-text text-transparent">
-                not generic retail SaaS.
+                convenience store margins.
               </span>
             </motion.h1>
 
@@ -487,7 +488,7 @@ export function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              Manage vendor pricing, compare wholesale costs, calculate shelf prices, and inspect register transactions in real-time from your back-office computer and store devices.
+              Connect your Verifone register in 5 minutes. Update prices from anywhere, compare wholesale vendor costs, and get daily shift reports directly in Google Sheets.
             </motion.p>
 
             {/* Dynamic Focus Feature Pill */}
@@ -537,7 +538,7 @@ export function LandingPage() {
               <VerifoneBadge />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-900 shadow-sm">
                 <HardDrive className="h-3.5 w-3.5 text-[#00B36B]" />
-                Back-office PC - Real-time Relay
+                Back-office PC - Connects to Register
               </span>
             </motion.div>
 
