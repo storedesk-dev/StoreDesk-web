@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     "vendor cost comparison",
     "barcode scanning c-store",
     "convenience store software",
-    "c-store inventory management price book"
+    "c-store price book margin tracking"
   ],
   authors: [
     { name: "Trupal (StoreDesk)", url: siteUrl },
@@ -88,6 +88,9 @@ export const metadata: Metadata = {
       { url: "/brand/logo-mark.jpg", type: "image/jpeg" }
     ],
     apple: [{ url: "/brand/logo-mark.jpg", type: "image/jpeg" }]
+  },
+  verification: {
+    google: "ELm9u6dJOxQAaNx5-2-a8-u1wsPVVsjgEBJD9TDN3Jw"
   },
   robots: {
     index: true,

@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/product",
     "/how-it-works",
     "/about",
+    "/download",
     "/contact",
     "/privacy",
     "/terms"
@@ -28,6 +29,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency = "daily";
     } else if (route === "/product" || route === "/how-it-works") {
       priority = 0.9;
+      changeFrequency = "weekly";
+    } else if (route === "/download") {
+      priority = 0.85;
       changeFrequency = "weekly";
     } else if (route === "/about" || route === "/contact") {
       priority = 0.8;

@@ -11,7 +11,8 @@ export default function TermsPage() {
         
         <h2 className="text-xl font-bold text-[var(--ink)]">1. Core Functionality</h2>
         <p>
-          StoreDesk is engineered exclusively for **margin tracking, wholesale cost comparison, and price book management**.
+          StoreDesk is built for <strong>margin tracking, wholesale cost comparison, and price book management</strong>.
+          It is not an inventory system and does not track stock quantities or reorder levels.
         </p>
 
         <h2 className="text-xl font-bold text-[var(--ink)]">2. POS Integrations</h2>
@@ -23,8 +24,9 @@ export default function TermsPage() {
 
         <h2 className="text-xl font-bold text-[var(--ink)]">3. Data Source of Truth</h2>
         <p>
-          StoreDesk operates on a local-first philosophy. Your local StoreDesk Worker PC acts as the ultimate Source of Truth. 
-          If WAN connectivity is lost, local pricing rules and invoice workflows remain functional, and changes will be queued and pushed to the cloud upon reconnection.
+          StoreDesk operates on a local-first philosophy. Your local StoreDesk Worker PC is the source of truth for all
+          pricing and vendor cost data. Product data, vendor prices, and pricing rules are stored on your hardware
+          and are not shared with third parties.
         </p>
 
         <p className="pt-8 border-t border-[var(--border)] mt-8">
