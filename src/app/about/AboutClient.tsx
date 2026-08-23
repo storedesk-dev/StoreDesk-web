@@ -22,7 +22,7 @@ const PRINCIPLES = [
   { subject: "No Stock Counts", score: 100 },
   { subject: "Mobile Speed", score: 88 },
   { subject: "Store Engine", score: 96 },
-  { subject: "Register Sync", score: 90 }
+  { subject: "Price Accuracy", score: 95 }
 ];
 
 export function AboutClient() {
@@ -40,11 +40,14 @@ export function AboutClient() {
               <h2 className="text-lg font-bold text-[var(--foreground)]">Why StoreDesk was built</h2>
             </div>
             <p className="text-[var(--muted)] leading-relaxed">
-              Convenience store owners deal with thousands of items, rising supplier prices, and stacks of paper invoices. 
-              What they need is a clear system to track cost truth, calculate proper selling prices, and scan barcodes on the floor.
+              Most convenience store software focuses on inventory counts or POS management.
+              StoreDesk fills the gap between what your register shows and what you actually paid your vendor
+              — a gap that quietly erodes margins every day vendor prices change.
             </p>
             <p className="mt-4 text-[var(--muted)] leading-relaxed">
-              Created by the StoreDesk team, StoreDesk runs on your store computer with a desktop dashboard for management and a fast mobile app for floor staff — keeping all your pricing data fast, local, and accurate.
+              StoreDesk runs entirely on your store computer. The desktop dashboard handles your full price book
+              and vendor cost comparisons. StoreDesk Mobile puts that data in your pocket on the floor
+              — scan any barcode, see your true cost and margin, and know instantly which vendor to reorder from.
             </p>
             <div className="mt-5">
               <VerifoneBadge />

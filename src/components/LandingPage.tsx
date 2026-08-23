@@ -10,7 +10,6 @@ import { VerifoneBadge } from "@/components/VerifoneBadge";
 import { SITE, contactMailto } from "@/lib/site";
 import {
   HardDrive,
-  TrendingUp,
   ArrowRight,
   CheckCircle2,
   ShieldCheck,
@@ -20,9 +19,10 @@ import {
   ChevronRight,
   Smartphone,
   Scan,
-  Receipt,
   Search,
   DollarSign,
+  Tag,
+  Store,
   Mail
 } from "lucide-react";
 
@@ -64,99 +64,100 @@ function NextMongoLogo() {
   );
 }
 
-/** Rotating words for hero focus pill */
+/** Rotating words for hero focus pill — all grounded in features the app actually has */
 const FLIP_WORDS = [
-  "Compare wholesale vendor costs",
-  "Sync reports into Google Sheets",
-  "Fix prices without touching Commander",
+  "Know your true cost before you buy",
+  "Track vendor price changes over time",
+  "Find the best vendor for every product",
   "Stop losing money on vendor hikes",
-  "Scan products from the floor"
+  "Scan any barcode on the floor instantly",
+  "Set smart margins with pricing rules"
 ];
 
-/** 6 Validated App Screens mapped from project wireframes */
+/** App screens — grounded in features that exist in StoreDesk Mobile today */
 const validatedScreens = [
   {
     id: "login",
     src: "/screenshots/mobile-app-1.jpeg",
     title: "StoreDesk Login",
     subtitle: "Secure Store Authentication",
-    desc: "Authentication screen for store staff and managers with organization-provisioned AppUser credentials.",
-    tag: "Core UI",
+    desc: "Sign in with your organization-provisioned AppUser credentials. Accounts are set up when your store license is created — no self-registration.",
+    tag: "Auth",
     icon: Smartphone
-  },
-  {
-    id: "analytics",
-    src: "/screenshots/mobile-app-5.jpeg",
-    title: "Sales Tax & Analytics",
-    subtitle: "Live Shift & Category Feed",
-    desc: "Dashboard featuring sales breakdowns, hourly trends, category breakdown, and live shift transaction feed.",
-    tag: "Analytics",
-    icon: BarChart3
-  },
-  {
-    id: "sync",
-    src: "/screenshots/mobile-app-6.jpeg",
-    title: "Transaction & Register Sync",
-    subtitle: "Real-time Receipt Breakdown",
-    desc: "Detailed view of specific cash register transactions, line items, taxes, and subtotal calculation.",
-    tag: "Live Feed",
-    icon: Receipt
   },
   {
     id: "scanner",
     src: "/screenshots/mobile-app-2.jpeg",
-    title: "Barcode Scanner & Search",
-    desc: "Price Book catalog with instant UPC camera scanner trigger and fast search by name, brand, or department.",
-    subtitle: "Instant Camera Lookup",
+    title: "Barcode Scanner",
+    subtitle: "Instant UPC Camera Lookup",
+    desc: "Aim at any shelf barcode and get the product name, your vendor's cost, the suggested selling price, and your margin — instantly.",
     tag: "Scan First",
     icon: Scan
   },
   {
     id: "details",
     src: "/screenshots/mobile-app-3.jpeg",
-    title: "Product Details & Comparison",
-    subtitle: "PLU & Vendor Cost Overlay",
-    desc: "Live PLU details showing selling price, department tax categories, unit size, and wholesale supplier cost.",
+    title: "Product Details",
+    subtitle: "Cost & Margin Breakdown",
+    desc: "See the full product card: unit size, pack quantity, selling price, and your calculated cost per unit. Know your margin before you touch the shelf label.",
     tag: "Price Book",
     icon: Search
   },
   {
     id: "vendor",
     src: "/screenshots/mobile-app-4.jpeg",
-    title: "Vendor Prices & Cost Breakdown",
-    subtitle: "True Margin Transparency",
-    desc: "Cost analysis overlay comparing retail prices against local vendor costs to calculate true profit margins.",
-    tag: "Margin Control",
+    title: "Vendor Price Comparison",
+    subtitle: "Best Supplier, Lowest Cost",
+    desc: "Compare every vendor's price for this product side-by-side. The best supplier is highlighted so you know exactly who to order from.",
+    tag: "Vendor Compare",
     icon: DollarSign
+  },
+  {
+    id: "pricebook",
+    src: "/screenshots/mobile-app-5.jpeg",
+    title: "Price Book Search",
+    subtitle: "Full Catalog On Your Phone",
+    desc: "Browse or search your full product catalog from anywhere in the store. Filter by name, brand, or category without going back to the office.",
+    tag: "Catalog",
+    icon: Tag
+  },
+  {
+    id: "pricing",
+    src: "/screenshots/mobile-app-6.jpeg",
+    title: "Suggested Selling Price",
+    subtitle: "Margin Rules Applied",
+    desc: "StoreDesk calculates a suggested retail price from your pricing rules — margin %, markup %, or fixed amount — so your prices always protect your profit.",
+    tag: "Pricing",
+    icon: Store
   }
 ];
 
 const techStack = [
   {
-    name: "Desktop Dashboard",
-    role: "Command Center",
-    desc: "Primary UI for store managers to manage price updates and compare vendor costs.",
+    name: "StoreDesk Desktop",
+    role: "Price Book & Vendor Command Center",
+    desc: "React + Electron dashboard for managers. Add products, set vendor prices, compare costs, and apply margin rules — all from your back-office PC.",
     LogoComponent: ReactElectronLogo,
     badge: "Desktop App"
   },
   {
-    name: "Local Store Connection",
-    role: "Verifone POS Sync",
-    desc: "Connects directly to your Verifone Commander to access and manage your POS data securely.",
+    name: "StoreDesk Worker",
+    role: "Local API Server",
+    desc: "Node.js + Express + MongoDB running on your back-office PC. All store data lives on your hardware — not in a shared cloud database.",
     LogoComponent: NodeJsLogo,
-    badge: "POS Integration"
+    badge: "Local Server"
   },
   {
-    name: "Cloud Reporting",
-    role: "Google Sheets Sync",
-    desc: "Automatically exports your daily metrics and shift closeouts to shared spreadsheets.",
+    name: "StoreDesk Cloud Hub",
+    role: "License & Account Sync",
+    desc: "Lightweight relay on GCP that keeps your store license active and desktop/mobile accounts synchronized. No product data ever leaves your store.",
     LogoComponent: GcpCloudLogo,
-    badge: "Reporting"
+    badge: "Cloud Hub"
   },
   {
-    name: "Web Portal",
-    role: "Admin Management",
-    desc: "Secure web portal for managing licenses, billing, and multi-store settings.",
+    name: "StoreDesk Web",
+    role: "License Portal",
+    desc: "Secure web portal for managing store licenses, billing, and provisioning AppUser accounts when a new store is onboarded.",
     LogoComponent: NextMongoLogo,
     badge: "Web Portal"
   }
@@ -165,23 +166,23 @@ const techStack = [
 const steps = [
   {
     n: "01",
-    title: "Install Store Engine",
-    body: "Local PC setup running Edge Agent on store back-office PC."
+    title: "Install StoreDesk Worker",
+    body: "Run the installer on your back-office Windows PC. It starts a local server and MongoDB database — no internet required after setup."
   },
   {
     n: "02",
-    title: "Sign In & Provision Accounts",
-    body: "Secure org access provisioned when store license is created."
+    title: "Build Your Price Book",
+    body: "Add your products and product variants. Enter your vendor names and the prices they charge per pack, case, or unit."
   },
   {
     n: "03",
-    title: "Connect Floor Devices",
-    body: "Scan barcodes anywhere on the floor over store Wi-Fi."
+    title: "Connect Your Phone",
+    body: "Log in to StoreDesk Mobile from any Android phone on your store Wi-Fi. No pairing QR needed — sign in as your org AppUser."
   },
   {
     n: "04",
-    title: "Compare & Set Prices",
-    body: "Protect profit margins with live wholesale vendor cost overlays."
+    title: "Scan & Protect Your Margins",
+    body: "Scan shelf barcodes to see cost, best vendor, and your exact margin. Stop selling below cost before the next price hike hits."
   }
 ];
 
@@ -488,7 +489,7 @@ export function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              Connect your Verifone register in 5 minutes. Update prices from anywhere, compare wholesale vendor costs, and get daily shift reports directly in Google Sheets.
+              Runs on your back-office PC. Track every vendor&apos;s cost, compare prices across suppliers, set margins per product, and let your staff scan barcodes anywhere on the floor.
             </motion.p>
 
             {/* Dynamic Focus Feature Pill */}
@@ -515,16 +516,16 @@ export function LandingPage() {
               </div>
             </motion.div>
 
-            {/* Live Ticker Metric Spotlight */}
+            {/* Local-first honest value badge */}
             <motion.div
               className="mt-4 inline-flex items-center gap-3 rounded-xl border border-slate-300 bg-white/90 px-3.5 py-2 shadow-sm backdrop-blur-sm"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12 }}
             >
-              <TrendingUp className="h-4 w-4 text-[#00B36B]" />
+              <HardDrive className="h-4 w-4 text-[#00B36B]" />
               <span className="text-xs font-bold text-slate-900">
-                Live Net Shift Sync: <AnimatedCounter value={356.2} />
+                Local-first &middot; No cloud required &middot; Your data stays in your store
               </span>
             </motion.div>
 
@@ -538,7 +539,7 @@ export function LandingPage() {
               <VerifoneBadge />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-900 shadow-sm">
                 <HardDrive className="h-3.5 w-3.5 text-[#00B36B]" />
-                Back-office PC - Connects to Register
+                Back-office PC &middot; Store Wi-Fi &middot; Local Network
               </span>
             </motion.div>
 

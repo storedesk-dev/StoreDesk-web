@@ -65,8 +65,8 @@ export function DeviceStage() {
           <BarChart3 className="h-4 w-4" />
         </span>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Live Register</p>
-          <p className="text-xs font-extrabold text-[#00B36B]">Sales & Tax Dashboard</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Best Vendor</p>
+          <p className="text-xs font-extrabold text-[#00B36B]">Lowest Cost Per Unit</p>
         </div>
       </motion.div>
 

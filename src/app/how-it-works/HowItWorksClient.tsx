@@ -5,7 +5,6 @@ import { MarketingShell } from "@/components/MarketingShell";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
 import { motion } from "framer-motion";
 import {
-  CloudSync,
   HardDrive,
   Laptop,
   Server,
@@ -16,18 +15,18 @@ import {
 
 const steps = [
   {
-    title: "Step 1: Install the App",
-    detail: "Run it on your back-office Windows PC where your Verifone Commander is connected.",
+    title: "Step 1: Install StoreDesk Worker",
+    detail: "Download and run the StoreDesk Worker installer on your back-office Windows PC. It starts a local Node.js server and MongoDB database — no internet required after setup.",
     icon: Download
   },
   {
-    title: "Step 2: Connect the Register",
-    detail: "It safely links to your Verifone Commander over your store's Wi-Fi. No technicians needed.",
-    icon: Server
+    title: "Step 2: Build Your Price Book",
+    detail: "Open StoreDesk Desktop and add your products, product variants, and vendors. Enter the prices each vendor charges per pack, case, or unit. StoreDesk calculates your true cost per item automatically.",
+    icon: Laptop
   },
   {
-    title: "Step 3: Start Managing Prices",
-    detail: "Walk the floor with your phone and scan items to fix bad prices. Sync reports directly to Google Sheets.",
+    title: "Step 3: Walk the Floor with StoreDesk Mobile",
+    detail: "Log in from any Android phone on your store Wi-Fi. Scan shelf barcodes to see your vendor cost, suggested selling price, and which supplier has the best deal — right where you need it.",
     icon: Smartphone
   }
 ];
@@ -42,7 +41,7 @@ export function HowItWorksClient() {
           </span>
           <div>
             <p className="text-sm font-bold">Your Store. Your Computer.</p>
-            <p className="text-xs text-[var(--muted)]">Store Connection + Desktop Dashboard + Mobile App + Google Sheets Sync</p>
+            <p className="text-xs text-[var(--muted)]">StoreDesk Worker + Desktop + Mobile App + Cloud Hub</p>
           </div>
         </div>
         <VerifoneBadge />
@@ -50,10 +49,10 @@ export function HowItWorksClient() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { icon: Server, label: "Store Connection", sub: "Local DB & POS Sync" },
-          { icon: Laptop, label: "Desktop Dashboard", sub: "Price Management UI" },
-          { icon: Smartphone, label: "Mobile App", sub: "Barcode Floor Scanner" },
-          { icon: CloudSync, label: "Cloud Reporting", sub: "Google Sheets Sync" }
+          { icon: Server, label: "StoreDesk Worker", sub: "Local Server & Database" },
+          { icon: Laptop, label: "StoreDesk Desktop", sub: "Price Book & Vendor Hub" },
+          { icon: Smartphone, label: "StoreDesk Mobile", sub: "Barcode Floor Scanner" },
+          { icon: HardDrive, label: "Cloud Hub", sub: "License & Account Sync" }
         ].map((card) => {
           const Icon = card.icon;
           return (

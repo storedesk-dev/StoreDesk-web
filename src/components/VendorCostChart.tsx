@@ -23,7 +23,7 @@ export function VendorCostChart() {
   return (
     <div className="h-[320px] w-full rounded-2xl border border-[var(--border)] bg-white/95 p-4 shadow-md shadow-blue-500/10">
       <p className="mb-2 text-sm font-bold text-[var(--foreground)]">Sample: sell vs vendor cost</p>
-      <p className="mb-4 text-xs text-[var(--muted)]">Illustrative only — live numbers come from Commander + your invoices.</p>
+      <p className="mb-4 text-xs text-[var(--muted)]">Illustrative only — live numbers come from your vendor price entries.</p>
       <ResponsiveContainer width="100%" height="85%">
         <BarChart data={SAMPLE} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(14,67,216,0.12)" />
