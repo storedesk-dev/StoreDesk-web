@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ProductClient } from "./ProductClient";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://storedesk.dev";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-desk-prod.vercel.app";
 
 export const metadata: Metadata = {
   title: "StoreDesk Features — Price Book, Vendor Cost Comparison & Mobile Scanner",

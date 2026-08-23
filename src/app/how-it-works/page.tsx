@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { HowItWorksClient } from "./HowItWorksClient";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://storedesk.dev";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-desk-prod.vercel.app";
 
 export const metadata: Metadata = {
   title: "How StoreDesk Works — Architecture, Store Engine & Mobile Scanning",
