@@ -568,6 +568,8 @@ export async function redeemSetupKey(body: {
     workerCredential: `${credentialId}.${secret}`,
     workerCredentialId: credentialId,
     hubUrl: hubUrl(),
+    cloudflareToken: store.cloudflareToken ?? null,
+    tunnelUrl: store.tunnelUrl ?? null,
     issuedAt: new Date().toISOString()
   };
 }
@@ -946,7 +948,7 @@ export async function issueClientSession(body: {
     role: "app_user",
     scopes: assignment.scopes,
     refreshCredential: `${refreshId}.${refreshSecret}`,
-    tunnelUrl: (store as any)?.tunnelUrl || null,
-    lanUrl: (installation as any)?.lanUrl || null
+    tunnelUrl: (store as Record<string, unknown>)?.tunnelUrl as string | null,
+    lanUrl: (installation as Record<string, unknown>)?.lanUrl as string | null
   };
 }

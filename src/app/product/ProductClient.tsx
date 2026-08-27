@@ -12,6 +12,7 @@ import {
   Receipt,
   RefreshCw,
   ScanBarcode,
+  Server,
   Smartphone
 } from "lucide-react";
 
@@ -41,9 +42,9 @@ const features = [
     accent: "from-[#00A87B] to-[#28C88B]"
   },
   {
-    title: "Instant Invoice Review",
-    body: "Upload vendor invoices, automatically see price hikes, and approve new costs with full control.",
-    icon: Receipt,
+    title: "Local First Architecture",
+    body: "Runs directly on your store PC. No cloud dependency for core operations. Secure Cloudflare Tunnel for authenticated mobile access.",
+    icon: Server,
     accent: "from-[#1A63F4] to-[#00A87B]"
   },
   {

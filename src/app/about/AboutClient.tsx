@@ -18,8 +18,8 @@ import { HeartHandshake, Lock, Scale, Sparkles, Users } from "lucide-react";
 
 const PRINCIPLES = [
   { subject: "Store Computer", score: 98 },
-  { subject: "Review First", score: 92 },
-  { subject: "No Stock Counts", score: 100 },
+  { subject: "Price Control", score: 92 },
+  { subject: "True Margins", score: 100 },
   { subject: "Mobile Speed", score: 88 },
   { subject: "Store Engine", score: 96 },
   { subject: "Register Sync", score: 90 }
@@ -40,7 +40,7 @@ export function AboutClient() {
               <h2 className="text-lg font-bold text-[var(--foreground)]">Why StoreDesk was built</h2>
             </div>
             <p className="text-[var(--muted)] leading-relaxed">
-              Convenience store owners deal with thousands of items, rising supplier prices, and stacks of paper invoices. 
+              Convenience store owners deal with thousands of items, rising supplier prices, and complex vendor pricing. 
               What they need is a clear system to track cost truth, calculate proper selling prices, and scan barcodes on the floor.
             </p>
             <p className="mt-4 text-[var(--muted)] leading-relaxed">
@@ -62,7 +62,7 @@ export function AboutClient() {
               <h2 className="text-lg font-bold text-[var(--foreground)]">Get in touch</h2>
             </div>
             <p className="text-[var(--muted)] leading-relaxed">
-              Built by convenience store operations specialists who understand retail pricing, vendor invoices, and register management.
+              Built by convenience store operations specialists who understand retail pricing, wholesale cost analysis, and register management.
             </p>
             <a href={contactMailto()} className="mt-4 inline-flex items-center gap-2 font-semibold text-[var(--sd-blue)] hover:underline">
               <HeartHandshake className="h-4 w-4" />
@@ -93,7 +93,7 @@ export function AboutClient() {
               <Lock className="h-4 w-4 text-[var(--sd-green)]" /> All store records stay securely on your computer
             </li>
             <li className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-[var(--sd-blue)]" /> Human review of vendor invoices before updating prices
+              <Lock className="h-4 w-4 text-[var(--sd-blue)]" /> Strict isolation of vendor cost layers from retail selling prices
             </li>
             <li className="flex items-center gap-2">
               <Lock className="h-4 w-4 text-[var(--sd-blue)]" /> Dedicated price book and supplier cost comparison

@@ -605,7 +605,7 @@ export function LandingPage() {
                 <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">Protect profit margins against rising costs</h3>
               </div>
               <p className="mt-4 text-base font-normal leading-relaxed text-slate-700">
-                Retail prices live on your cash register while wholesale costs live in vendor invoices. StoreDesk connects those two worlds so true per-unit profit margins are transparent before changing shelf labels.
+                Retail prices live on your cash register while true wholesale costs are tracked in your Price Book. StoreDesk connects those two worlds so true per-unit profit margins are transparent before changing shelf labels.
               </p>
             </motion.article>
 
