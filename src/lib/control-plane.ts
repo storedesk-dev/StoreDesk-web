@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db";
+import { provisionCloudflareTunnel } from "./cloudflare";
 import {
   AppUserModel,
   AuditEventModel,
@@ -197,6 +198,20 @@ export async function createStore(
     throw new ControlPlaneError(402, "SUBSCRIPTION_INACTIVE", "Store entitlement exhausted");
   }
   const storeId = publicId("store");
+
+  let cloudflareToken: string | undefined;
+  let tunnelUrl: string | undefined;
+
+  try {
+    const cf = await provisionCloudflareTunnel(storeId);
+    if (cf) {
+      cloudflareToken = cf.cloudflareToken;
+      tunnelUrl = cf.tunnelUrl;
+    }
+  } catch (err: any) {
+    console.error(`[cloudflare-provision] Failed to provision tunnel: ${err.message}`);
+  }
+
   const doc = await TenantStoreModel.create({
     organizationId,
     storeId,
@@ -205,6 +220,8 @@ export async function createStore(
     storeNumber: body.storeNumber?.trim(),
     address: body.address?.trim(),
     contactEmail: body.contactEmail?.trim().toLowerCase(),
+    cloudflareToken,
+    tunnelUrl,
     status: "active"
   });
   await writeAudit({
