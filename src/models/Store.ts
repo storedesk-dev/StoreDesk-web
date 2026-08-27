@@ -11,7 +11,9 @@ const StoreSchema = new Schema(
     licensePlan: { type: String, enum: ["trial", "standard", "custom"], default: "trial" },
     supportEndsAt: { type: Date, required: true },
     supportConfirmedAt: { type: Date },
-    notes: { type: String }
+    notes: { type: String },
+    tunnelUrl: { type: String, trim: true },
+    cloudflareToken: { type: String, trim: true }
   },
   { timestamps: true }
 );

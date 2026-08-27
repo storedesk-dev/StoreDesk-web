@@ -599,7 +599,7 @@ export async function completeBootstrap(
   organizationId: string,
   storeId: string,
   workerInstallationId: string,
-  body: { bootstrapVersion: string; hubHandshakeOk: boolean }
+  body: { bootstrapVersion: string; hubHandshakeOk: boolean; lanUrl?: string }
 ) {
   await connectDb();
   const installation = await WorkerInstallationModel.findOne({
@@ -608,12 +608,17 @@ export async function completeBootstrap(
     workerInstallationId
   });
   if (!installation) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Not found");
+  
+  if (body.lanUrl) {
+    (installation as any).lanUrl = body.lanUrl;
+  }
+
   if (!installation.firstBootstrapCompletedAt) {
     installation.firstBootstrapCompletedAt = new Date();
     installation.bootstrapVersion = body.bootstrapVersion;
     if (body.hubHandshakeOk) installation.hubVerifiedAt = new Date();
-    await installation.save();
   }
+  await installation.save();
   return safeJson({
     contractVersion: CONTRACT_VERSION,
     ready: Boolean(installation.firstBootstrapCompletedAt && installation.workerCredentialId),
@@ -721,7 +726,9 @@ async function assignmentSummaries(appUserId: string) {
       scopes: a.scopes,
       ready: Boolean(
         installation?.status === "active" && installation.firstBootstrapCompletedAt
-      )
+      ),
+      tunnelUrl: (store as any)?.tunnelUrl || null,
+      lanUrl: (installation as any)?.lanUrl || null
     });
   }
   return summaries;
@@ -908,6 +915,8 @@ export async function issueClientSession(body: {
     expiresAt: relay.expiresAt
   });
 
+  const store = await TenantStoreModel.findOne({ storeId: assignment.storeId }).lean();
+
   return {
     contractVersion: CONTRACT_VERSION,
     sessionToken: relay.token,
@@ -919,6 +928,8 @@ export async function issueClientSession(body: {
     assignmentId: assignment.assignmentId,
     role: "app_user",
     scopes: assignment.scopes,
-    refreshCredential: `${refreshId}.${refreshSecret}`
+    refreshCredential: `${refreshId}.${refreshSecret}`,
+    tunnelUrl: (store as any)?.tunnelUrl || null,
+    lanUrl: (installation as any)?.lanUrl || null
   };
 }

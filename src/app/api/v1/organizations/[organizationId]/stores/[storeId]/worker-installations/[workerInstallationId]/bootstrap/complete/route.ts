@@ -18,10 +18,11 @@ export async function POST(req: Request, ctx: Ctx) {
     ) {
       throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Resource not found");
     }
-    const body = (await req.json()) as { bootstrapVersion?: string; hubHandshakeOk?: boolean };
+        const body = (await req.json()) as { bootstrapVersion?: string; hubHandshakeOk?: boolean; lanUrl?: string };
     const result = await completeBootstrap(organizationId, storeId, workerInstallationId, {
       bootstrapVersion: body.bootstrapVersion || "1",
-      hubHandshakeOk: Boolean(body.hubHandshakeOk)
+      hubHandshakeOk: Boolean(body.hubHandshakeOk),
+      lanUrl: body.lanUrl
     });
     return NextResponse.json(result);
   } catch (error) {
