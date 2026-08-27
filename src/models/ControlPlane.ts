@@ -71,7 +71,9 @@ const TenantStoreSchema = new Schema(
     storeNumber: { type: String, trim: true },
     address: { type: String, trim: true },
     contactEmail: { type: String, lowercase: true, trim: true },
-    status: { type: String, enum: ["pending", "active", "suspended", "closed"], default: "active" }
+    status: { type: String, enum: ["pending", "active", "suspended", "closed"], default: "active" },
+    tunnelUrl: { type: String, trim: true },
+    cloudflareToken: { type: String, trim: true }
   },
   timestamps
 );
@@ -109,7 +111,8 @@ const WorkerInstallationSchema = new Schema(
     firstBootstrapCompletedAt: Date,
     bootstrapVersion: String,
     hubVerifiedAt: Date,
-    lastSeenAt: Date
+    lastSeenAt: Date,
+    lanUrl: { type: String, trim: true }
   },
   timestamps
 );
