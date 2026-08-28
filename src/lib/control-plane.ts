@@ -208,8 +208,9 @@ export async function createStore(
       cloudflareToken = cf.cloudflareToken;
       tunnelUrl = cf.tunnelUrl;
     }
-  } catch (err: any) {
-    console.error(`[cloudflare-provision] Failed to provision tunnel: ${err.message}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[cloudflare-provision] Failed to provision tunnel: ${msg}`);
   }
 
   const doc = await TenantStoreModel.create({
@@ -634,7 +635,7 @@ export async function completeBootstrap(
   if (!installation) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Not found");
   
   if (body.lanUrl) {
-    (installation as any).lanUrl = body.lanUrl;
+    installation.lanUrl = body.lanUrl;
   }
 
   if (!installation.firstBootstrapCompletedAt) {
@@ -751,8 +752,8 @@ async function assignmentSummaries(appUserId: string) {
       ready: Boolean(
         installation?.status === "active" && installation.firstBootstrapCompletedAt
       ),
-      tunnelUrl: (store as any)?.tunnelUrl || null,
-      lanUrl: (installation as any)?.lanUrl || null
+      tunnelUrl: (store as Record<string, unknown> | null)?.tunnelUrl ? String((store as Record<string, unknown>).tunnelUrl) : null,
+      lanUrl: (installation as Record<string, unknown> | null)?.lanUrl ? String((installation as Record<string, unknown>).lanUrl) : null
     });
   }
   return summaries;

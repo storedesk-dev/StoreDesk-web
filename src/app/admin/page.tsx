@@ -17,7 +17,7 @@ export default function AdminDashboardPage() {
         const orgs = data.organizations || [];
         setStats({
           organizations: orgs.length,
-          stores: orgs.reduce((acc: number, org: any) => acc + (org.stores?.length || 0), 0),
+          stores: orgs.reduce((acc: number, org: Record<string, unknown>) => acc + (Array.isArray(org.stores) ? org.stores.length : 0), 0),
           activeWorkers: 0 // Mock for now until we build the worker query
         });
       } catch (err) {

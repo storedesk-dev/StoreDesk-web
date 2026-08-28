@@ -9,7 +9,6 @@ import {
   CloudSync,
   FileSearch,
   HardDrive,
-  Receipt,
   RefreshCw,
   ScanBarcode,
   Server,

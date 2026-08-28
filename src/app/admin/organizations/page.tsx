@@ -4,8 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
-export default function OrganizationsPage() {
-  const [organizations, setOrganizations] = useState([]);
+interface OrganizationItem {
+  _id: string;
+  organizationId: string;
+  name: string;
+  status: string;
+  stores?: unknown[];
+}
+
+export default function AdminOrganizationsPage() {
+  const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,7 +62,7 @@ export default function OrganizationsPage() {
                 <td colSpan={5} className="px-6 py-8 text-center text-[var(--muted)]">No organizations found.</td>
               </tr>
             ) : (
-              organizations.map((org: any) => (
+              organizations.map((org: OrganizationItem) => (
                 <tr key={org._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{org.name}</td>
                   <td className="px-6 py-4 font-mono text-[11px] text-[var(--muted)]">{org.organizationId}</td>
