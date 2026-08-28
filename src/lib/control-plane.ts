@@ -472,6 +472,11 @@ export async function redeemSetupKey(body: {
   }).lean();
   if (!sub) throw new ControlPlaneError(402, "SUBSCRIPTION_INACTIVE", "Subscription inactive");
 
+  const store = await TenantStoreModel.findOne({
+    organizationId: key.organizationId,
+    storeId: key.storeId
+  }).lean();
+
   const installation = await WorkerInstallationModel.findOne({
     workerInstallationId: key.workerInstallationId,
     organizationId: key.organizationId,
@@ -568,8 +573,8 @@ export async function redeemSetupKey(body: {
     workerCredential: `${credentialId}.${secret}`,
     workerCredentialId: credentialId,
     hubUrl: hubUrl(),
-    cloudflareToken: store.cloudflareToken ?? null,
-    tunnelUrl: store.tunnelUrl ?? null,
+    cloudflareToken: store?.cloudflareToken ?? null,
+    tunnelUrl: store?.tunnelUrl ?? null,
     issuedAt: new Date().toISOString()
   };
 }
