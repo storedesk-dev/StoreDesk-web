@@ -208,8 +208,9 @@ export async function createStore(
       cloudflareToken = cf.cloudflareToken;
       tunnelUrl = cf.tunnelUrl;
     }
-  } catch (err: any) {
-    console.error(`[cloudflare-provision] Failed to provision tunnel: ${err.message}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[cloudflare-provision] Failed to provision tunnel: ${msg}`);
   }
 
   const doc = await TenantStoreModel.create({
@@ -472,6 +473,11 @@ export async function redeemSetupKey(body: {
   }).lean();
   if (!sub) throw new ControlPlaneError(402, "SUBSCRIPTION_INACTIVE", "Subscription inactive");
 
+  const store = await TenantStoreModel.findOne({
+    organizationId: key.organizationId,
+    storeId: key.storeId
+  }).lean();
+
   const installation = await WorkerInstallationModel.findOne({
     workerInstallationId: key.workerInstallationId,
     organizationId: key.organizationId,
@@ -568,6 +574,8 @@ export async function redeemSetupKey(body: {
     workerCredential: `${credentialId}.${secret}`,
     workerCredentialId: credentialId,
     hubUrl: hubUrl(),
+    cloudflareToken: store?.cloudflareToken ?? null,
+    tunnelUrl: store?.tunnelUrl ?? null,
     issuedAt: new Date().toISOString()
   };
 }
@@ -627,7 +635,7 @@ export async function completeBootstrap(
   if (!installation) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Not found");
   
   if (body.lanUrl) {
-    (installation as any).lanUrl = body.lanUrl;
+    installation.lanUrl = body.lanUrl;
   }
 
   if (!installation.firstBootstrapCompletedAt) {
@@ -744,8 +752,8 @@ async function assignmentSummaries(appUserId: string) {
       ready: Boolean(
         installation?.status === "active" && installation.firstBootstrapCompletedAt
       ),
-      tunnelUrl: (store as any)?.tunnelUrl || null,
-      lanUrl: (installation as any)?.lanUrl || null
+      tunnelUrl: (store as Record<string, unknown> | null)?.tunnelUrl ? String((store as Record<string, unknown>).tunnelUrl) : null,
+      lanUrl: (installation as Record<string, unknown> | null)?.lanUrl ? String((installation as Record<string, unknown>).lanUrl) : null
     });
   }
   return summaries;
@@ -946,7 +954,7 @@ export async function issueClientSession(body: {
     role: "app_user",
     scopes: assignment.scopes,
     refreshCredential: `${refreshId}.${refreshSecret}`,
-    tunnelUrl: (store as any)?.tunnelUrl || null,
-    lanUrl: (installation as any)?.lanUrl || null
+    tunnelUrl: (store as Record<string, unknown>)?.tunnelUrl as string | null,
+    lanUrl: (installation as Record<string, unknown>)?.lanUrl as string | null
   };
 }

@@ -32,7 +32,7 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
     })
   });
 
-  const data = (await res.json()) as any;
+  const data = (await res.json()) as { success?: boolean; result?: { id?: string; token?: string }; errors?: Array<{ message?: string }> };
   if (!res.ok || !data.success) {
     const errMsg = data.errors?.[0]?.message || "Failed to create Cloudflare tunnel";
     throw new Error(errMsg);
@@ -70,15 +70,16 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
         })
       });
 
-      const dnsData = (await dnsRes.json()) as any;
+      const dnsData = (await dnsRes.json()) as { success?: boolean; errors?: Array<{ message?: string }> };
       if (!dnsRes.ok || !dnsData.success) {
         const errMsg = dnsData.errors?.[0]?.message || "Failed to create DNS CNAME record";
         console.warn(`[cloudflare:warn] CNAME registration warning: ${errMsg}`);
       } else {
         console.info("[cloudflare] DNS CNAME record registered successfully.");
       }
-    } catch (dnsErr: any) {
-      console.warn(`[cloudflare:warn] Failed to create DNS record: ${dnsErr.message}`);
+    } catch (dnsErr: unknown) {
+      const msg = dnsErr instanceof Error ? dnsErr.message : String(dnsErr);
+      console.warn(`[cloudflare:warn] Failed to create DNS record: ${msg}`);
     }
   }
 

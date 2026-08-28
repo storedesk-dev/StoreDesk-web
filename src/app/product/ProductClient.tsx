@@ -6,56 +6,55 @@ import { VendorCostChart } from "@/components/VendorCostChart";
 import { motion } from "framer-motion";
 import {
   BarChart3,
+  CloudSync,
   FileSearch,
   HardDrive,
-  History,
-  Package,
   RefreshCw,
   ScanBarcode,
-  Smartphone,
-  Star
+  Server,
+  Smartphone
 } from "lucide-react";
 
 const features = [
   {
     title: "Price Book Management",
-    body: "Your entire store catalog, instantly searchable. Add products and variants with UPC, pack size, and unit size. Update prices from the desktop without touching the register.",
+    body: "Your entire store catalog, instantly searchable. Update prices from anywhere without standing at the register.",
     icon: RefreshCw,
     accent: "from-[#0E43D8] to-[#1A63F4]"
   },
   {
     title: "Vendor Cost Comparison",
-    body: "Compare all your local suppliers side-by-side per product. Always know who has the cheapest wholesale price before you place your next order.",
+    body: "Compare all your local suppliers side-by-side. Always know who has the cheapest wholesale price before you buy.",
     icon: BarChart3,
     accent: "from-[#1A63F4] to-[#4f8cff]"
   },
   {
-    title: "Price History Tracking",
-    body: "Every vendor price change is recorded. See how costs have shifted over time so you can catch supplier price hikes before they eat your margin.",
-    icon: History,
+    title: "Google Sheets Sync",
+    body: "Configure Google Sheets to get your daily, monthly, and department sale reports to get a better idea of how the store is performing.",
+    icon: CloudSync,
     accent: "from-[#00A87B] to-[#28C88B]"
   },
   {
     title: "Stop Margin Bleed",
-    body: "Compare your retail shelf prices against what you actually paid so you never sell at a loss again. Pricing rules enforce your minimum margin automatically.",
+    body: "Compare your retail shelf prices against what you actually paid so you never sell at a loss again.",
     icon: FileSearch,
     accent: "from-[#00A87B] to-[#28C88B]"
   },
   {
-    title: "Best Vendor Badge",
-    body: "The lowest-cost supplier is automatically highlighted on every product card on mobile so your staff always knows which vendor to reorder from.",
-    icon: Star,
+    title: "Local First Architecture",
+    body: "Runs directly on your store PC. No cloud dependency for core operations. Secure Cloudflare Tunnel for authenticated mobile access.",
+    icon: Server,
     accent: "from-[#1A63F4] to-[#00A87B]"
   },
   {
-    title: "Multi-Pack Math",
-    body: "Enter a case or pack price and StoreDesk automatically calculates price per item and price per base unit so you can compare a 12-pack to a 24-pack instantly.",
-    icon: Package,
+    title: "Sales Tax & Excel Export",
+    body: "Automatic sales tax calculations that give you a ready-to-file Excel sheet. Just upload it and it does the job.",
+    icon: HardDrive,
     accent: "from-[#0E43D8] to-[#1A63F4]"
   },
   {
     title: "StoreDesk Mobile Scanner",
-    body: "Turn any Android phone into a price checker with StoreDesk Mobile. Scan shelf barcodes to instantly see what you pay, what you sell it for, and your exact profit.",
+    body: "Turn any phone into a price checker with StoreDesk Mobile. Scan shelf barcodes to instantly see what you pay, what you sell it for, and your exact profit.",
     icon: Smartphone,
     accent: "from-[#00A87B] to-[#1A63F4]"
   },

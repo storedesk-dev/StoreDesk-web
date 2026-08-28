@@ -99,11 +99,12 @@ export async function POST(req: Request) {
         organizationId: assignment.organizationId,
         name: org?.name || "Store Owner"
       },
-      tunnelUrl: (store as any)?.tunnelUrl || null,
-      lanUrl: (installation as any)?.lanUrl || null,
+      tunnelUrl: (store as Record<string, unknown> | null)?.tunnelUrl ? String((store as Record<string, unknown>).tunnelUrl) : null,
+      lanUrl: (installation as Record<string, unknown> | null)?.lanUrl ? String((installation as Record<string, unknown>).lanUrl) : null,
       assignmentId: assignment.assignmentId
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "An unexpected error occurred" }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "An unexpected error occurred";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

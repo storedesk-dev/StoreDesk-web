@@ -80,16 +80,19 @@ export function HowItWorksClient() {
           return (
             <motion.li
               key={step.title}
-              className="flex gap-4 rounded-2xl border border-[var(--border)] bg-white/95 p-5 shadow-sm"
+              className="relative flex gap-6 pb-8 last:pb-0"
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.05 }}
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white">
+              {i !== steps.length - 1 && (
+                <div className="absolute left-6 top-12 bottom-0 w-px bg-gradient-to-b from-[var(--sd-blue)]/50 to-transparent" />
+              )}
+              <span className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white shadow-md">
                 <Icon className="h-5 w-5" />
               </span>
-              <div>
+              <div className="rounded-2xl border border-[var(--border)] bg-white/95 p-5 shadow-sm w-full">
                 <h3 className="text-lg font-bold">{step.title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">{step.detail}</p>
               </div>
