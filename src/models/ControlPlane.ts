@@ -110,7 +110,6 @@ const WorkerInstallationSchema = new Schema(
     activatedAt: Date,
     firstBootstrapCompletedAt: Date,
     bootstrapVersion: String,
-    hubVerifiedAt: Date,
     lastSeenAt: Date,
     lanUrl: { type: String, trim: true }
   },

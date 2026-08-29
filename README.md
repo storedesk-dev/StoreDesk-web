@@ -41,15 +41,21 @@ Assets under `public/brand/` from parent `brand-kit/` (`#1A63F4` / `#00A87B`).
 - Rotate agent key / suspend store
 - Mock agents page (Hub later)
 
-## Env (`.env.local`)
+## Env (`.env.local` / Vercel)
 
-| Variable | Required? | Purpose |
-|----------|-----------|---------|
-| `MONGODB_URI` | Yes for Atlas | Store license DB. Also supplies admin password if `ADMIN_PASSWORD` unset. |
-| `ADMIN_PASSWORD` | No | Override admin gate password (defaults to URI password). |
+The Control Plane requires 10 environment variables in production.
 
-Example:
+| Variable | Purpose |
+|----------|---------|
+| `MONGODB_URI` | MongoDB connection string. |
+| `SUPPORT_ADMIN_EMAIL` | Email for root admin login at `/admin-gate`. |
+| `SUPPORT_ADMIN_PASSWORD` | Password for root admin login. |
+| `RELAY_SESSION_SECRET` | 32+ char random string for signing JWT tokens. |
+| `RELAY_KEY_ID` | Identifier for the secret (e.g., `key-v1`). |
+| `CONTROL_PLANE_ISSUER` | Domain name of the control plane (e.g., `storedesk.net`). |
+| `CLOUDFLARE_API_TOKEN` | Token to provision Zero Trust tunnels. |
+| `CLOUDFLARE_ACCOUNT_ID` | CF Account ID. |
+| `CLOUDFLARE_ZONE_ID` | CF Zone ID for the tunnel domain. |
+| `CLOUDFLARE_TUNNEL_DOMAIN` | Domain for tunnels (e.g., `storedesk.net`). |
 
-```txt
-MONGODB_URI=mongodb+srv://storedeskdev_db_user:****@storedesk.friyqcp.mongodb.net/storedesk?retryWrites=true&w=majority&appName=StoreDesk
-```
+*Note: Setup Keys (for Worker Installation) are no longer emailed. The `/admin` panel API will return the plaintext `setupKey` in its JSON response for manual distribution.*
