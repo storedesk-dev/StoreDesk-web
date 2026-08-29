@@ -41,25 +41,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Users className="h-4 w-4" />
             AppUsers
           </Link>
-          <div className="pt-4 pb-2">
-            <p className="px-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-              Security
-            </p>
-          </div>
-          <Link
-            href="/admin/setup-keys"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
-          >
-            <KeyRound className="h-4 w-4" />
-            Setup Keys
-          </Link>
-          <Link
-            href="/admin/audit"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
-          >
-            <ShieldAlert className="h-4 w-4" />
-            Audit Logs
-          </Link>
         </nav>
       </aside>
 
