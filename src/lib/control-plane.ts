@@ -389,6 +389,7 @@ export async function issueSetupKeyEmail(
 
   return safeJson({
     keyId: record.keyId,
+    setupKey: issued.plaintext,
     status: record.status,
     expiresAt: record.expiresAt,
     contactEmail: record.contactEmail,
