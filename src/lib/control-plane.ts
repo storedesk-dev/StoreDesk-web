@@ -99,9 +99,6 @@ export async function writeAudit(input: {
   });
 }
 
-function hubUrl() {
-  return process.env.HUB_WSS_URL?.trim() || "wss://hub.example.invalid/ws";
-}
 
 export async function createOrganization(
   admin: InternalAdminActor,
@@ -574,7 +571,6 @@ export async function redeemSetupKey(body: {
     },
     workerCredential: `${credentialId}.${secret}`,
     workerCredentialId: credentialId,
-    hubUrl: hubUrl(),
     cloudflareToken: store?.cloudflareToken ?? null,
     tunnelUrl: store?.tunnelUrl ?? null,
     issuedAt: new Date().toISOString()
@@ -614,7 +610,6 @@ export async function getBootstrap(
           offlineGraceDays: sub.offlineGraceDays
         }
       : null,
-    hubUrl: hubUrl(),
     protocolRange: { min: 1, max: 1 },
     serverTime: new Date().toISOString(),
     firstBootstrapCompletedAt: installation.firstBootstrapCompletedAt || null
@@ -625,7 +620,7 @@ export async function completeBootstrap(
   organizationId: string,
   storeId: string,
   workerInstallationId: string,
-  body: { bootstrapVersion: string; hubHandshakeOk: boolean; lanUrl?: string }
+  body: { bootstrapVersion: string; lanUrl?: string }
 ) {
   await connectDb();
   const installation = await WorkerInstallationModel.findOne({
@@ -642,7 +637,6 @@ export async function completeBootstrap(
   if (!installation.firstBootstrapCompletedAt) {
     installation.firstBootstrapCompletedAt = new Date();
     installation.bootstrapVersion = body.bootstrapVersion;
-    if (body.hubHandshakeOk) installation.hubVerifiedAt = new Date();
   }
   await installation.save();
   return safeJson({
@@ -947,7 +941,6 @@ export async function issueClientSession(body: {
     contractVersion: CONTRACT_VERSION,
     sessionToken: relay.token,
     expiresAt: relay.expiresAt.toISOString(),
-    hubUrl: hubUrl(),
     organizationId: assignment.organizationId,
     storeId: assignment.storeId,
     workerInstallationId: assignment.workerInstallationId,
