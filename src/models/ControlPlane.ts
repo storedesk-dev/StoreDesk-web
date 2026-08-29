@@ -73,6 +73,7 @@ const TenantStoreSchema = new Schema(
     contactEmail: { type: String, lowercase: true, trim: true },
     status: { type: String, enum: ["pending", "active", "suspended", "closed"], default: "active" },
     tunnelUrl: { type: String, trim: true },
+    configJson: { type: String },
     cloudflareToken: { type: String, trim: true }
   },
   timestamps
