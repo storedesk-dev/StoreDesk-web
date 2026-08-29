@@ -1,24 +1,72 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Store, Users, ArrowLeft, Loader2, Server, CreditCard } from "lucide-react";
+import {
+  Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail
+} from "lucide-react";
+
+type OrgUser = {
+  appUserId: string;
+  email: string;
+  name?: string;
+  status: "pending_enrollment" | "active" | "disabled";
+  lastLoginAt?: string;
+  createdAt?: string;
+  assignments: { storeId: string; role: string; status: string }[];
+};
+
+type Store = {
+  _id: string;
+  storeId: string;
+  name: string;
+  status: string;
+  tunnelUrl?: string;
+  createdAt?: string;
+};
+
+type Org = {
+  organizationId: string;
+  name: string;
+  status: string;
+  billingEmail?: string;
+};
+
+
+const statusColors: Record<string, string> = {
+  active: "bg-emerald-50 text-emerald-700 border border-emerald-200/60",
+  pending_enrollment: "bg-amber-50 text-amber-700 border border-amber-200/60",
+  disabled: "bg-red-50 text-red-700 border border-red-200/60",
+  trialing: "bg-blue-50 text-blue-700 border border-blue-200/60",
+  suspended: "bg-red-50 text-red-700 border border-red-200/60",
+  cancelled: "bg-gray-100 text-gray-500",
+  expired: "bg-gray-100 text-gray-500",
+};
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[status] ?? "bg-gray-100 text-gray-700"}`}>
+      {status.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+function fmtDate(d?: string) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
 
 export default function AdminOrganizationDetailPage() {
-  const { orgId } = useParams();
-  const [org, setOrg] = useState<any>(null);
-  const [stores, setStores] = useState<any[]>([]);
+  const { orgId } = useParams<{ orgId: string }>();
+  const [org, setOrg] = useState<Org | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [appUsers, setAppUsers] = useState<OrgUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("stores");
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"stores" | "users">("stores");
 
-  useEffect(() => {
-    if (orgId) {
-      loadData();
-    }
-  }, [orgId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [orgRes, storesRes] = await Promise.all([
@@ -27,7 +75,6 @@ export default function AdminOrganizationDetailPage() {
       ]);
       const orgData = await orgRes.json();
       const storesData = await storesRes.json();
-      
       setOrg(orgData.organization);
       setStores(storesData.stores || []);
     } catch (err) {
@@ -35,7 +82,26 @@ export default function AdminOrganizationDetailPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [orgId]);
+
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/app-users`);
+      const data = await res.json();
+      setAppUsers(data.appUsers || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [orgId]);
+
+  useEffect(() => { if (orgId) loadData(); }, [loadData, orgId]);
+
+  useEffect(() => {
+    if (activeTab === "users") loadUsers();
+  }, [activeTab, loadUsers]);
 
   if (loading) {
     return (
@@ -64,6 +130,7 @@ export default function AdminOrganizationDetailPage() {
       </Link>
 
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden mb-8">
+        {/* Header */}
         <div className="p-8 border-b border-gray-200/60">
           <div className="flex items-center justify-between">
             <div>
@@ -72,11 +139,7 @@ export default function AdminOrganizationDetailPage() {
                 <span className="text-sm font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">
                   {org.organizationId}
                 </span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  org.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-700'
-                }`}>
-                  {org.status}
-                </span>
+                <StatusBadge status={org.status} />
               </div>
             </div>
             <div className="text-right">
@@ -86,34 +149,29 @@ export default function AdminOrganizationDetailPage() {
           </div>
         </div>
 
+        {/* Tabs */}
         <div className="flex border-b border-gray-200/60 bg-gray-50/50 px-8 gap-8">
-          <button 
-            onClick={() => setActiveTab("stores")}
-            className={`py-4 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${
-              activeTab === 'stores' ? 'border-[var(--sd-blue)] text-[var(--sd-blue)]' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Store className="h-4 w-4" /> Stores ({stores.length})
-          </button>
-          <button 
-            onClick={() => setActiveTab("users")}
-            className={`py-4 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${
-              activeTab === 'users' ? 'border-[var(--sd-blue)] text-[var(--sd-blue)]' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Users className="h-4 w-4" /> App Users
-          </button>
-          <button 
-            onClick={() => setActiveTab("billing")}
-            className={`py-4 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${
-              activeTab === 'billing' ? 'border-[var(--sd-blue)] text-[var(--sd-blue)]' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <CreditCard className="h-4 w-4" /> Billing & Licenses
-          </button>
+          {([
+            { key: "stores", label: `Stores (${stores.length})`, icon: Store },
+            { key: "users", label: `App Users (${appUsers.length})`, icon: Users },
+          ] as const).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`py-4 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${
+                activeTab === key
+                  ? "border-[var(--sd-blue)] text-[var(--sd-blue)]"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
         </div>
 
-        <div className="p-0">
+        {/* Tab Content */}
+        <div>
+          {/* ─── Stores Tab ─── */}
           {activeTab === "stores" && (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -136,16 +194,10 @@ export default function AdminOrganizationDetailPage() {
                     </tr>
                   ) : (
                     stores.map(store => (
-                      <tr key={store._id} className="hover:bg-gray-50/80 transition-colors group">
+                      <tr key={store._id} className="hover:bg-gray-50/80 transition-colors">
                         <td className="px-8 py-5 font-medium text-gray-900">{store.name}</td>
                         <td className="px-8 py-5 font-mono text-[11px] text-gray-500">{store.storeId}</td>
-                        <td className="px-8 py-5">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            store.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {store.status}
-                          </span>
-                        </td>
+                        <td className="px-8 py-5"><StatusBadge status={store.status} /></td>
                         <td className="px-8 py-5">
                           {store.tunnelUrl ? (
                             <a href={store.tunnelUrl} target="_blank" rel="noreferrer" className="text-[var(--sd-blue)] hover:underline truncate max-w-[200px] block">
@@ -156,8 +208,8 @@ export default function AdminOrganizationDetailPage() {
                           )}
                         </td>
                         <td className="px-8 py-5 text-right">
-                          <Link 
-                            href={`/admin/organizations/${orgId}/stores/${store.storeId}`} 
+                          <Link
+                            href={`/admin/organizations/${orgId}/stores/${store.storeId}`}
                             className="inline-flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[var(--sd-blue)] transition-colors shadow-sm"
                           >
                             Configure
@@ -171,19 +223,78 @@ export default function AdminOrganizationDetailPage() {
             </div>
           )}
 
+          {/* ─── App Users Tab ─── */}
           {activeTab === "users" && (
-            <div className="p-12 text-center text-gray-500">
-              <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium text-gray-900 mb-1">App Users Management</h3>
-              <p>User management module will be implemented here.</p>
-            </div>
-          )}
-
-          {activeTab === "billing" && (
-            <div className="p-12 text-center text-gray-500">
-              <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium text-gray-900 mb-1">Billing Overview</h3>
-              <p>Subscription and license management will be implemented here.</p>
+            <div>
+              <div className="px-8 py-4 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-sm text-gray-500">App Users with access to this organization.</p>
+                <button
+                  onClick={loadUsers}
+                  disabled={usersLoading}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${usersLoading ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+              </div>
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-[var(--sd-blue)]" />
+                </div>
+              ) : appUsers.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  <UserPlus className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-1">No App Users</h3>
+                  <p className="text-sm">No active user assignments for this organization.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-gray-50/50 text-[var(--muted)] text-xs uppercase tracking-wider border-b border-gray-200/60">
+                      <tr>
+                        <th className="px-8 py-5 font-semibold">User</th>
+                        <th className="px-8 py-5 font-semibold">Status</th>
+                        <th className="px-8 py-5 font-semibold">Assigned Stores</th>
+                        <th className="px-8 py-5 font-semibold">Last Login</th>
+                        <th className="px-8 py-5 font-semibold">Added</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {appUsers.map(user => (
+                        <tr key={user.appUserId} className="hover:bg-gray-50/80 transition-colors">
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full bg-[var(--sd-blue)]/10 flex items-center justify-center flex-shrink-0">
+                                <Mail className="h-4 w-4 text-[var(--sd-blue)]" />
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">{user.name || user.email}</div>
+                                {user.name && <div className="text-xs text-gray-500">{user.email}</div>}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5"><StatusBadge status={user.status} /></td>
+                          <td className="px-8 py-5">
+                            {user.assignments.length === 0 ? (
+                              <span className="text-gray-400 text-xs italic">No stores</span>
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                {user.assignments.map((a, i) => (
+                                  <span key={i} className="text-xs font-mono text-gray-600 bg-gray-100 rounded px-1.5 py-0.5">
+                                    {a.storeId} · <span className="text-gray-400">{a.role}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-8 py-5 text-sm text-gray-600">{fmtDate(user.lastLoginAt)}</td>
+                          <td className="px-8 py-5 text-sm text-gray-600">{fmtDate(user.createdAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>
