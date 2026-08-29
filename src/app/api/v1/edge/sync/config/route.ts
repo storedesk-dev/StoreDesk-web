@@ -59,3 +59,34 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
+
+export async function GET(req: Request) {
+  try {
+    const worker = await authenticateWorker(req);
+    await connectDb();
+    
+    const store = await TenantStoreModel.findOne({ 
+      organizationId: worker.organizationId, 
+      storeId: worker.storeId 
+    }).lean();
+
+    if (!store) {
+      return NextResponse.json({ error: "Store not found" }, { status: 404 });
+    }
+
+    const { WorkerInstallationModel } = await import("@/models/ControlPlane");
+    const installation = await WorkerInstallationModel.findOne({
+      organizationId: worker.organizationId,
+      storeId: worker.storeId,
+      workerInstallationId: worker.workerInstallationId
+    }).lean();
+
+    return NextResponse.json({ 
+      configJson: store.configJson,
+      cloudflareToken: installation?.cloudflareToken,
+      tunnelUrl: installation?.tunnelUrl
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+  }
+}
