@@ -27,12 +27,12 @@ export async function GET(req: Request, ctx: Ctx) {
 import { z } from "zod";
 
 const ConfigSchema = z.object({
-  posIntegration: z.literal("verifone_commander"),
+  posIntegration: z.string().optional(),
   posIpAddress: z.string().optional(),
   posUsername: z.string().optional(),
   posPassword: z.string().optional(),
   featureFlags: z.record(z.string(), z.boolean()).optional()
-}).strict();
+}).catchall(z.any());
 
 export async function PUT(req: Request, ctx: Ctx) {
   try {

@@ -79,10 +79,17 @@ export default function AdminOrganizationDetailPage() {
   const [subsLoading, setSubsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"stores" | "users" | "subscriptions">("stores");
   const [isCreatingStore, setIsCreatingStore] = useState(false);
+  const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreId, setNewStoreId] = useState("");
   const [newStoreSlug, setNewStoreSlug] = useState("");
   const [createStoreBusy, setCreateStoreBusy] = useState(false);
+
+  // New Subscription State
+  const [subPlan, setSubPlan] = useState<"trial" | "standard" | "custom">("trial");
+  const [subStores, setSubStores] = useState(5);
+  const [subWorkers, setSubWorkers] = useState(5);
+  const [subDays, setSubDays] = useState(30);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -161,16 +168,22 @@ export default function AdminOrganizationDetailPage() {
     }
   };
 
-  const handleCreateTrialSubscription = async () => {
-    if (!confirm("Start a 30-day trial subscription for this organization?")) return;
+  const handleCreateSubscription = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSubsLoading(true);
     try {
       const res = await fetch(`/api/v1/admin/organizations/${orgId}/subscriptions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "trial", maxStores: 5, maxWorkerInstallations: 5 })
+        body: JSON.stringify({ 
+          plan: subPlan, 
+          maxStores: Number(subStores), 
+          maxWorkerInstallations: Number(subWorkers),
+          entitlementDays: Number(subDays)
+        })
       });
       if (res.ok) {
+        setIsCreatingSubscription(false);
         loadSubscriptions();
       } else {
         const data = await res.json();
@@ -405,12 +418,12 @@ export default function AdminOrganizationDetailPage() {
                     Refresh
                   </button>
                   <button
-                    onClick={handleCreateTrialSubscription}
+                    onClick={() => setIsCreatingSubscription(true)}
                     disabled={subsLoading}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
                   >
                     <CreditCard className="h-4 w-4" />
-                    Start Trial
+                    New Subscription
                   </button>
                 </div>
               </div>
@@ -462,6 +475,96 @@ export default function AdminOrganizationDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Create Subscription Modal */}
+      {isCreatingSubscription && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <form 
+            onSubmit={handleCreateSubscription}
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          >
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold">Issue Subscription</h2>
+              <button 
+                type="button" 
+                onClick={() => setIsCreatingSubscription(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+                <select
+                  value={subPlan}
+                  onChange={e => {
+                    setSubPlan(e.target.value as "trial"|"standard"|"custom");
+                    if (e.target.value === "trial") setSubDays(30);
+                    if (e.target.value === "standard") setSubDays(365);
+                  }}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none bg-white"
+                >
+                  <option value="trial">Trial</option>
+                  <option value="standard">Standard</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration (Days)</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={subDays}
+                    onChange={e => setSubDays(Number(e.target.value))}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Stores</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={subStores}
+                    onChange={e => setSubStores(Number(e.target.value))}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Max Worker Installations</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  value={subWorkers}
+                  onChange={e => setSubWorkers(Number(e.target.value))}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setIsCreatingSubscription(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={subsLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-[var(--sd-blue)] rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {subsLoading ? "Saving..." : "Create"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Create Store Modal */}
       {isCreatingStore && (

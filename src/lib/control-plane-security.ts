@@ -65,6 +65,7 @@ export function parseSetupKey(value: string): { keyId: string; secret: string } 
 }
 
 export function safeJson<T>(value: T): T {
+  if (value instanceof Date) return value.toISOString() as unknown as T;
   if (Array.isArray(value)) return value.map((item) => safeJson(item)) as T;
   if (!value || typeof value !== "object") return value;
   const result: Record<string, unknown> = {};
