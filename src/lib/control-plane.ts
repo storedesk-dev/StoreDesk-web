@@ -221,6 +221,15 @@ export async function createStore(
     contactEmail: body.contactEmail?.trim().toLowerCase(),
     cloudflareToken,
     tunnelUrl,
+    configJson: JSON.stringify({
+      posIntegration: "verifone_commander",
+      posIpAddress: "",
+      posUsername: "",
+      posPassword: "",
+      featureFlags: {
+        enableBetaScanner: false
+      }
+    }, null, 2),
     status: "active"
   });
   await writeAudit({

@@ -279,7 +279,7 @@ export default function AdminStoreDetailPage() {
           <JsonEditor 
             value={configJson} 
             onChange={setConfigJson} 
-            placeholder={'{\n  "featureFlags": {\n    "enableBetaScanner": true\n  }\n}'}
+            placeholder={'{\n  "posIntegration": "verifone_commander",\n  "posIpAddress": "",\n  "posUsername": "",\n  "posPassword": "",\n  "featureFlags": {}\n}'}
           />
         </div>
 
