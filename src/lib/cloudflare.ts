@@ -83,6 +83,42 @@ export async function provisionCloudflareTunnel(storeId: string, tunnelSlug: str
     }
   }
 
+  // 3. Configure the Tunnel routing (Published Application / Public Hostname)
+  console.info(`[cloudflare] Configuring tunnel routing for ${tunnelSlug}.${tunnelDomain} -> http://localhost:4000 ...`);
+  try {
+    const configRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        config: {
+          ingress: [
+            {
+              hostname: `${tunnelSlug}.${tunnelDomain}`,
+              service: "http://localhost:4000"
+            },
+            {
+              service: "http_status:404"
+            }
+          ]
+        }
+      })
+    });
+
+    const configData = (await configRes.json()) as { success?: boolean; errors?: Array<{ message?: string }> };
+    if (!configRes.ok || !configData.success) {
+      const errMsg = configData.errors?.[0]?.message || "Failed to configure tunnel routing";
+      console.warn(`[cloudflare:warn] Tunnel configuration warning: ${errMsg}`);
+    } else {
+      console.info("[cloudflare] Tunnel routing configured successfully.");
+    }
+  } catch (configErr: unknown) {
+    const msg = configErr instanceof Error ? configErr.message : String(configErr);
+    console.warn(`[cloudflare:warn] Failed to configure tunnel routing: ${msg}`);
+  }
+
   return {
     cloudflareToken: tunnelToken,
     tunnelUrl
