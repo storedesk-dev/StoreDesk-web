@@ -84,7 +84,7 @@ export async function provisionCloudflareTunnel(storeId: string, tunnelSlug: str
   }
 
   // 3. Configure the Tunnel routing (Published Application / Public Hostname)
-  console.info(`[cloudflare] Configuring tunnel routing for ${tunnelSlug}.${tunnelDomain} -> http://localhost:4000 ...`);
+  console.info(`[cloudflare] Configuring tunnel routing for ${tunnelSlug}.${tunnelDomain} -> http://localhost:4310 ...`);
   try {
     const configRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`, {
       method: "PUT",
@@ -97,7 +97,7 @@ export async function provisionCloudflareTunnel(storeId: string, tunnelSlug: str
           ingress: [
             {
               hostname: `${tunnelSlug}.${tunnelDomain}`,
-              service: "http://localhost:4000"
+              service: "http://localhost:4310"
             },
             {
               service: "http_status:404"
