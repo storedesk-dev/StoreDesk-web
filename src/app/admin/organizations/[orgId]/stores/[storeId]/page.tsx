@@ -254,6 +254,31 @@ export default function AdminStoreDetailPage() {
               />
             </div>
             
+            {store?.cloudflareToken && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tunnel Token</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    readOnly
+                    value={store.cloudflareToken}
+                    className="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-500 font-mono text-xs overflow-hidden text-ellipsis"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(store.cloudflareToken);
+                      alert("Token copied to clipboard");
+                    }}
+                    className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
+                    title="Copy Token"
+                  >
+                    <Copy className="h-4 w-4 text-gray-600" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Use this token to manually run cloudflared on the Edge server if needed.</p>
+              </div>
+            )}
+            
             <div className="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-100">
               <div>
                 <div className="text-sm font-medium text-gray-700 flex items-center gap-2">
