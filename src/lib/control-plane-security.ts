@@ -70,7 +70,9 @@ export function safeJson<T>(value: T): T {
   if (!value || typeof value !== "object") return value;
   const result: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (key === "__v" || key === "passwordHash" || key === "secretHash" || SECRET_FIELD.test(key)) {
+    if (key === "cloudflareToken") {
+      // Explicitly allow tunnel tokens so the admin UI can display them
+    } else if (key === "__v" || key === "passwordHash" || key === "secretHash" || SECRET_FIELD.test(key)) {
       continue;
     }
     result[key] = safeJson(child);
