@@ -12,7 +12,7 @@ export async function provisionCloudflareTunnel(storeId: string, tunnelSlug: str
     return null;
   }
 
-  const tunnelName = `storedesk-${tunnelSlug}`;
+  const tunnelName = tunnelSlug;
   // Generate a cryptographically secure 32-byte secret for the tunnel
   const tunnelSecret = crypto.randomBytes(32).toString("base64");
 
