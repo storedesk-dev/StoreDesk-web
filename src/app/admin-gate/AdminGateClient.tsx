@@ -41,7 +41,7 @@ export default function AdminGateClient() {
         className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-6 shadow-lg shadow-blue-500/5"
       >
         <Image
-          src="/brand/logo-lockup-horizontal.png"
+          src="/brand/logo-lockup-horizontal.svg"
           alt="StoreDesk"
           width={160}
           height={34}
@@ -81,4 +81,3 @@ export default function AdminGateClient() {
     </main>
   );
 }
-

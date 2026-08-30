@@ -35,11 +35,11 @@ export function MarketingShell({
             </motion.h1>
           </div>
           <Image
-            src="/brand/logo-lockup-horizontal.png"
+            src="/brand/logo-lockup-horizontal.svg"
             alt=""
             width={180}
             height={38}
-            className="hidden h-9 w-auto shrink-0 rounded-lg bg-white/90 object-contain p-1 shadow-sm md:block"
+            className="hidden h-9 w-auto shrink-0 object-contain md:block"
           />
         </div>
       </div>
@@ -48,4 +48,3 @@ export function MarketingShell({
     </div>
   );
 }
-
