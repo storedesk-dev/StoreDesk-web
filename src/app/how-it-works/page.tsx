@@ -24,10 +24,11 @@ export const metadata: Metadata = {
     description:
       "Store Engine on store PC, Desktop management, and Mobile floor scanning over store Wi-Fi. Local, fast, and private.",
     url: `${siteUrl}/how-it-works`,
-    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.jpg`, width: 1200, height: 400, alt: "StoreDesk System Map & Architecture" }]
+    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.png`, width: 1200, height: 400, alt: "StoreDesk System Map & Architecture" }]
   }
 };
 
 export default function HowItWorksPage() {
   return <HowItWorksClient />;
 }
+

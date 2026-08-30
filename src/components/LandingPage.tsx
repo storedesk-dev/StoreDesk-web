@@ -5,9 +5,9 @@ import Link from "next/link";
 import { motion, AnimatePresence, useInView, useMotionValue, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { DeviceStage } from "@/components/DeviceStage";
-import { SiteHeader } from "@/components/SiteChrome";
+import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
-import { SITE, contactMailto } from "@/lib/site";
+import { contactMailto } from "@/lib/site";
 import {
   HardDrive,
   ArrowRight,
@@ -22,8 +22,7 @@ import {
   Search,
   DollarSign,
   Tag,
-  Store,
-  Mail
+  Store
 } from "lucide-react";
 
 /** Official Tech Brand SVG Logos */
@@ -734,64 +733,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 7. FOOTER BASE - High-Contrast Deep Solid Navy (#0A1633) */}
-      <footer className="border-t border-slate-800 bg-[#0A1633] px-6 pb-12 pt-16 text-white">
-        <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
-          {/* Left Column */}
-          <div>
-            <Image
-              src="/brand/logo-lockup-horizontal.jpg"
-              alt="StoreDesk"
-              width={180}
-              height={40}
-              className="mb-4 h-9 w-auto rounded bg-white p-1 object-contain shadow-sm"
-            />
-            <p className="max-w-sm text-xs font-normal leading-relaxed text-slate-200">
-              Read-only price book management, wholesale vendor cost overlays, and register margin analysis for convenience stores and gas stations.
-            </p>
-            <p className="mt-6 text-xs font-medium text-slate-400">
-              © 2026 StoreDesk. Built for convenience stores & gas stations.
-            </p>
-          </div>
-
-          {/* Center Column - Explore Links */}
-          <div>
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#00FF95]">Explore</h4>
-            <ul className="mt-4 space-y-2.5 text-sm font-medium text-slate-100">
-              <li>
-                <Link href="/" className="transition hover:text-[#00FF95]">Home</Link>
-              </li>
-              <li>
-                <Link href="/product" className="transition hover:text-[#00FF95]">Product</Link>
-              </li>
-              <li>
-                <Link href="/how-it-works" className="hover:text-[#00FF95] transition">How it works</Link>
-              </li>
-              <li>
-                <Link href="/about" className="transition hover:text-[#00FF95]">About</Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition hover:text-[#00FF95]">Contact</Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Right Column - Contact & Legal */}
-          <div>
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#00FF95]">Contact</h4>
-            <a
-              href={contactMailto()}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:border-white/40 hover:bg-white/20"
-            >
-              <Mail className="h-4 w-4 text-[#61DAFB]" /> {SITE.email}
-            </a>
-            <div className="mt-6 flex gap-5 text-xs font-medium text-slate-200">
-              <Link href="/privacy" className="transition hover:text-[#00FF95] hover:underline">Privacy Policy</Link>
-              <Link href="/terms" className="transition hover:text-[#00FF95] hover:underline">Terms of Service</Link>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

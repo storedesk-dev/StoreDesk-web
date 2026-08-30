@@ -26,10 +26,11 @@ export const metadata: Metadata = {
     description:
       "Price Book management, vendor cost comparison, margin & markup pricing rules, and StoreDesk Mobile barcode scanner for convenience stores.",
     url: `${siteUrl}/product`,
-    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.jpg`, width: 1200, height: 400, alt: "StoreDesk Product Features" }]
+    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.png`, width: 1200, height: 400, alt: "StoreDesk Product Features" }]
   }
 };
 
 export default function ProductPage() {
   return <ProductClient />;
 }
+
