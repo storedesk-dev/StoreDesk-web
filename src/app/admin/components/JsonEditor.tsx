@@ -43,13 +43,15 @@ export function JsonEditor({ value, onChange, label, placeholder }: JsonEditorPr
       setIsValid(true);
       setError(null);
       onChange(val);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsValid(false);
       // Format Zod errors nicely if it's a ZodError
-      if (err.errors) {
-        setError(err.errors.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', '));
-      } else {
+      if (err instanceof z.ZodError) {
+        setError(err.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '));
+      } else if (err instanceof Error) {
         setError(err.message);
+      } else {
+        setError("Invalid format");
       }
     }
   };
@@ -63,7 +65,7 @@ export function JsonEditor({ value, onChange, label, placeholder }: JsonEditorPr
       setIsValid(true);
       setError(null);
       onChange(formatted);
-    } catch (err: any) {
+    } catch {
       // Cannot format invalid JSON
     }
   };

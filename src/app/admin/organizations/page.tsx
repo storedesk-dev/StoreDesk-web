@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Building2, ChevronRight, X, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 interface OrganizationItem {
   _id: string;
@@ -24,8 +23,7 @@ export default function AdminOrganizationsPage() {
   const [newOrgSlug, setNewOrgSlug] = useState("");
   const [newOrgEmail, setNewOrgEmail] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const router = useRouter();
-
+  
   useEffect(() => {
     loadOrganizations();
   }, []);

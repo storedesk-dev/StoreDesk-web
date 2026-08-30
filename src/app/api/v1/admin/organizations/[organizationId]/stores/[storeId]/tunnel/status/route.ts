@@ -51,7 +51,7 @@ export async function GET(req: Request, ctx: Ctx) {
           message: `Tunnel returned status ${res.status}`
         });
       }
-    } catch (e) {
+    } catch {
       return NextResponse.json({
         status: "offline",
         message: "Tunnel is unreachable or timed out"

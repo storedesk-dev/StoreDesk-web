@@ -38,7 +38,7 @@ export async function PUT(req: Request) {
     if (store.configJson && store.configJson.trim()) {
       try {
         currentConfig = JSON.parse(store.configJson);
-      } catch (e) {
+      } catch {
         // If unparseable, start fresh
       }
     }
@@ -52,11 +52,11 @@ export async function PUT(req: Request) {
     await store.save();
 
     return NextResponse.json({ store: safeJson(store) });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid configuration schema" }, { status: 400 });
     }
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -86,7 +86,7 @@ export async function GET(req: Request) {
       cloudflareToken: installation?.cloudflareToken,
       tunnelUrl: installation?.tunnelUrl
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Internal Server Error" }, { status: 500 });
   }
 }

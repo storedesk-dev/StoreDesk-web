@@ -65,6 +65,10 @@ export default function AdminOrganizationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"stores" | "users">("stores");
+  const [isCreatingStore, setIsCreatingStore] = useState(false);
+  const [newStoreName, setNewStoreName] = useState("");
+  const [newStoreId, setNewStoreId] = useState("");
+  const [createStoreBusy, setCreateStoreBusy] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -77,7 +81,7 @@ export default function AdminOrganizationDetailPage() {
       const storesData = await storesRes.json();
       setOrg(orgData.organization);
       setStores(storesData.stores || []);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
     } finally {
       setLoading(false);
@@ -90,7 +94,7 @@ export default function AdminOrganizationDetailPage() {
       const res = await fetch(`/api/v1/admin/organizations/${orgId}/app-users`);
       const data = await res.json();
       setAppUsers(data.appUsers || []);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
     } finally {
       setUsersLoading(false);
@@ -102,6 +106,31 @@ export default function AdminOrganizationDetailPage() {
   useEffect(() => {
     if (activeTab === "users") loadUsers();
   }, [activeTab, loadUsers]);
+
+  const handleCreateStore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateStoreBusy(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newStoreName, storeNumber: newStoreId })
+      });
+      if (res.ok) {
+        setIsCreatingStore(false);
+        setNewStoreName("");
+        setNewStoreId("");
+        loadData();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create store");
+      }
+    } catch {
+      alert("Failed to create store");
+    } finally {
+      setCreateStoreBusy(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -174,6 +203,16 @@ export default function AdminOrganizationDetailPage() {
           {/* ─── Stores Tab ─── */}
           {activeTab === "stores" && (
             <div className="overflow-x-auto">
+              <div className="px-8 py-4 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-sm text-gray-500">Stores provisioned under this organization.</p>
+                <button
+                  onClick={() => setIsCreatingStore(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  <Store className="h-4 w-4" />
+                  Add Store
+                </button>
+              </div>
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50/50 text-[var(--muted)] text-xs uppercase tracking-wider border-b border-gray-200/60">
                   <tr>
@@ -299,6 +338,66 @@ export default function AdminOrganizationDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Create Store Modal */}
+      {isCreatingStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <form 
+            onSubmit={handleCreateStore}
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          >
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold">Provision New Store</h2>
+              <button 
+                type="button" 
+                onClick={() => setIsCreatingStore(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Store Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newStoreName}
+                  onChange={e => setNewStoreName(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
+                  placeholder="e.g. Acme Midtown"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Store ID / Number</label>
+                <input
+                  type="text"
+                  value={newStoreId}
+                  onChange={e => setNewStoreId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
+                  placeholder="e.g. 101"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setIsCreatingStore(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={createStoreBusy}
+                className="px-4 py-2 text-sm font-medium text-white bg-[var(--sd-blue)] rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {createStoreBusy ? "Creating..." : "Create Store"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

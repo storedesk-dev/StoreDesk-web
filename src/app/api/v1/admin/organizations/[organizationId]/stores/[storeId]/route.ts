@@ -36,7 +36,7 @@ const ConfigSchema = z.object({
 
 export async function PUT(req: Request, ctx: Ctx) {
   try {
-    const admin = await requireInternalAdmin(req);
+    await requireInternalAdmin(req);
     const { organizationId, storeId } = await ctx.params;
     const body = await req.json();
     
@@ -58,8 +58,9 @@ export async function PUT(req: Request, ctx: Ctx) {
         try {
           const parsed = JSON.parse(body.configJson);
           ConfigSchema.parse(parsed);
-        } catch (e: any) {
-          return NextResponse.json({ error: `Invalid configuration: ${e.message}` }, { status: 400 });
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "Invalid configuration";
+          return NextResponse.json({ error: `Invalid configuration: ${msg}` }, { status: 400 });
         }
       }
       store.configJson = body.configJson;

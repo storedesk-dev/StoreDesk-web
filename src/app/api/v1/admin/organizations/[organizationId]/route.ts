@@ -5,11 +5,14 @@ import { connectDb } from "@/lib/db";
 import { OrganizationModel } from "@/models/ControlPlane";
 import { safeJson } from "@/lib/control-plane-security";
 
-export async function GET(req: Request, { params }: { params: { organizationId: string } }) {
+type Ctx = { params: Promise<{ organizationId: string }> };
+
+export async function GET(req: Request, ctx: Ctx) {
   try {
+    const { organizationId } = await ctx.params;
     await requireInternalAdmin(req);
     await connectDb();
-    const doc = await OrganizationModel.findOne({ organizationId: params.organizationId }).lean();
+    const doc = await OrganizationModel.findOne({ organizationId }).lean();
     if (!doc) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }

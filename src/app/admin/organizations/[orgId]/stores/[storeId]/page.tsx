@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Save, Server, ShieldCheck, Activity } from "lucide-react";
+import { useParams } from "next/navigation";
+import { ArrowLeft, Loader2, Save, Server, ShieldCheck, Activity, KeyRound, Copy, Check } from "lucide-react";
 import { JsonEditor } from "../../../../components/JsonEditor";
 
 export default function AdminStoreDetailPage() {
   const { orgId, storeId } = useParams();
-  const router = useRouter();
-  
+    
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [store, setStore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -23,10 +23,17 @@ export default function AdminStoreDetailPage() {
   const [licensePlan, setLicensePlan] = useState("");
   const [tunnelUrl, setTunnelUrl] = useState("");
 
+  // Setup Key state
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [keyExpiresAt, setKeyExpiresAt] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     if (orgId && storeId) {
       loadData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId, storeId]);
 
   async function loadData() {
@@ -44,7 +51,7 @@ export default function AdminStoreDetailPage() {
       if (data.store.tunnelUrl) {
         checkTunnelStatus();
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
     } finally {
       setLoading(false);
@@ -58,7 +65,7 @@ export default function AdminStoreDetailPage() {
       const data = await res.json();
       setTunnelStatus(data.status || "unknown");
       setTunnelMessage(data.message || "");
-    } catch (err) {
+    } catch {
       setTunnelStatus("offline");
       setTunnelMessage("Failed to check status");
     }
@@ -83,13 +90,44 @@ export default function AdminStoreDetailPage() {
         const err = await res.json();
         alert(`Failed to save: ${err.error || 'Unknown error'}`);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
       alert("Error saving store");
     } finally {
       setSaving(false);
     }
   }
+
+  async function handleGenerateKey() {
+    setIsGeneratingKey(true);
+    setGeneratedKey(null);
+    try {
+      const res = await fetch(`/api/v1/admin/setup-keys`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: orgId, storeId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setGeneratedKey(data.setupKey);
+        setKeyExpiresAt(data.expiresAt);
+      } else {
+        alert(data.error || "Failed to generate key");
+      }
+    } catch {
+      alert("Error generating setup key");
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  }
+
+  const copyToClipboard = () => {
+    if (generatedKey) {
+      navigator.clipboard.writeText(generatedKey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   if (loading) {
     return (
@@ -188,6 +226,67 @@ export default function AdminStoreDetailPage() {
             placeholder={'{\n  "featureFlags": {\n    "enableBetaScanner": true\n  }\n}'}
           />
         </div>
+
+        {/* Setup & Activation Panel */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <KeyRound className="h-5 w-5 text-emerald-500" />
+            <h2 className="text-lg font-semibold text-gray-900">Setup & Activation</h2>
+          </div>
+          
+          <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-medium text-emerald-900">Generate Worker Setup Key</h3>
+                <p className="text-sm text-emerald-700/80 mt-1 max-w-md">
+                  Issue a one-time 6-digit key for the store owner to activate their physical Edge server.
+                  This requires the Cloudflare Tunnel URL to be configured and saved first.
+                </p>
+              </div>
+              
+              {!generatedKey ? (
+                <button
+                  onClick={handleGenerateKey}
+                  disabled={!tunnelUrl || isGeneratingKey}
+                  className="flex-shrink-0 flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingKey ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+                  ) : (
+                    <><KeyRound className="h-4 w-4" /> Issue Setup Key</>
+                  )}
+                </button>
+              ) : (
+                <div className="bg-white border border-emerald-200 rounded-xl p-4 flex-shrink-0 text-center shadow-sm">
+                  <div className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1">One-Time Key</div>
+                  <div className="text-3xl font-mono font-bold tracking-widest text-gray-900 mb-2">
+                    {generatedKey}
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-xs text-gray-500">
+                      Expires: {new Date(keyExpiresAt!).toLocaleTimeString()}
+                    </span>
+                    <button 
+                      onClick={copyToClipboard}
+                      className="text-emerald-600 hover:text-emerald-700 flex items-center gap-1 text-xs font-medium bg-emerald-50 px-2 py-1 rounded-md"
+                    >
+                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {!tunnelUrl && (
+              <div className="mt-3 text-xs font-medium text-amber-600 flex items-center gap-1.5">
+                <ShieldCheck className="h-3 w-3" />
+                Tunnel URL is missing. Save the tunnel URL before issuing a key.
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   );

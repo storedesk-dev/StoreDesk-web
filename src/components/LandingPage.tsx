@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { DeviceStage } from "@/components/DeviceStage";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
-import { SITE, contactMailto } from "@/lib/site";
+import { contactMailto } from "@/lib/site";
 import {
   HardDrive,
   TrendingUp,
@@ -22,8 +22,7 @@ import {
   Scan,
   Receipt,
   Search,
-  DollarSign,
-  Mail
+  DollarSign
 } from "lucide-react";
 
 /** Official Tech Brand SVG Logos */
