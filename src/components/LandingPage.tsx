@@ -739,7 +739,7 @@ export function LandingPage() {
           {/* Left Column */}
           <div>
             <Image
-              src="/brand/logo-lockup-horizontal.jpg"
+              src="/brand/logo-lockup-horizontal.png"
               alt="StoreDesk"
               width={180}
               height={40}
@@ -794,3 +794,4 @@ export function LandingPage() {
     </div>
   );
 }
+

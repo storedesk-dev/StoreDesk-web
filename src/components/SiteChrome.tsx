@@ -30,7 +30,7 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
         <Link href="/" className="shrink-0">
           <Image
-            src="/brand/logo-lockup-horizontal.jpg"
+            src="/brand/logo-lockup-horizontal.png"
             alt={SITE.name}
             width={200}
             height={42}
@@ -146,7 +146,7 @@ export function SiteFooter() {
       <div className="relative mx-auto grid max-w-6xl gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
           <Image
-            src="/brand/logo-lockup-horizontal.jpg"
+            src="/brand/logo-lockup-horizontal.png"
             alt={SITE.name}
             width={160}
             height={34}
@@ -186,3 +186,4 @@ export function SiteFooter() {
     </footer>
   );
 }
+

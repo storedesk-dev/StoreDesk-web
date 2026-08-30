@@ -35,7 +35,7 @@ export function MarketingShell({
             </motion.h1>
           </div>
           <Image
-            src="/brand/logo-lockup-horizontal.jpg"
+            src="/brand/logo-lockup-horizontal.png"
             alt=""
             width={180}
             height={38}
@@ -48,3 +48,4 @@ export function MarketingShell({
     </div>
   );
 }
+

@@ -68,7 +68,7 @@ export const metadata: Metadata = {
       "StoreDesk: StoreDesk Worker on your store PC, Desktop management, and Mobile floor scanner. Price Book, vendor costs, POS reports, and Verifone Commander integration.",
     images: [
       {
-        url: `${siteUrl}/brand/logo-lockup-horizontal.jpg`,
+        url: `${siteUrl}/brand/logo-lockup-horizontal.png`,
         width: 1200,
         height: 400,
         alt: "StoreDesk C-Store Platform"
@@ -80,14 +80,14 @@ export const metadata: Metadata = {
     title: "StoreDesk — Local-First C-Store Backoffice Software",
     description:
       "StoreDesk: Worker on your store PC, Desktop dashboard, and Mobile floor scanner. Built for convenience stores & gas stations.",
-    images: [`${siteUrl}/brand/logo-lockup-horizontal.jpg`]
+    images: [`${siteUrl}/brand/logo-lockup-horizontal.png`]
   },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/brand/logo-mark.jpg", type: "image/jpeg" }
+      { url: "/brand/logo-mark.png", type: "image/jpeg" }
     ],
-    apple: [{ url: "/brand/logo-mark.jpg", type: "image/jpeg" }]
+    apple: [{ url: "/brand/logo-mark.png", type: "image/jpeg" }]
   },
   robots: {
     index: true,
@@ -131,7 +131,7 @@ const jsonLd = {
       "@id": `${siteUrl}/#organization`,
       "name": "StoreDesk",
       "url": siteUrl,
-      "logo": `${siteUrl}/brand/logo-mark.jpg`,
+      "logo": `${siteUrl}/brand/logo-mark.png`,
       "sameAs": []
     },
     {
@@ -160,3 +160,4 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
+

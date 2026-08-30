@@ -21,10 +21,11 @@ export const metadata: Metadata = {
     description:
       "Get help setting up StoreDesk Worker, Desktop app, or StoreDesk Mobile scanner for your convenience store or gas station.",
     url: `${siteUrl}/contact`,
-    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.jpg`, width: 1200, height: 400, alt: "Contact StoreDesk Team" }]
+    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.png`, width: 1200, height: 400, alt: "Contact StoreDesk Team" }]
   }
 };
 
 export default function ContactPage() {
   return <ContactClient />;
 }
+

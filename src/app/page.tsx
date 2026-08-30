@@ -28,10 +28,11 @@ export const metadata: Metadata = {
     description:
       "StoreDesk by Trupal: StoreDesk Worker on store PC, Electron desktop app, and StoreDesk Mobile scanner. Works with Verifone Commander.",
     url: siteUrl,
-    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.jpg`, width: 1200, height: 400, alt: "StoreDesk" }]
+    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.png`, width: 1200, height: 400, alt: "StoreDesk" }]
   }
 };
 
 export default function HomePage() {
   return <LandingPage />;
 }
+

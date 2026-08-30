@@ -25,10 +25,11 @@ export const metadata: Metadata = {
     description:
       "Price Book, Cost & Profit Analysis, Invoice Review, Store Reports, StoreDesk Mobile scanning app, and Verifone Commander sync.",
     url: `${siteUrl}/product`,
-    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.jpg`, width: 1200, height: 400, alt: "StoreDesk Product Features" }]
+    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.png`, width: 1200, height: 400, alt: "StoreDesk Product Features" }]
   }
 };
 
 export default function ProductPage() {
   return <ProductClient />;
 }
+
