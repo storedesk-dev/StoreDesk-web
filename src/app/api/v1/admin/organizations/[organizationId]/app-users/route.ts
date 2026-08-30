@@ -3,7 +3,8 @@ import { requireInternalAdmin } from "@/lib/admin-auth";
 import { jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
 import { AppUserModel, UserAssignmentModel } from "@/models/ControlPlane";
-import { safeJson } from "@/lib/control-plane-security";
+import { safeJson, issueSetupKey, hashSecret, publicId } from "@/lib/control-plane-security";
+import { z } from "zod";
 
 type Ctx = { params: Promise<{ organizationId: string }> };
 
@@ -29,6 +30,70 @@ export async function GET(req: Request, ctx: Ctx) {
     }));
 
     return NextResponse.json({ appUsers: result });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+const CreateAppUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().optional(),
+  role: z.enum(["store_operator", "store_manager", "viewer"]),
+  storeId: z.string().optional()
+});
+
+export async function POST(req: Request, ctx: Ctx) {
+  try {
+    const admin = await requireInternalAdmin(req);
+    const { organizationId } = await ctx.params;
+    const body = await req.json();
+    const parsed = CreateAppUserSchema.parse(body);
+
+    await connectDb();
+
+    // 1. Find or Create the AppUser
+    let appUser = await AppUserModel.findOne({ email: parsed.email.toLowerCase() });
+    
+    let setupKeyPlaintext = null;
+    if (!appUser) {
+      // Issue a setup key for enrollment
+      const setupKey = issueSetupKey();
+      const secretHash = await hashSecret(setupKey.secret);
+      
+      appUser = await AppUserModel.create({
+        appUserId: publicId("apu"),
+        email: parsed.email.toLowerCase(),
+        name: parsed.name,
+        status: "pending_enrollment",
+        enrollmentSecretHash: secretHash,
+        enrollmentExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        createdByAdminId: admin.adminId
+      });
+      setupKeyPlaintext = setupKey.plaintext;
+    } else {
+      // Optionally update name if missing
+      if (parsed.name && !appUser.name) {
+        appUser.name = parsed.name;
+        await appUser.save();
+      }
+    }
+
+    // 2. Create the Assignment
+    const assignment = await UserAssignmentModel.create({
+      assignmentId: publicId("asn"),
+      appUserId: appUser.appUserId,
+      organizationId,
+      storeId: parsed.storeId,
+      role: parsed.role,
+      status: "active",
+      createdByAdminId: admin.adminId
+    });
+
+    return NextResponse.json({ 
+      appUser: safeJson(appUser), 
+      assignment: safeJson(assignment),
+      setupKey: setupKeyPlaintext 
+    });
   } catch (error) {
     return jsonError(error);
   }

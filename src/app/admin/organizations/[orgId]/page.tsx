@@ -91,6 +91,15 @@ export default function AdminOrganizationDetailPage() {
   const [subWorkers, setSubWorkers] = useState(5);
   const [subDays, setSubDays] = useState(30);
 
+  // New App User State
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"store_operator" | "store_manager" | "viewer">("store_operator");
+  const [newUserStoreId, setNewUserStoreId] = useState("");
+  const [createUserBusy, setCreateUserBusy] = useState(false);
+  const [generatedSetupKey, setGeneratedSetupKey] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -190,14 +199,49 @@ export default function AdminOrganizationDetailPage() {
         alert(data.error || "Failed to create subscription");
       }
     } catch (err: unknown) {
+      setSubPlan("trial");
+      setSubStores(5);
+      setSubWorkers(5);
+      setSubDays(30);
+      loadSubscriptions();
       console.error(err);
-      alert("Failed to create subscription");
+      alert("Failed to create subscription: " + (err as Error).message);
     } finally {
       setSubsLoading(false);
     }
   };
 
-  if (loading) {
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateUserBusy(true);
+    try {
+      const payload: Record<string, string> = {
+        email: newUserEmail,
+        name: newUserName,
+        role: newUserRole
+      };
+      if (newUserStoreId) {
+        payload.storeId = newUserStoreId;
+      }
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/app-users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      
+      setGeneratedSetupKey(data.setupKey || "User exists and is already enrolled.");
+      loadUsers();
+    } catch (err: unknown) {
+      console.error(err);
+      alert("Failed to create user: " + (err as Error).message);
+    } finally {
+      setCreateUserBusy(false);
+    }
+  };
+
+  if (loading && !org) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-[var(--sd-blue)]" />
@@ -333,14 +377,24 @@ export default function AdminOrganizationDetailPage() {
             <div>
               <div className="px-8 py-4 border-b border-gray-100 flex items-center justify-between">
                 <p className="text-sm text-gray-500">App Users with access to this organization.</p>
-                <button
-                  onClick={loadUsers}
-                  disabled={usersLoading}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${usersLoading ? "animate-spin" : ""}`} />
-                  Refresh
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={loadUsers}
+                    disabled={usersLoading}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50 px-3 py-1.5"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${usersLoading ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={() => setIsCreatingUser(true)}
+                    disabled={usersLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    New App User
+                  </button>
+                </div>
               </div>
               {usersLoading ? (
                 <div className="flex items-center justify-center py-16">
@@ -498,12 +552,8 @@ export default function AdminOrganizationDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
                 <select
                   value={subPlan}
-                  onChange={e => {
-                    setSubPlan(e.target.value as "trial"|"standard"|"custom");
-                    if (e.target.value === "trial") setSubDays(30);
-                    if (e.target.value === "standard") setSubDays(365);
-                  }}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none bg-white"
+                  onChange={e => setSubPlan(e.target.value as "trial" | "standard" | "custom")}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
                 >
                   <option value="trial">Trial</option>
                   <option value="standard">Standard</option>
@@ -512,37 +562,37 @@ export default function AdminOrganizationDetailPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration (Days)</label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    value={subDays}
-                    onChange={e => setSubDays(Number(e.target.value))}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Max Stores</label>
                   <input
                     type="number"
-                    required
-                    min={1}
                     value={subStores}
                     onChange={e => setSubStores(Number(e.target.value))}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
+                    min="1"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Workers</label>
+                  <input
+                    type="number"
+                    value={subWorkers}
+                    onChange={e => setSubWorkers(Number(e.target.value))}
+                    min="1"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
+                    required
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Max Worker Installations</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (Days)</label>
                 <input
                   type="number"
+                  value={subDays}
+                  onChange={e => setSubDays(Number(e.target.value))}
+                  min="1"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
                   required
-                  min={1}
-                  value={subWorkers}
-                  onChange={e => setSubWorkers(Number(e.target.value))}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
                 />
               </div>
             </div>
@@ -550,19 +600,149 @@ export default function AdminOrganizationDetailPage() {
               <button
                 type="button"
                 onClick={() => setIsCreatingSubscription(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={subsLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-[var(--sd-blue)] rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
               >
-                {subsLoading ? "Saving..." : "Create"}
+                {subsLoading ? "Issuing..." : "Start Trial"}
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Create App User Modal */}
+      {isCreatingUser && !generatedSetupKey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <form 
+            onSubmit={handleCreateUser}
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          >
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold">Invite App User</h2>
+              <button 
+                type="button" 
+                onClick={() => setIsCreatingUser(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  value={newUserEmail}
+                  onChange={e => setNewUserEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
+                  placeholder="manager@store.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name (Optional)</label>
+                <input
+                  type="text"
+                  value={newUserName}
+                  onChange={e => setNewUserName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  value={newUserRole}
+                  onChange={e => setNewUserRole(e.target.value as "store_operator" | "store_manager" | "viewer")}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
+                >
+                  <option value="store_operator">Store Operator</option>
+                  <option value="store_manager">Store Manager</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Store (Optional)</label>
+                <select
+                  value={newUserStoreId}
+                  onChange={e => setNewUserStoreId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
+                >
+                  <option value="">-- All Organization Stores --</option>
+                  {stores.map(s => (
+                    <option key={s.storeId} value={s.storeId}>{s.name} ({s.storeId})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">If blank, the user will have access to all stores in this organization.</p>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setIsCreatingUser(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={createUserBusy}
+                className="px-4 py-2 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+              >
+                {createUserBusy ? "Creating..." : "Create User"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Generated App User Setup Key Modal */}
+      {generatedSetupKey && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 text-center border-b border-gray-100">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 mb-4">
+                <UserPlus className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">User Created Successfully!</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Share this Setup Key with the user. They will need it to log in and set their permanent password on their device.
+              </p>
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <code className="text-lg font-bold text-[var(--sd-blue)] break-all">
+                  {generatedSetupKey}
+                </code>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex flex-col sm:flex-row justify-center gap-3">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(generatedSetupKey);
+                  alert("Setup Key Copied!");
+                }}
+                className="px-6 py-2.5 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                Copy Key
+              </button>
+              <button
+                onClick={() => {
+                  setGeneratedSetupKey(null);
+                  setIsCreatingUser(false);
+                  setNewUserEmail("");
+                  setNewUserName("");
+                }}
+                className="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
