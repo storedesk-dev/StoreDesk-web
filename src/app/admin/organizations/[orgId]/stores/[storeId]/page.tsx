@@ -46,7 +46,16 @@ export default function AdminStoreDetailPage() {
       const data = await res.json();
       setStore(data.store);
       
-      setConfigJson(data.store.configJson || "");
+      const defaultJson = JSON.stringify({
+        posIntegration: "verifone_commander",
+        posIpAddress: "",
+        posUsername: "",
+        posPassword: "",
+        featureFlags: {
+          enableBetaScanner: false
+        }
+      }, null, 2);
+      setConfigJson(data.store.configJson || defaultJson);
       setLicensePlan(data.store.licensePlan || "trial");
       setTunnelUrl(data.store.tunnelUrl || "");
       
