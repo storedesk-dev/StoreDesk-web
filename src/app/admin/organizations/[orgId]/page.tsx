@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail
+  Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard
 } from "lucide-react";
 
 type OrgUser = {
@@ -31,6 +31,17 @@ type Org = {
   name: string;
   status: string;
   billingEmail?: string;
+};
+
+type Subscription = {
+  _id: string;
+  subscriptionId: string;
+  plan: string;
+  status: string;
+  startsAt: string;
+  supportEndsAt?: string;
+  maxStores: number;
+  maxWorkerInstallations: number;
 };
 
 
@@ -62,9 +73,11 @@ export default function AdminOrganizationDetailPage() {
   const [org, setOrg] = useState<Org | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [appUsers, setAppUsers] = useState<OrgUser[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"stores" | "users">("stores");
+  const [subsLoading, setSubsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"stores" | "users" | "subscriptions">("stores");
   const [isCreatingStore, setIsCreatingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreId, setNewStoreId] = useState("");
@@ -102,11 +115,25 @@ export default function AdminOrganizationDetailPage() {
     }
   }, [orgId]);
 
+  const loadSubscriptions = useCallback(async () => {
+    setSubsLoading(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/subscriptions`);
+      const data = await res.json();
+      setSubscriptions(data.subscriptions || []);
+    } catch (err: unknown) {
+      console.error(err);
+    } finally {
+      setSubsLoading(false);
+    }
+  }, [orgId]);
+
   useEffect(() => { if (orgId) loadData(); }, [loadData, orgId]);
 
   useEffect(() => {
     if (activeTab === "users") loadUsers();
-  }, [activeTab, loadUsers]);
+    if (activeTab === "subscriptions") loadSubscriptions();
+  }, [activeTab, loadUsers, loadSubscriptions]);
 
   const handleCreateStore = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +158,29 @@ export default function AdminOrganizationDetailPage() {
       alert("Failed to create store");
     } finally {
       setCreateStoreBusy(false);
+    }
+  };
+
+  const handleCreateTrialSubscription = async () => {
+    if (!confirm("Start a 30-day trial subscription for this organization?")) return;
+    setSubsLoading(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/subscriptions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "trial", maxStores: 5, maxWorkerInstallations: 5 })
+      });
+      if (res.ok) {
+        loadSubscriptions();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create subscription");
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      alert("Failed to create subscription");
+    } finally {
+      setSubsLoading(false);
     }
   };
 
@@ -185,6 +235,7 @@ export default function AdminOrganizationDetailPage() {
           {([
             { key: "stores", label: `Stores (${stores.length})`, icon: Store },
             { key: "users", label: `App Users (${appUsers.length})`, icon: Users },
+            { key: "subscriptions", label: `Subscriptions`, icon: CreditCard },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -334,6 +385,77 @@ export default function AdminOrganizationDetailPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── Subscriptions Tab ─── */}
+          {activeTab === "subscriptions" && (
+            <div>
+              <div className="px-8 py-4 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-sm text-gray-500">Manage billing and limits for this organization.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={loadSubscriptions}
+                    disabled={subsLoading}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50 px-3 py-1.5"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${subsLoading ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={handleCreateTrialSubscription}
+                    disabled={subsLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Start Trial
+                  </button>
+                </div>
+              </div>
+              
+              {subsLoading && subscriptions.length === 0 ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-[var(--sd-blue)]" />
+                </div>
+              ) : subscriptions.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-1">No Active Subscriptions</h3>
+                  <p className="text-sm">This organization does not have an active billing plan or trial.</p>
+                </div>
+              ) : (
+                <div className="p-8 grid gap-4 grid-cols-1 md:grid-cols-2">
+                  {subscriptions.map(sub => (
+                    <div key={sub._id} className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm flex flex-col">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-bold text-gray-900 capitalize">{sub.plan} Plan</h4>
+                          <p className="text-xs text-gray-500 font-mono mt-1">{sub.subscriptionId}</p>
+                        </div>
+                        <StatusBadge status={sub.status} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm mt-auto">
+                        <div>
+                          <div className="text-gray-500 text-xs">Max Stores</div>
+                          <div className="font-medium">{sub.maxStores}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-xs">Max Workers</div>
+                          <div className="font-medium">{sub.maxWorkerInstallations}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-xs">Starts</div>
+                          <div className="font-medium">{fmtDate(sub.startsAt)}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-xs">Ends</div>
+                          <div className="font-medium">{fmtDate(sub.supportEndsAt)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
