@@ -73,3 +73,27 @@ export async function PUT(req: Request, ctx: Ctx) {
     return jsonError(error);
   }
 }
+
+import { WorkerInstallationModel, SetupKeyModel } from "@/models/ControlPlane";
+
+export async function DELETE(req: Request, ctx: Ctx) {
+  try {
+    await requireInternalAdmin(req);
+    const { organizationId, storeId } = await ctx.params;
+    
+    await connectDb();
+    
+    const store = await TenantStoreModel.findOne({ organizationId, storeId });
+    if (!store) {
+      return NextResponse.json({ error: "Store not found" }, { status: 404 });
+    }
+
+    await TenantStoreModel.deleteOne({ organizationId, storeId });
+    await WorkerInstallationModel.deleteMany({ organizationId, storeId });
+    await SetupKeyModel.deleteMany({ organizationId, storeId });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return jsonError(error);
+  }
+}

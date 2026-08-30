@@ -17,6 +17,8 @@ export default function AdminStoreDetailPage() {
   // Tunnel Status
   const [tunnelStatus, setTunnelStatus] = useState<"checking" | "online" | "offline" | "unknown">("unknown");
   const [tunnelMessage, setTunnelMessage] = useState("");
+  const [isDeletingTunnel, setIsDeletingTunnel] = useState(false);
+  const [isDeletingStore, setIsDeletingStore] = useState(false);
 
   // Editable fields
   const [configJson, setConfigJson] = useState("");
@@ -121,6 +123,49 @@ export default function AdminStoreDetailPage() {
     }
   }
 
+  async function handleDeleteTunnel() {
+    if (!confirm("Are you sure you want to delete the Cloudflare Tunnel configuration for this store? This will break the connection to the Edge server.")) return;
+    setIsDeletingTunnel(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}/tunnel`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        alert("Tunnel configuration deleted");
+        setTunnelUrl("");
+        loadData();
+      } else {
+        const err = await res.json();
+        alert(`Failed to delete tunnel: ${err.error || 'Unknown error'}`);
+      }
+    } catch {
+      alert("Error deleting tunnel");
+    } finally {
+      setIsDeletingTunnel(false);
+    }
+  }
+
+  async function handleDeleteStore() {
+    if (!confirm("Are you absolutely sure you want to delete this store? This action cannot be undone and will delete all worker installations and keys.")) return;
+    setIsDeletingStore(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        alert("Store deleted");
+        window.location.href = `/admin/organizations/${orgId}`;
+      } else {
+        const err = await res.json();
+        alert(`Failed to delete store: ${err.error || 'Unknown error'}`);
+      }
+    } catch {
+      alert("Error deleting store");
+    } finally {
+      setIsDeletingStore(false);
+    }
+  }
+
   const copyToClipboard = () => {
     if (generatedKey) {
       navigator.clipboard.writeText(generatedKey);
@@ -173,9 +218,20 @@ export default function AdminStoreDetailPage() {
       <div className="grid grid-cols-1 gap-6">
         {/* Tunnel Settings */}
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Server className="h-5 w-5 text-indigo-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Cloudflare Tunnel</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Server className="h-5 w-5 text-indigo-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Cloudflare Tunnel</h2>
+            </div>
+            {store?.tunnelUrl && (
+              <button
+                onClick={handleDeleteTunnel}
+                disabled={isDeletingTunnel}
+                className="text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isDeletingTunnel ? "Deleting..." : "Clear Tunnel Config"}
+              </button>
+            )}
           </div>
           <div className="space-y-4">
             <div>
@@ -284,6 +340,25 @@ export default function AdminStoreDetailPage() {
                 Tunnel URL is missing. Save the tunnel URL before issuing a key.
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="bg-red-50/50 backdrop-blur-xl rounded-2xl border border-red-200/60 shadow-sm p-6 mt-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
+              <p className="text-sm text-red-700 mt-1">
+                Permanently delete this store and all associated data. This action cannot be undone.
+              </p>
+            </div>
+            <button
+              onClick={handleDeleteStore}
+              disabled={isDeletingStore}
+              className="flex-shrink-0 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 shadow-sm disabled:opacity-50 transition-colors"
+            >
+              {isDeletingStore ? "Deleting..." : "Delete Store"}
+            </button>
           </div>
         </div>
 
