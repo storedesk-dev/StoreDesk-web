@@ -27,14 +27,15 @@ export default function AdminHeader() {
   return (
     <header className="sticky top-0 z-10 flex h-16 w-full items-center justify-between border-b border-[var(--border)] bg-white/80 px-6 backdrop-blur-md">
       <div className="flex items-center gap-4">
-        {/* Brand Icon (Mobile / Collapsed view fallback or just standard) */}
+        {/* Brand Logo (Horizontal) */}
         <div className="hidden sm:flex items-center gap-2 pr-4 border-r border-[var(--border)]">
           <Image
-            src="/brand/icon.svg"
-            alt="StoreDesk Icon"
-            width={24}
-            height={24}
-            className="h-6 w-6 object-contain"
+            src="/brand/logo-lockup-horizontal.svg"
+            alt="StoreDesk"
+            width={160}
+            height={36}
+            className="h-9 w-auto object-contain"
+            priority
           />
         </div>
 
