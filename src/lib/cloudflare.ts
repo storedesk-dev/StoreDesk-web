@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-export async function provisionCloudflareTunnel(storeId: string): Promise<{
+export async function provisionCloudflareTunnel(storeId: string, tunnelSlug: string): Promise<{
   cloudflareToken: string;
   tunnelUrl: string;
 } | null> {
@@ -12,7 +12,7 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
     return null;
   }
 
-  const tunnelName = `storedesk-${storeId}`;
+  const tunnelName = `storedesk-${tunnelSlug}`;
   // Generate a cryptographically secure 32-byte secret for the tunnel
   const tunnelSecret = crypto.randomBytes(32).toString("base64");
 
@@ -48,12 +48,12 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
   console.info(`[cloudflare] Tunnel created successfully. ID: ${tunnelId}`);
 
   const tunnelDomain = process.env.CLOUDFLARE_TUNNEL_DOMAIN?.trim() || "tunnels.storedesk.net";
-  const tunnelUrl = `https://${storeId}.${tunnelDomain}`;
+  const tunnelUrl = `https://${tunnelSlug}.${tunnelDomain}`;
 
   // 2. Create the DNS record (CNAME) pointing to the tunnel if zone ID is provided
   const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
   if (zoneId) {
-    console.info(`[cloudflare] Creating DNS CNAME record for ${storeId}.${tunnelDomain}...`);
+    console.info(`[cloudflare] Creating DNS CNAME record for ${tunnelSlug}.${tunnelDomain}...`);
     try {
       const dnsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`, {
         method: "POST",
@@ -63,7 +63,7 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
         },
         body: JSON.stringify({
           type: "CNAME",
-          name: `${storeId}.${tunnelDomain}`,
+          name: `${tunnelSlug}.${tunnelDomain}`,
           content: `${tunnelId}.cfargotunnel.com`,
           ttl: 1,
           proxied: true

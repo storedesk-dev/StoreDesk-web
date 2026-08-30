@@ -180,6 +180,7 @@ export async function createStore(
     storeNumber?: string;
     address?: string;
     contactEmail?: string;
+    slug?: string;
   }
 ) {
   await connectDb();
@@ -200,7 +201,7 @@ export async function createStore(
   let tunnelUrl: string | undefined;
 
   try {
-    const cf = await provisionCloudflareTunnel(storeId);
+    const cf = await provisionCloudflareTunnel(storeId, body.slug || storeId);
     if (cf) {
       cloudflareToken = cf.cloudflareToken;
       tunnelUrl = cf.tunnelUrl;

@@ -68,6 +68,7 @@ export default function AdminOrganizationDetailPage() {
   const [isCreatingStore, setIsCreatingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreId, setNewStoreId] = useState("");
+  const [newStoreSlug, setNewStoreSlug] = useState("");
   const [createStoreBusy, setCreateStoreBusy] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -114,12 +115,13 @@ export default function AdminOrganizationDetailPage() {
       const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newStoreName, storeNumber: newStoreId })
+        body: JSON.stringify({ name: newStoreName, storeNumber: newStoreId, slug: newStoreSlug })
       });
       if (res.ok) {
         setIsCreatingStore(false);
         setNewStoreName("");
         setNewStoreId("");
+        setNewStoreSlug("");
         loadData();
       } else {
         const data = await res.json();
@@ -377,6 +379,22 @@ export default function AdminOrganizationDetailPage() {
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[var(--sd-blue)] outline-none"
                   placeholder="e.g. 101"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tunnel Slug</label>
+                <div className="flex rounded-xl border border-gray-200 overflow-hidden focus-within:border-[var(--sd-blue)]">
+                  <input
+                    type="text"
+                    value={newStoreSlug}
+                    onChange={e => setNewStoreSlug(e.target.value)}
+                    className="w-full px-3 py-2 text-sm outline-none"
+                    placeholder="e.g. hop-in"
+                  />
+                  <span className="bg-gray-50 border-l border-gray-200 px-3 py-2 text-sm text-gray-500 font-mono flex-shrink-0">
+                    .storedesk.net
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Leave empty to auto-generate from Store ID</p>
               </div>
             </div>
             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
