@@ -95,7 +95,7 @@ export default function AdminOrganizationDetailPage() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserName, setNewUserName] = useState("");
-  const [newUserRole, setNewUserRole] = useState<"store_operator" | "store_manager" | "viewer">("store_operator");
+  const [newUserRole, setNewUserRole] = useState<"org_admin" | "store_operator" | "store_manager" | "viewer">("store_operator");
   const [newUserStoreId, setNewUserStoreId] = useState("");
   const [createUserBusy, setCreateUserBusy] = useState(false);
   const [generatedSetupKey, setGeneratedSetupKey] = useState<string | null>(null);
@@ -659,11 +659,12 @@ export default function AdminOrganizationDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                 <select
                   value={newUserRole}
-                  onChange={e => setNewUserRole(e.target.value as "store_operator" | "store_manager" | "viewer")}
+                  onChange={e => setNewUserRole(e.target.value as "org_admin" | "store_operator" | "store_manager" | "viewer")}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
                 >
-                  <option value="store_operator">Store Operator</option>
+                  <option value="org_admin">Organization Admin</option>
                   <option value="store_manager">Store Manager</option>
+                  <option value="store_operator">Store Operator</option>
                   <option value="viewer">Viewer</option>
                 </select>
               </div>

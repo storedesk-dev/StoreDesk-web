@@ -75,6 +75,7 @@ export async function PUT(req: Request, ctx: Ctx) {
 }
 
 import { WorkerInstallationModel, SetupKeyModel } from "@/models/ControlPlane";
+import { deleteCloudflareTunnel } from "@/lib/cloudflare";
 
 export async function DELETE(req: Request, ctx: Ctx) {
   try {
@@ -86,6 +87,18 @@ export async function DELETE(req: Request, ctx: Ctx) {
     const store = await TenantStoreModel.findOne({ organizationId, storeId });
     if (!store) {
       return NextResponse.json({ error: "Store not found" }, { status: 404 });
+    }
+
+    if (store.tunnelUrl) {
+      try {
+        const urlObj = new URL(store.tunnelUrl);
+        const tunnelSlug = urlObj.hostname.split('.')[0];
+        if (tunnelSlug) {
+          await deleteCloudflareTunnel(tunnelSlug);
+        }
+      } catch (err) {
+        console.warn("[delete store] Failed to delete tunnel gracefully:", err);
+      }
     }
 
     await TenantStoreModel.deleteOne({ organizationId, storeId });

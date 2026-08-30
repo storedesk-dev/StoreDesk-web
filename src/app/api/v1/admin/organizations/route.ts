@@ -57,7 +57,7 @@ export async function POST(req: Request) {
         assignmentId: publicId("asn"),
         appUserId: appUser.appUserId,
         organizationId: organization.organizationId,
-        role: "store_manager", // implicit org-wide manager when storeId is blank
+        role: "org_admin", // Organization Owner role
         status: "active",
         createdByAdminId: admin.adminId
       });

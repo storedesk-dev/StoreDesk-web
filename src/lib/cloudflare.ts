@@ -124,3 +124,68 @@ export async function provisionCloudflareTunnel(storeId: string, tunnelSlug: str
     tunnelUrl
   };
 }
+
+export async function deleteCloudflareTunnel(tunnelSlug: string): Promise<boolean> {
+  const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+
+  if (!token || !accountId) {
+    console.info("[cloudflare] Missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID. Skipping tunnel deletion.");
+    return false;
+  }
+
+  console.info(`[cloudflare] Deleting tunnel "${tunnelSlug}"...`);
+
+  try {
+    // 1. Fetch tunnel by name to get its ID
+    const listRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel?name=${tunnelSlug}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const listData = (await listRes.json()) as { success?: boolean; result?: Array<{ id: string }> };
+    
+    const tunnels = listData.result || [];
+    if (tunnels.length > 0) {
+      const tunnelId = tunnels[0].id;
+      // Delete the tunnel
+      const delRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel/${tunnelId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!delRes.ok) {
+        console.warn(`[cloudflare:warn] Failed to delete tunnel ${tunnelId}`);
+      } else {
+        console.info(`[cloudflare] Tunnel ${tunnelId} deleted successfully.`);
+      }
+    } else {
+      console.info(`[cloudflare] Tunnel "${tunnelSlug}" not found. Moving on.`);
+    }
+
+    // 2. Delete DNS CNAME records associated with this tunnel slug
+    const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
+    if (zoneId) {
+      const tunnelDomain = process.env.CLOUDFLARE_TUNNEL_DOMAIN?.trim() || "tunnels.storedesk.net";
+      const recordName = `${tunnelSlug}.${tunnelDomain}`;
+      
+      const dnsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?name=${recordName}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const dnsData = (await dnsRes.json()) as { success?: boolean; result?: Array<{ id: string }> };
+      
+      const records = dnsData.result || [];
+      for (const record of records) {
+        const dnsDelRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${record.id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (dnsDelRes.ok) {
+          console.info(`[cloudflare] DNS record ${record.id} for ${recordName} deleted successfully.`);
+        }
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`[cloudflare:error] Failed to delete tunnel "${tunnelSlug}":`, error);
+    return false;
+  }
+}
