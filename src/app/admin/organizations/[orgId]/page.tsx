@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard, Shield, Plus, Trash2, Monitor, Smartphone } from "lucide-react";
 import { RolePreview } from "./RolePreview";
 import { getPage } from "@/config/pages";
@@ -80,6 +80,7 @@ export type RoleConfigEntry = {
 
 export default function AdminOrganizationDetailPage() {
   const { orgId } = useParams<{ orgId: string }>();
+  const router = useRouter();
   const [org, setOrg] = useState<Org | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [appUsers, setAppUsers] = useState<OrgUser[]>([]);
@@ -272,6 +273,26 @@ export default function AdminOrganizationDetailPage() {
     }
   };
 
+  const handleDeleteOrg = async () => {
+    if (!confirm("Are you ABSOLUTELY sure you want to delete this Organization? This will cascade delete ALL associated Stores, Users, Setup Keys, Subscriptions, and Worker Installations. This cannot be undone.")) {
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        router.push("/admin/organizations");
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to delete organization");
+      }
+    } catch {
+      alert("Failed to delete organization");
+    }
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateUserBusy(true);
@@ -341,9 +362,18 @@ export default function AdminOrganizationDetailPage() {
                 <StatusBadge status={org.status} />
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Billing Email</div>
-              <div className="font-medium text-gray-900">{org.billingEmail || "Not configured"}</div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm text-gray-500">Billing Email</div>
+                <div className="font-medium text-gray-900">{org.billingEmail || "Not configured"}</div>
+              </div>
+              <button
+                onClick={handleDeleteOrg}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Organization
+              </button>
             </div>
           </div>
         </div>
