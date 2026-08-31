@@ -233,7 +233,7 @@ const UserAssignmentSchema = new Schema(
     organizationId: id,
     storeId: id,
     workerInstallationId: id,
-    role: { type: String, enum: ["org_admin", "store_operator", "store_manager", "viewer"], required: true },
+    role: { type: String, required: true },
     scopes: { type: [String], default: ["relay:request"] },
     status: { type: String, enum: ["active", "revoked"], default: "active" },
     revokedAt: Date,

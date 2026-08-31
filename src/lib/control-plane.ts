@@ -696,7 +696,7 @@ export async function createAssignment(
     organizationId: string;
     storeId: string;
     workerInstallationId: string;
-    role: "org_admin" | "store_operator" | "store_manager" | "viewer";
+    role: string;
     scopes?: string[];
   }
 ) {

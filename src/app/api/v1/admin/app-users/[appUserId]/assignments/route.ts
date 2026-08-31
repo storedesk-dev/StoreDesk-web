@@ -12,7 +12,7 @@ export async function POST(req: Request, ctx: Ctx) {
       organizationId?: string;
       storeId?: string;
       workerInstallationId?: string;
-      role?: "store_operator" | "store_manager" | "viewer";
+      role?: string;
       scopes?: string[];
     };
     if (!body.organizationId || !body.storeId || !body.workerInstallationId || !body.role) {

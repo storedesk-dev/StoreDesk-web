@@ -542,26 +542,108 @@ export default function AdminStoreDetailPage() {
               </div>
             );
 
+            const addCustomRole = () => {
+              const rName = prompt("Enter Custom Role Name (e.g. Cashier, Shift Supervisor):");
+              if (!rName || !rName.trim()) return;
+              const rId = prompt("Enter Custom Role ID (e.g. cashier, shift_supervisor):", rName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")) || "";
+              if (!rId || !rId.trim()) return;
+
+              if (roles.some(r => r.roleId === rId.trim())) {
+                alert(`Role ID "${rId.trim()}" already exists.`);
+                return;
+              }
+
+              const newRole: RoleEntry = {
+                roleName: rName.trim(),
+                roleId: rId.trim(),
+                accessKeys: {
+                  electron: {
+                    pages: [
+                      { key: "pos",            enabled: true,  featureFlags: { enableRefunds: false, enableDiscounts: false } },
+                      { key: "dashboard",      enabled: true,  featureFlags: {} },
+                      { key: "products",       enabled: true,  featureFlags: {} },
+                      { key: "vendors",        enabled: false, featureFlags: {} },
+                      { key: "vendorPrices",   enabled: false, featureFlags: {} },
+                      { key: "priceBook",      enabled: false, featureFlags: {} },
+                      { key: "pricingRules",   enabled: false, featureFlags: {} },
+                      { key: "costAnalysis",   enabled: false, featureFlags: {} },
+                      { key: "transactions",   enabled: true,  featureFlags: {} },
+                      { key: "manageWorker",   enabled: false, featureFlags: {} },
+                      { key: "userManagement", enabled: false, featureFlags: {} },
+                      { key: "settings",       enabled: false, featureFlags: {} }
+                    ]
+                  },
+                  mobile: {
+                    pages: [
+                      { key: "mobilePos",           enabled: true,  featureFlags: {} },
+                      { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
+                      { key: "mobileScanner",        enabled: true,  featureFlags: {} },
+                      { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
+                      { key: "mobileVendorPrices",   enabled: false, featureFlags: {} },
+                      { key: "mobilePriceBook",      enabled: false, featureFlags: {} },
+                      { key: "mobileTransactions",   enabled: false, featureFlags: {} },
+                      { key: "mobileReports",        enabled: false, featureFlags: {} },
+                      { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
+                      { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
+                    ]
+                  }
+                }
+              };
+
+              updateRoles([...roles, newRole]);
+            };
+
+            const deleteRole = (ri: number) => {
+              const target = roles[ri];
+              if (target.roleId === "org_admin") {
+                alert("Cannot delete the Organization Admin role.");
+                return;
+              }
+              if (!confirm(`Delete role "${target.roleName}" (${target.roleId})?`)) return;
+              const nr = roles.filter((_, idx) => idx !== ri);
+              updateRoles(nr);
+            };
+
             const ROLE_CHIP: Record<string, string> = {
-              org_admin:      "bg-indigo-50 border-indigo-200 text-indigo-700",
-              store_manager:  "bg-blue-50 border-blue-200 text-blue-700",
-              store_operator: "bg-amber-50 border-amber-200 text-amber-700",
-              viewer:         "bg-gray-50 border-gray-200 text-gray-600",
+              org_admin: "bg-indigo-50 border-indigo-200 text-indigo-700",
             };
 
             return (
               <div className="space-y-6">
+                <div className="flex justify-between items-center bg-gray-50/80 p-4 rounded-xl border border-gray-200/80">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Custom Organization Roles</h3>
+                    <p className="text-xs text-gray-500">Create custom roles with customized Electron & Mobile page access keys.</p>
+                  </div>
+                  <button
+                    onClick={addCustomRole}
+                    className="px-3.5 py-1.5 bg-[var(--sd-blue)] text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    + Add Custom Role
+                  </button>
+                </div>
+
                 {roles.map((role, ri) => (
-                  <div key={role.roleId} className="border border-gray-200 rounded-2xl overflow-hidden">
-                    <div className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-100 bg-gray-50/60">
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                        ROLE_CHIP[role.roleId] ?? "bg-gray-50 border-gray-200 text-gray-700"
-                      }`}>{role.roleName}</div>
-                      <code className="text-[11px] font-mono text-gray-400">{role.roleId}</code>
+                  <div key={role.roleId} className="border border-gray-200 rounded-2xl overflow-hidden bg-white">
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50/60">
+                      <div className="flex items-center gap-3">
+                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                          ROLE_CHIP[role.roleId] ?? "bg-blue-50 border-blue-200 text-blue-700"
+                        }`}>{role.roleName}</div>
+                        <code className="text-[11px] font-mono text-gray-400">{role.roleId}</code>
+                      </div>
+                      {role.roleId !== "org_admin" && (
+                        <button
+                          onClick={() => deleteRole(ri)}
+                          className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                        >
+                          Delete Role
+                        </button>
+                      )}
                     </div>
                     <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {renderPlatform(ri, "electron", role.accessKeys.electron.pages)}
-                      {renderPlatform(ri, "mobile",   role.accessKeys.mobile.pages)}
+                      {renderPlatform(ri, "electron", role.accessKeys.electron?.pages || [])}
+                      {renderPlatform(ri, "mobile",   role.accessKeys.mobile?.pages || [])}
                     </div>
                   </div>
                 ))}

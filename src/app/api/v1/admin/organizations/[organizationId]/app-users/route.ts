@@ -38,7 +38,7 @@ export async function GET(req: Request, ctx: Ctx) {
 const CreateAppUserSchema = z.object({
   email: z.string().email(),
   name: z.string().optional(),
-  role: z.enum(["org_admin", "store_operator", "store_manager", "viewer"]).optional(),
+  role: z.string().optional(),
   storeId: z.string().optional()
 });
 

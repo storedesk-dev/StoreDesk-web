@@ -95,7 +95,7 @@ export default function AdminOrganizationDetailPage() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserName, setNewUserName] = useState("");
-  const [newUserRole, setNewUserRole] = useState<"org_admin" | "store_operator" | "store_manager" | "viewer">("store_operator");
+  const [newUserRole, setNewUserRole] = useState<string>("org_admin");
   const [newUserStoreId, setNewUserStoreId] = useState("");
   const [createUserBusy, setCreateUserBusy] = useState(false);
   const [generatedSetupKey, setGeneratedSetupKey] = useState<string | null>(null);
@@ -722,17 +722,24 @@ export default function AdminOrganizationDetailPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select
-                  value={newUserRole}
-                  onChange={e => setNewUserRole(e.target.value as "org_admin" | "store_operator" | "store_manager" | "viewer")}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
-                >
-                  <option value="org_admin">Organization Admin</option>
-                  <option value="store_manager">Store Manager</option>
-                  <option value="store_operator">Store Operator</option>
-                  <option value="viewer">Viewer</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role ID</label>
+                <div className="space-y-2">
+                  <select
+                    value={newUserRole}
+                    onChange={e => setNewUserRole(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
+                  >
+                    <option value="org_admin">Organization Admin (org_admin)</option>
+                    {newUserRole !== "org_admin" && <option value={newUserRole}>{newUserRole}</option>}
+                  </select>
+                  <input
+                    type="text"
+                    value={newUserRole}
+                    onChange={e => setNewUserRole(e.target.value)}
+                    placeholder="or type custom role ID (e.g. cashier, shift_manager)"
+                    className="w-full px-4 py-2 text-xs border border-gray-200 rounded-lg outline-none focus:border-[var(--sd-blue)]"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Store (Optional)</label>
