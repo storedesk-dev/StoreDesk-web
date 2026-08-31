@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard, Shield, Plus, Trash2
+  Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard, Shield, Plus, Trash2, Check, ChevronDown
 } from "lucide-react";
+import { getPage } from "@/config/pages";
 
 type OrgUser = {
   appUserId: string;
@@ -99,6 +100,8 @@ export default function AdminOrganizationDetailPage() {
   const [orgRoles, setOrgRoles] = useState<RoleConfigEntry[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [rolesSaving, setRolesSaving] = useState(false);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>("org_admin");
+  const [selectedPlatformTab, setSelectedPlatformTab] = useState<"electron" | "mobile">("electron");
 
   // New Subscription State
   const [subPlan, setSubPlan] = useState<"trial" | "standard" | "custom">("trial");
@@ -718,6 +721,7 @@ export default function AdminOrganizationDetailPage() {
                         }
                       };
 
+                      setSelectedRoleId(rId.trim());
                       saveOrgRoles([...orgRoles, newRole]);
                     }}
                     disabled={rolesSaving || rolesLoading}
@@ -734,126 +738,219 @@ export default function AdminOrganizationDetailPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-[var(--sd-blue)]" />
                 </div>
               ) : (
-                <div className="p-8 space-y-6">
-                  {orgRoles.map((role, ri) => {
-                    const isCorePage = (k: string) => k === "dashboard" || k === "settings" || k === "mobileDashboard";
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-[600px] border-t border-gray-100">
+                  {/* Left Column: Role Selector & Roster */}
+                  <div className="lg:col-span-4 border-r border-gray-100 p-6 bg-gray-50/40 space-y-4">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1">
+                      Organization Roles ({orgRoles.length})
+                    </div>
 
-                    const togglePage = (app: "electron" | "mobile", pageKey: string) => {
-                      if (isCorePage(pageKey)) {
-                        alert(`"${pageKey}" is a core system page and is always enabled.`);
-                        return;
-                      }
-                      const updated: RoleConfigEntry[] = JSON.parse(JSON.stringify(orgRoles));
-                      const p = updated[ri].accessKeys[app].pages.find((p: PageConfigEntry) => p.key === pageKey);
-                      if (p) p.enabled = !p.enabled;
-                      saveOrgRoles(updated);
-                    };
+                    <div className="space-y-2">
+                      {orgRoles.map(role => {
+                        const isSelected = (selectedRoleId || orgRoles[0]?.roleId) === role.roleId;
+                        const electronCount = role.accessKeys?.electron?.pages?.filter((p: any) => p.enabled || p.key === "dashboard" || p.key === "settings").length || 0;
+                        const mobileCount = role.accessKeys?.mobile?.pages?.filter((p: any) => p.enabled || p.key === "mobileDashboard").length || 0;
 
-                    const deleteRole = () => {
-                      if (role.roleId === "org_admin") {
-                        alert("Cannot delete Organization Admin role.");
-                        return;
-                      }
-                      if (!confirm(`Delete role "${role.roleName}" (${role.roleId})?`)) return;
-                      saveOrgRoles(orgRoles.filter((_, idx) => idx !== ri));
-                    };
-
-                    return (
-                      <div key={role.roleId} className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/60">
-                          <div className="flex items-center gap-3">
-                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                              role.roleId === "org_admin" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-blue-50 border-blue-200 text-blue-700"
-                            }`}>
-                              {role.roleName}
+                        return (
+                          <div
+                            key={role.roleId}
+                            onClick={() => setSelectedRoleId(role.roleId)}
+                            className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-white border-blue-500 shadow-sm ring-2 ring-blue-500/10"
+                                : "bg-white border-gray-200 hover:border-gray-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-sm font-bold text-gray-900">{role.roleName}</span>
+                              <code className="text-[10px] font-mono text-gray-400">{role.roleId}</code>
                             </div>
-                            <code className="text-xs font-mono text-gray-400">{role.roleId}</code>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                                🖥 {electronCount} Desktop Pages
+                              </span>
+                              <span className="text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">
+                                📱 {mobileCount} Mobile Screens
+                              </span>
+                            </div>
                           </div>
-                          {role.roleId !== "org_admin" && (
-                            <button
-                              onClick={deleteRole}
-                              className="text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-1 rounded hover:bg-red-50 transition-colors inline-flex items-center gap-1"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete Role
-                            </button>
-                          )}
-                        </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                        <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          {/* Electron Platform */}
-                          <div>
-                            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold mb-3 bg-blue-50 text-blue-700">
-                              🖥 Desktop (Electron)
+                  {/* Right Column: Platform Tabs & Page/Feature Matrix */}
+                  <div className="lg:col-span-8 p-6 bg-white space-y-6">
+                    {(() => {
+                      const activeRole = orgRoles.find(r => r.roleId === (selectedRoleId || orgRoles[0]?.roleId)) || orgRoles[0];
+                      if (!activeRole) return null;
+
+                      const ri = orgRoles.findIndex(r => r.roleId === activeRole.roleId);
+                      const isCorePage = (k: string) => k === "dashboard" || k === "settings" || k === "mobileDashboard";
+
+                      const togglePage = (app: "electron" | "mobile", pageKey: string) => {
+                        if (isCorePage(pageKey)) {
+                          alert(`"${pageKey}" is a core system page and is always enabled.`);
+                          return;
+                        }
+                        const updated: RoleConfigEntry[] = JSON.parse(JSON.stringify(orgRoles));
+                        const p = updated[ri].accessKeys[app].pages.find((p: PageConfigEntry) => p.key === pageKey);
+                        if (p) p.enabled = !p.enabled;
+                        saveOrgRoles(updated);
+                      };
+
+                      const toggleFlag = (app: "electron" | "mobile", pageKey: string, flagKey: string) => {
+                        const updated: RoleConfigEntry[] = JSON.parse(JSON.stringify(orgRoles));
+                        const p = updated[ri].accessKeys[app].pages.find((p: PageConfigEntry) => p.key === pageKey);
+                        if (p) {
+                          if (!p.featureFlags) p.featureFlags = {};
+                          const currentVal = p.featureFlags[flagKey];
+                          const flagDef = getPage(pageKey)?.knownFeatureFlags[flagKey];
+                          const defaultVal = flagDef ? flagDef.default : true;
+                          p.featureFlags[flagKey] = currentVal === undefined ? !defaultVal : !currentVal;
+                        }
+                        saveOrgRoles(updated);
+                      };
+
+                      const deleteRole = () => {
+                        if (activeRole.roleId === "org_admin") {
+                          alert("Cannot delete Organization Admin role.");
+                          return;
+                        }
+                        if (!confirm(`Delete role "${activeRole.roleName}" (${activeRole.roleId})?`)) return;
+                        const nextRoles = orgRoles.filter(r => r.roleId !== activeRole.roleId);
+                        setSelectedRoleId(nextRoles[0]?.roleId || "org_admin");
+                        saveOrgRoles(nextRoles);
+                      };
+
+                      const pageList = activeRole.accessKeys?.[selectedPlatformTab]?.pages || [];
+
+                      return (
+                        <div className="space-y-6">
+                          {/* Selected Role Header & Platform Tabs */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-base font-bold text-gray-900">{activeRole.roleName}</h4>
+                                <code className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{activeRole.roleId}</code>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Select pages and toggle inner feature flags for {selectedPlatformTab === "electron" ? "Desktop (Electron)" : "Mobile (Flutter)"}.
+                              </p>
                             </div>
-                            <div className="space-y-2">
-                              {(role.accessKeys?.electron?.pages || []).map((page: PageConfigEntry) => {
-                                const isCore = isCorePage(page.key);
-                                const isEnabled = isCore || page.enabled;
-                                return (
-                                  <div key={page.key} className={`rounded-xl border transition-all ${isEnabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
-                                    <div className="flex items-center justify-between px-4 py-2.5">
-                                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                                        <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
-                                        <span className="text-sm font-medium text-gray-900 capitalize">{page.key}</span>
-                                        {isCore && (
-                                          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">Always Enabled</span>
+
+                            <div className="flex items-center gap-3">
+                              {/* Platform Tabs Control */}
+                              <div className="inline-flex p-1 bg-gray-100 rounded-xl border border-gray-200">
+                                <button
+                                  onClick={() => setSelectedPlatformTab("electron")}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                    selectedPlatformTab === "electron"
+                                      ? "bg-white text-blue-700 shadow-sm"
+                                      : "text-gray-600 hover:text-gray-900"
+                                  }`}
+                                >
+                                  🖥 Desktop (Electron)
+                                </button>
+                                <button
+                                  onClick={() => setSelectedPlatformTab("mobile")}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                    selectedPlatformTab === "mobile"
+                                      ? "bg-white text-purple-700 shadow-sm"
+                                      : "text-gray-600 hover:text-gray-900"
+                                  }`}
+                                >
+                                  📱 Mobile (Flutter)
+                                </button>
+                              </div>
+
+                              {activeRole.roleId !== "org_admin" && (
+                                <button
+                                  onClick={deleteRole}
+                                  className="text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors inline-flex items-center gap-1 border border-red-200"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Page & Feature Flag List */}
+                          <div className="space-y-3">
+                            {pageList.map((page: PageConfigEntry) => {
+                              const isCore = isCorePage(page.key);
+                              const isEnabled = isCore || page.enabled;
+                              const pageDef = getPage(page.key);
+                              const flags = pageDef?.knownFeatureFlags || {};
+                              const flagKeys = Object.keys(flags);
+
+                              return (
+                                <div key={page.key} className={`rounded-xl border transition-all ${isEnabled ? "bg-white border-gray-200 shadow-sm" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
+                                  <div className="flex items-center justify-between px-4 py-3">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded shrink-0">{page.key}</code>
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-bold text-gray-900">{pageDef?.label || page.key}</span>
+                                          {isCore && (
+                                            <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">Always Enabled</span>
+                                          )}
+                                        </div>
+                                        {pageDef?.description && (
+                                          <p className="text-xs text-gray-500 mt-0.5">{pageDef.description}</p>
                                         )}
                                       </div>
-                                      <button
-                                        onClick={() => togglePage("electron", page.key)}
-                                        disabled={isCore}
-                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-emerald-500" : "bg-gray-200"} ${isCore ? "opacity-60 cursor-not-allowed" : ""}`}
-                                        role="switch"
-                                        aria-checked={isEnabled}
-                                      >
-                                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${isEnabled ? "translate-x-4" : "translate-x-0"}`} />
-                                      </button>
                                     </div>
+                                    <button
+                                      onClick={() => togglePage(selectedPlatformTab, page.key)}
+                                      disabled={isCore}
+                                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-emerald-500" : "bg-gray-200"} ${isCore ? "opacity-60 cursor-not-allowed" : ""}`}
+                                      role="switch"
+                                      aria-checked={isEnabled}
+                                    >
+                                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                                    </button>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </div>
 
-                          {/* Mobile Platform */}
-                          <div>
-                            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold mb-3 bg-purple-50 text-purple-700">
-                              📱 Mobile (Flutter)
-                            </div>
-                            <div className="space-y-2">
-                              {(role.accessKeys?.mobile?.pages || []).map((page: PageConfigEntry) => {
-                                const isCore = isCorePage(page.key);
-                                const isEnabled = isCore || page.enabled;
-                                return (
-                                  <div key={page.key} className={`rounded-xl border transition-all ${isEnabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
-                                    <div className="flex items-center justify-between px-4 py-2.5">
-                                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                                        <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
-                                        <span className="text-sm font-medium text-gray-900 capitalize">{page.key}</span>
-                                        {isCore && (
-                                          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">Always Enabled</span>
-                                        )}
+                                  {/* Feature Flags Inside Page */}
+                                  {isEnabled && flagKeys.length > 0 && (
+                                    <div className="px-4 pb-3 pt-2 border-t border-gray-100 bg-gray-50/50 rounded-b-xl space-y-2">
+                                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                        Feature Flags inside {pageDef?.label || page.key}
                                       </div>
-                                      <button
-                                        onClick={() => togglePage("mobile", page.key)}
-                                        disabled={isCore}
-                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-emerald-500" : "bg-gray-200"} ${isCore ? "opacity-60 cursor-not-allowed" : ""}`}
-                                        role="switch"
-                                        aria-checked={isEnabled}
-                                      >
-                                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${isEnabled ? "translate-x-4" : "translate-x-0"}`} />
-                                      </button>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        {flagKeys.map(fk => {
+                                          const fDef = flags[fk];
+                                          const isFlagActive = page.featureFlags?.[fk] !== undefined ? page.featureFlags[fk] : fDef.default;
+                                          return (
+                                            <div key={fk} className="flex items-center justify-between p-2 rounded-lg bg-white border border-gray-200">
+                                              <div className="pr-2">
+                                                <span className="text-xs font-semibold text-gray-800">{fDef.label}</span>
+                                                <p className="text-[10px] text-gray-400 leading-tight">{fDef.description}</p>
+                                              </div>
+                                              <button
+                                                onClick={() => toggleFlag(selectedPlatformTab, page.key, fk)}
+                                                className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition-colors shrink-0 ${
+                                                  isFlagActive ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-gray-100 text-gray-400 border-gray-200"
+                                                }`}
+                                              >
+                                                {isFlagActive ? "ON" : "OFF"}
+                                              </button>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
