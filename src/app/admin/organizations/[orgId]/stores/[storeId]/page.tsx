@@ -66,7 +66,6 @@ export default function AdminStoreDetailPage() {
                 { key: "costAnalysis",   enabled: true,  featureFlags: {} },
                 { key: "transactions",   enabled: true,  featureFlags: { enableExport: true } },
                 { key: "manageWorker",   enabled: true,  featureFlags: {} },
-                { key: "userManagement", enabled: true,  featureFlags: {} },
                 { key: "settings",       enabled: true,  featureFlags: {} }
               ]},
               mobile: { pages: [
@@ -97,7 +96,6 @@ export default function AdminStoreDetailPage() {
                 { key: "costAnalysis",   enabled: true,  featureFlags: {} },
                 { key: "transactions",   enabled: true,  featureFlags: { enableExport: true } },
                 { key: "manageWorker",   enabled: false, featureFlags: {} },
-                { key: "userManagement", enabled: false, featureFlags: {} },
                 { key: "settings",       enabled: true,  featureFlags: {} }
               ]},
               mobile: { pages: [
@@ -128,7 +126,6 @@ export default function AdminStoreDetailPage() {
                 { key: "costAnalysis",   enabled: false, featureFlags: {} },
                 { key: "transactions",   enabled: true,  featureFlags: { enableExport: false } },
                 { key: "manageWorker",   enabled: false, featureFlags: {} },
-                { key: "userManagement", enabled: false, featureFlags: {} },
                 { key: "settings",       enabled: false, featureFlags: {} }
               ]},
               mobile: { pages: [
@@ -159,7 +156,6 @@ export default function AdminStoreDetailPage() {
                 { key: "costAnalysis",   enabled: false, featureFlags: {} },
                 { key: "transactions",   enabled: true,  featureFlags: { enableExport: false } },
                 { key: "manageWorker",   enabled: false, featureFlags: {} },
-                { key: "userManagement", enabled: false, featureFlags: {} },
                 { key: "settings",       enabled: false, featureFlags: {} }
               ]},
               mobile: { pages: [
@@ -453,7 +449,6 @@ export default function AdminStoreDetailPage() {
               costAnalysis:     { label: "Cost Analysis",       desc: "Cross-vendor cost comparison.",               flags: {} },
               transactions:     { label: "Transactions",        desc: "Transaction history and reporting.",           flags: { enableExport: "Export CSV", enableRefundView: "Refund View" } },
               manageWorker:     { label: "Manage Worker",       desc: "Edge server status and controls.",             flags: {} },
-              userManagement:   { label: "User Management",     desc: "App user roles and sessions.",                 flags: {} },
               settings:         { label: "Settings",            desc: "Store settings and POS config.",               flags: {} },
               mobilePos:           { label: "POS (Mobile)",          desc: "Mobile point-of-sale.",                  flags: { enableManualEntry: "Manual Entry", enableQuickSale: "Quick Sale" } },
               mobileDashboard:     { label: "Dashboard (Mobile)",    desc: "Mobile home screen.",                    flags: {} },
@@ -569,7 +564,6 @@ export default function AdminStoreDetailPage() {
                       { key: "costAnalysis",   enabled: false, featureFlags: {} },
                       { key: "transactions",   enabled: true,  featureFlags: {} },
                       { key: "manageWorker",   enabled: false, featureFlags: {} },
-                      { key: "userManagement", enabled: false, featureFlags: {} },
                       { key: "settings",       enabled: false, featureFlags: {} }
                     ]
                   },

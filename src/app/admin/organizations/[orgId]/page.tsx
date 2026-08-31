@@ -3,9 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import {
-  Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard, Shield, Plus, Trash2, Check, ChevronDown
-} from "lucide-react";
+import { Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard, Shield, Plus, Trash2 } from "lucide-react";
+import { RolePreview } from "./RolePreview";
 import { getPage } from "@/config/pages";
 
 type OrgUser = {
@@ -69,8 +68,8 @@ function fmtDate(d?: string) {
   return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
-type PageConfigEntry = { key: string; enabled: boolean; featureFlags: Record<string, boolean> };
-type RoleConfigEntry = {
+export type PageConfigEntry = { key: string; enabled: boolean; featureFlags: Record<string, boolean> };
+export type RoleConfigEntry = {
   roleName: string;
   roleId: string;
   accessKeys: {
@@ -700,7 +699,6 @@ export default function AdminOrganizationDetailPage() {
                               { key: "costAnalysis",   enabled: false, featureFlags: {} },
                               { key: "transactions",   enabled: true,  featureFlags: {} },
                               { key: "manageWorker",   enabled: false, featureFlags: {} },
-                              { key: "userManagement", enabled: false, featureFlags: {} },
                               { key: "settings",       enabled: false, featureFlags: {} }
                             ]
                           },
@@ -748,8 +746,8 @@ export default function AdminOrganizationDetailPage() {
                     <div className="space-y-2">
                       {orgRoles.map(role => {
                         const isSelected = (selectedRoleId || orgRoles[0]?.roleId) === role.roleId;
-                        const electronCount = role.accessKeys?.electron?.pages?.filter((p: any) => p.enabled || p.key === "dashboard" || p.key === "settings").length || 0;
-                        const mobileCount = role.accessKeys?.mobile?.pages?.filter((p: any) => p.enabled || p.key === "mobileDashboard").length || 0;
+                        const electronCount = role.accessKeys?.electron?.pages?.filter((p: PageConfigEntry) => p.enabled || p.key === "dashboard" || p.key === "settings").length || 0;
+                        const mobileCount = role.accessKeys?.mobile?.pages?.filter((p: PageConfigEntry) => p.enabled || p.key === "mobileDashboard").length || 0;
 
                         return (
                           <div
@@ -947,6 +945,17 @@ export default function AdminOrganizationDetailPage() {
                               );
                             })}
                           </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ROLE VISUAL PREVIEW */}
+                    {(() => {
+                      const activeRole = orgRoles.find(r => r.roleId === (selectedRoleId || orgRoles[0]?.roleId)) || orgRoles[0];
+                      if (!activeRole) return null;
+                      return (
+                        <div className="pt-8 mt-8 border-t border-gray-100">
+                          <RolePreview role={activeRole} />
                         </div>
                       );
                     })()}

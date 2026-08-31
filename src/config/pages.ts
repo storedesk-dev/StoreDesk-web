@@ -38,7 +38,7 @@ export const ELECTRON_PAGES: PageDefinition[] = [
   { key: "costAnalysis",   label: "Cost Analysis",    description: "Cross-vendor cost comparison.",                app: "electron", filePath: "src/pages/CostAnalysisPage.tsx",   defaultEnabled: true,  knownFeatureFlags: {} },
   { key: "transactions",   label: "Transactions",     description: "Transaction history and reporting.",            app: "electron", filePath: "src/pages/TransactionsPage.tsx",   defaultEnabled: true,  knownFeatureFlags: { enableExport: { label: "Export CSV", description: "Export to CSV.", default: true }, enableRefundView: { label: "Refund View", description: "Show refunds.", default: true } } },
   { key: "manageWorker",   label: "Manage Worker",    description: "Edge server status and controls.",             app: "electron", filePath: "src/pages/ManageWorkerPage.tsx",   defaultEnabled: true,  knownFeatureFlags: {} },
-  { key: "userManagement", label: "User Management",  description: "App user roles and sessions.",                 app: "electron", filePath: "src/pages/UserManagementPage.tsx", defaultEnabled: false, knownFeatureFlags: {} },
+
   { key: "settings",       label: "Settings",         description: "Store settings and POS config.",               app: "electron", filePath: "src/pages/SettingsPage.tsx",       defaultEnabled: true, alwaysEnabled: true, knownFeatureFlags: {} },
 ];
 
