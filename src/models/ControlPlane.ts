@@ -106,7 +106,7 @@ const WorkerInstallationSchema = new Schema(
     },
     platform: { type: String, enum: ["windows", "macos", "linux"] },
     workerVersion: String,
-    serviceManagerVersion: String,
+    electronVersion: String,
     workerCredentialId: String,
     eulaAcceptanceId: String,
     activatedAt: Date,

@@ -464,7 +464,7 @@ export async function redeemSetupKey(body: {
     workerInstallationId: string;
     platform: "windows" | "macos" | "linux";
     workerVersion: string;
-    serviceManagerVersion: string;
+    electronVersion: string;
     type?: string;
   };
 }) {
@@ -591,7 +591,7 @@ export async function redeemSetupKey(body: {
   installation.status = "active";
   installation.platform = body.installation.platform;
   installation.workerVersion = body.installation.workerVersion;
-  installation.serviceManagerVersion = body.installation.serviceManagerVersion;
+  installation.electronVersion = body.installation.electronVersion;
   installation.workerCredentialId = credentialId;
   installation.eulaAcceptanceId = eulaAcceptanceId;
   installation.activatedAt = new Date();
