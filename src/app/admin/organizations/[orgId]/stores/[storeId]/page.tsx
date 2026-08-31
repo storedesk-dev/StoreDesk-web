@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Loader2, Save, Server, ShieldCheck, Activity, KeyRound, Copy, Check } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Server, ShieldCheck, Activity, KeyRound, Copy, Check, Settings2 } from "lucide-react";
 import { JsonEditor } from "../../../../components/JsonEditor";
 
 export default function AdminStoreDetailPage() {
@@ -299,6 +299,65 @@ export default function AdminStoreDetailPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Feature Flags UI */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Settings2 className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-lg font-semibold text-gray-900">Feature Flags</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-6">
+            Toggle features on or off for this specific store. These settings will sync to the Edge Worker and apply to the Desktop and Mobile apps.
+          </p>
+          
+          {(() => {
+            let parsed: Record<string, unknown> = {};
+            try { parsed = configJson.trim() ? JSON.parse(configJson) : {}; } catch { }
+            const flags = (parsed.featureFlags as Record<string, boolean>) || {};
+            
+            const toggleFeature = (key: string) => {
+              try {
+                const newParsed: Record<string, unknown> = configJson.trim() ? JSON.parse(configJson) : {};
+                if (!newParsed.featureFlags) newParsed.featureFlags = {};
+                (newParsed.featureFlags as Record<string, boolean>)[key] = !(newParsed.featureFlags as Record<string, boolean>)[key];
+                setConfigJson(JSON.stringify(newParsed, null, 2));
+              } catch {
+                alert("Cannot toggle feature while Advanced Configuration JSON is invalid.");
+              }
+            };
+
+            const knownFeatures = [
+              { key: "enableInvoiceUpload", label: "Invoice Upload", desc: "Allow store managers to upload and review vendor invoices." },
+              { key: "enableLotterySetup", label: "Lottery Setup", desc: "Enable the lottery product creation and management tools." },
+              { key: "enablePriceCompare", label: "Price Comparison", desc: "Show the vendor price comparison tool." },
+              { key: "enableMobileScanner", label: "Mobile Scanner", desc: "Allow mobile app to scan products." },
+            ];
+
+            return (
+              <div className="space-y-4">
+                {knownFeatures.map(feature => {
+                  const isEnabled = !!flags[feature.key];
+                  return (
+                    <div key={feature.key} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+                      <div>
+                        <div className="font-medium text-gray-900">{feature.label}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{feature.desc}</div>
+                      </div>
+                      <button
+                        onClick={() => toggleFeature(feature.key)}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isEnabled ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                        role="switch"
+                        aria-checked={isEnabled}
+                      >
+                        <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Configuration JSON */}

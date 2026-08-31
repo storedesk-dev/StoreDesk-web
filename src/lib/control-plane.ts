@@ -744,6 +744,15 @@ async function assignmentSummaries(appUserId: string) {
       TenantStoreModel.findOne({ storeId: a.storeId }).lean(),
       WorkerInstallationModel.findOne({ workerInstallationId: a.workerInstallationId }).lean()
     ]);
+    // Parse featureFlags from configJson
+    let featureFlags: Record<string, boolean> = {};
+    try {
+      const raw = (store as Record<string, unknown> | null)?.configJson;
+      if (raw && typeof raw === "string") {
+        const parsed = JSON.parse(raw);
+        featureFlags = parsed.featureFlags || {};
+      }
+    } catch { }
     summaries.push({
       assignmentId: a.assignmentId,
       organizationId: a.organizationId,
@@ -754,6 +763,7 @@ async function assignmentSummaries(appUserId: string) {
       workerName: installation?.workerName,
       role: a.role,
       scopes: a.scopes,
+      featureFlags,
       ready: Boolean(
         installation?.status === "active" && installation.firstBootstrapCompletedAt
       ),
@@ -947,6 +957,16 @@ export async function issueClientSession(body: {
 
   const store = await TenantStoreModel.findOne({ storeId: assignment.storeId }).lean();
 
+  // Parse featureFlags from the store's configJson
+  let featureFlags: Record<string, boolean> = {};
+  try {
+    const raw = (store as Record<string, unknown> | null)?.configJson;
+    if (raw && typeof raw === "string") {
+      const parsed = JSON.parse(raw);
+      featureFlags = parsed.featureFlags || {};
+    }
+  } catch { }
+
   return {
     contractVersion: CONTRACT_VERSION,
     sessionToken: relay.token,
@@ -955,8 +975,9 @@ export async function issueClientSession(body: {
     storeId: assignment.storeId,
     workerInstallationId: assignment.workerInstallationId,
     assignmentId: assignment.assignmentId,
-    role: "app_user",
+    role: assignment.role,
     scopes: assignment.scopes,
+    featureFlags,
     refreshCredential: `${refreshId}.${refreshSecret}`,
     tunnelUrl: (store as Record<string, unknown>)?.tunnelUrl as string | null,
     lanUrl: (installation as Record<string, unknown>)?.lanUrl as string | null
