@@ -123,7 +123,11 @@ export default function AdminOrganizationDetailPage() {
     try {
       const res = await fetch(`/api/v1/admin/organizations/${orgId}/app-users`);
       const data = await res.json();
-      setAppUsers(data.appUsers || []);
+      const usersList = data.appUsers || [];
+      setAppUsers(usersList);
+      if (usersList.length === 0) {
+        setNewUserRole("org_admin");
+      }
     } catch (err: unknown) {
       console.error(err);
     } finally {
@@ -413,7 +417,7 @@ export default function AdminOrganizationDetailPage() {
                       <tr>
                         <th className="px-8 py-5 font-semibold">User</th>
                         <th className="px-8 py-5 font-semibold">Status</th>
-                        <th className="px-8 py-5 font-semibold">Assigned Stores</th>
+                        <th className="px-8 py-5 font-semibold">Assigned Role & Stores</th>
                         <th className="px-8 py-5 font-semibold">Last Login</th>
                         <th className="px-8 py-5 font-semibold">Added</th>
                       </tr>
@@ -435,14 +439,33 @@ export default function AdminOrganizationDetailPage() {
                           <td className="px-8 py-5"><StatusBadge status={user.status} /></td>
                           <td className="px-8 py-5">
                             {user.assignments.length === 0 ? (
-                              <span className="text-gray-400 text-xs italic">No stores</span>
+                              <span className="text-gray-400 text-xs italic">No assignments</span>
                             ) : (
-                              <div className="flex flex-col gap-1">
-                                {user.assignments.map((a, i) => (
-                                  <span key={i} className="text-xs font-mono text-gray-600 bg-gray-100 rounded px-1.5 py-0.5">
-                                    {a.storeId} · <span className="text-gray-400">{a.role}</span>
-                                  </span>
-                                ))}
+                              <div className="flex flex-col gap-1.5">
+                                {user.assignments.map((a, i) => {
+                                  const roleChipStyles: Record<string, string> = {
+                                    org_admin: "bg-indigo-50 text-indigo-700 border-indigo-200 font-bold",
+                                    store_manager: "bg-blue-50 text-blue-700 border-blue-200",
+                                    store_operator: "bg-amber-50 text-amber-700 border-amber-200",
+                                    viewer: "bg-gray-50 text-gray-600 border-gray-200",
+                                  };
+                                  const roleLabels: Record<string, string> = {
+                                    org_admin: "Org Admin",
+                                    store_manager: "Store Manager",
+                                    store_operator: "Store Operator",
+                                    viewer: "Viewer",
+                                  };
+                                  return (
+                                    <div key={i} className="flex items-center gap-2">
+                                      <span className={`text-[11px] px-2 py-0.5 rounded-full border ${roleChipStyles[a.role] || "bg-gray-50 text-gray-700 border-gray-200"}`}>
+                                        {roleLabels[a.role] || a.role}
+                                      </span>
+                                      <span className="text-xs font-mono text-gray-500">
+                                        {a.storeId ? `Store #${a.storeId}` : "All Stores"}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </td>
@@ -454,6 +477,49 @@ export default function AdminOrganizationDetailPage() {
                   </table>
                 </div>
               )}
+
+              {/* Roles & Permissions Matrix Overview */}
+              <div className="p-8 border-t border-gray-100 bg-gray-50/50">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Organization Roles & System Access</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 mb-2">
+                      Org Admin (Default 1st User)
+                    </div>
+                    <p className="text-xs text-gray-600 mb-2">Full administrative access across all stores, edge workers, user management, and store settings.</p>
+                    <div className="text-[11px] font-mono text-indigo-600 bg-indigo-50/50 p-2 rounded border border-indigo-100">
+                      All Desktop + Mobile pages enabled with full feature flags.
+                    </div>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 mb-2">
+                      Store Manager
+                    </div>
+                    <p className="text-xs text-gray-600 mb-2">Manages store inventory, vendor prices, pricing rules, cost analysis, and transactions.</p>
+                    <div className="text-[11px] font-mono text-blue-600 bg-blue-50/50 p-2 rounded border border-blue-100">
+                      Desktop & Mobile inventory + pricing controls.
+                    </div>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 mb-2">
+                      Store Operator
+                    </div>
+                    <p className="text-xs text-gray-600 mb-2">Cashier & store clerk — operates POS, scans items, and views daily transactions.</p>
+                    <div className="text-[11px] font-mono text-amber-600 bg-amber-50/50 p-2 rounded border border-amber-100">
+                      POS, Scanner, and basic Transaction views.
+                    </div>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 mb-2">
+                      Viewer
+                    </div>
+                    <p className="text-xs text-gray-600 mb-2">Read-only auditor or accountant — views dashboard metrics and transactions.</p>
+                    <div className="text-[11px] font-mono text-gray-600 bg-gray-50 p-2 rounded border border-gray-200">
+                      Dashboard and Product list read-only access.
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

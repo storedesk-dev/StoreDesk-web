@@ -51,9 +51,132 @@ export default function AdminStoreDetailPage() {
         posIpAddress: "",
         posUsername: "",
         posPassword: "",
-        featureFlags: {
-          enableBetaScanner: false
-        }
+        roles: [
+          {
+            roleName: "Organization Admin", roleId: "org_admin",
+            accessKeys: {
+              electron: { pages: [
+                { key: "pos",            enabled: true,  featureFlags: { enableRefunds: true, enableDiscounts: true, enableVoidTransaction: true } },
+                { key: "dashboard",      enabled: true,  featureFlags: {} },
+                { key: "products",       enabled: true,  featureFlags: { enableBulkImport: true } },
+                { key: "vendors",        enabled: true,  featureFlags: {} },
+                { key: "vendorPrices",   enabled: true,  featureFlags: {} },
+                { key: "priceBook",      enabled: true,  featureFlags: {} },
+                { key: "pricingRules",   enabled: true,  featureFlags: {} },
+                { key: "costAnalysis",   enabled: true,  featureFlags: {} },
+                { key: "transactions",   enabled: true,  featureFlags: { enableExport: true } },
+                { key: "manageWorker",   enabled: true,  featureFlags: {} },
+                { key: "userManagement", enabled: true,  featureFlags: {} },
+                { key: "settings",       enabled: true,  featureFlags: {} }
+              ]},
+              mobile: { pages: [
+                { key: "mobilePos",           enabled: true,  featureFlags: { enableManualEntry: true, enableQuickSale: true } },
+                { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
+                { key: "mobileScanner",        enabled: true,  featureFlags: { enableCameraFlash: true } },
+                { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
+                { key: "mobileVendorPrices",   enabled: true,  featureFlags: {} },
+                { key: "mobilePriceBook",      enabled: true,  featureFlags: {} },
+                { key: "mobileTransactions",   enabled: true,  featureFlags: { enableExport: true } },
+                { key: "mobileReports",        enabled: true,  featureFlags: {} },
+                { key: "mobileAnalytics",      enabled: true,  featureFlags: {} },
+                { key: "mobileSalesTax",       enabled: true,  featureFlags: {} }
+              ]}
+            }
+          },
+          {
+            roleName: "Store Manager", roleId: "store_manager",
+            accessKeys: {
+              electron: { pages: [
+                { key: "pos",            enabled: true,  featureFlags: { enableRefunds: true, enableDiscounts: false, enableVoidTransaction: false } },
+                { key: "dashboard",      enabled: true,  featureFlags: {} },
+                { key: "products",       enabled: true,  featureFlags: { enableBulkImport: false } },
+                { key: "vendors",        enabled: true,  featureFlags: {} },
+                { key: "vendorPrices",   enabled: true,  featureFlags: {} },
+                { key: "priceBook",      enabled: true,  featureFlags: {} },
+                { key: "pricingRules",   enabled: true,  featureFlags: {} },
+                { key: "costAnalysis",   enabled: true,  featureFlags: {} },
+                { key: "transactions",   enabled: true,  featureFlags: { enableExport: true } },
+                { key: "manageWorker",   enabled: false, featureFlags: {} },
+                { key: "userManagement", enabled: false, featureFlags: {} },
+                { key: "settings",       enabled: true,  featureFlags: {} }
+              ]},
+              mobile: { pages: [
+                { key: "mobilePos",           enabled: true,  featureFlags: { enableManualEntry: true, enableQuickSale: false } },
+                { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
+                { key: "mobileScanner",        enabled: true,  featureFlags: { enableCameraFlash: true } },
+                { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
+                { key: "mobileVendorPrices",   enabled: true,  featureFlags: {} },
+                { key: "mobilePriceBook",      enabled: true,  featureFlags: {} },
+                { key: "mobileTransactions",   enabled: true,  featureFlags: { enableExport: false } },
+                { key: "mobileReports",        enabled: false, featureFlags: {} },
+                { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
+                { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
+              ]}
+            }
+          },
+          {
+            roleName: "Store Operator", roleId: "store_operator",
+            accessKeys: {
+              electron: { pages: [
+                { key: "pos",            enabled: true,  featureFlags: { enableRefunds: false, enableDiscounts: false, enableVoidTransaction: false } },
+                { key: "dashboard",      enabled: true,  featureFlags: {} },
+                { key: "products",       enabled: true,  featureFlags: { enableBulkImport: false } },
+                { key: "vendors",        enabled: false, featureFlags: {} },
+                { key: "vendorPrices",   enabled: false, featureFlags: {} },
+                { key: "priceBook",      enabled: false, featureFlags: {} },
+                { key: "pricingRules",   enabled: false, featureFlags: {} },
+                { key: "costAnalysis",   enabled: false, featureFlags: {} },
+                { key: "transactions",   enabled: true,  featureFlags: { enableExport: false } },
+                { key: "manageWorker",   enabled: false, featureFlags: {} },
+                { key: "userManagement", enabled: false, featureFlags: {} },
+                { key: "settings",       enabled: false, featureFlags: {} }
+              ]},
+              mobile: { pages: [
+                { key: "mobilePos",           enabled: true,  featureFlags: { enableManualEntry: false, enableQuickSale: true } },
+                { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
+                { key: "mobileScanner",        enabled: true,  featureFlags: { enableCameraFlash: false } },
+                { key: "mobileProductSearch",  enabled: false, featureFlags: {} },
+                { key: "mobileVendorPrices",   enabled: false, featureFlags: {} },
+                { key: "mobilePriceBook",      enabled: false, featureFlags: {} },
+                { key: "mobileTransactions",   enabled: false, featureFlags: { enableExport: false } },
+                { key: "mobileReports",        enabled: false, featureFlags: {} },
+                { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
+                { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
+              ]}
+            }
+          },
+          {
+            roleName: "Viewer", roleId: "viewer",
+            accessKeys: {
+              electron: { pages: [
+                { key: "pos",            enabled: false, featureFlags: {} },
+                { key: "dashboard",      enabled: true,  featureFlags: {} },
+                { key: "products",       enabled: true,  featureFlags: { enableBulkImport: false } },
+                { key: "vendors",        enabled: false, featureFlags: {} },
+                { key: "vendorPrices",   enabled: false, featureFlags: {} },
+                { key: "priceBook",      enabled: false, featureFlags: {} },
+                { key: "pricingRules",   enabled: false, featureFlags: {} },
+                { key: "costAnalysis",   enabled: false, featureFlags: {} },
+                { key: "transactions",   enabled: true,  featureFlags: { enableExport: false } },
+                { key: "manageWorker",   enabled: false, featureFlags: {} },
+                { key: "userManagement", enabled: false, featureFlags: {} },
+                { key: "settings",       enabled: false, featureFlags: {} }
+              ]},
+              mobile: { pages: [
+                { key: "mobilePos",           enabled: false, featureFlags: {} },
+                { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
+                { key: "mobileScanner",        enabled: false, featureFlags: {} },
+                { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
+                { key: "mobileVendorPrices",   enabled: false, featureFlags: {} },
+                { key: "mobilePriceBook",      enabled: false, featureFlags: {} },
+                { key: "mobileTransactions",   enabled: false, featureFlags: {} },
+                { key: "mobileReports",        enabled: false, featureFlags: {} },
+                { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
+                { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
+              ]}
+            }
+          }
+        ]
       }, null, 2);
       setConfigJson(data.store.configJson || defaultJson);
       setLicensePlan(data.store.licensePlan || "trial");
@@ -301,60 +424,147 @@ export default function AdminStoreDetailPage() {
           </div>
         </div>
 
-        {/* Feature Flags UI */}
+        {/* Role-Based Page Access Editor */}
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-1">
             <Settings2 className="h-5 w-5 text-indigo-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Feature Flags</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Role Access & Page Flags</h2>
           </div>
           <p className="text-sm text-gray-500 mb-6">
-            Toggle features on or off for this specific store. These settings will sync to the Edge Worker and apply to the Desktop and Mobile apps.
+            Each role has its own page access list and per-page feature flags. The app reads the matching role at login and only shows those pages.
           </p>
-          
+
           {(() => {
+            interface PageEntry { key: string; enabled: boolean; featureFlags: Record<string, boolean> }
+            interface RoleEntry { roleName: string; roleId: string; accessKeys: { electron: { pages: PageEntry[] }; mobile: { pages: PageEntry[] } } }
+
             let parsed: Record<string, unknown> = {};
             try { parsed = configJson.trim() ? JSON.parse(configJson) : {}; } catch { }
-            const flags = (parsed.featureFlags as Record<string, boolean>) || {};
-            
-            const toggleFeature = (key: string) => {
-              try {
-                const newParsed: Record<string, unknown> = configJson.trim() ? JSON.parse(configJson) : {};
-                if (!newParsed.featureFlags) newParsed.featureFlags = {};
-                (newParsed.featureFlags as Record<string, boolean>)[key] = !(newParsed.featureFlags as Record<string, boolean>)[key];
-                setConfigJson(JSON.stringify(newParsed, null, 2));
-              } catch {
-                alert("Cannot toggle feature while Advanced Configuration JSON is invalid.");
-              }
+            const roles = (parsed.roles as RoleEntry[]) || [];
+
+            const PAGE_META: Record<string, { label: string; desc: string; flags: Record<string, string> }> = {
+              pos:              { label: "POS Workspace",       desc: "Point-of-sale terminal.",                     flags: { enableRefunds: "Refunds", enableDiscounts: "Discounts", enableVoidTransaction: "Void Txn", enableCashDrawer: "Cash Drawer" } },
+              dashboard:        { label: "Dashboard",           desc: "Overview cards and setup checklist.",          flags: {} },
+              products:         { label: "Products",            desc: "Product catalog management.",                  flags: { enableBulkImport: "Bulk Import", enableBarcodeGeneration: "Barcode Gen" } },
+              vendors:          { label: "Vendors",             desc: "Vendor directory.",                            flags: {} },
+              vendorPrices:     { label: "Vendor Prices",       desc: "Manual vendor price entry.",                   flags: {} },
+              priceBook:        { label: "Price Book",          desc: "Selling price management.",                    flags: {} },
+              pricingRules:     { label: "Pricing Rules",       desc: "Margin/markup and rounding rules.",            flags: {} },
+              costAnalysis:     { label: "Cost Analysis",       desc: "Cross-vendor cost comparison.",               flags: {} },
+              transactions:     { label: "Transactions",        desc: "Transaction history and reporting.",           flags: { enableExport: "Export CSV", enableRefundView: "Refund View" } },
+              manageWorker:     { label: "Manage Worker",       desc: "Edge server status and controls.",             flags: {} },
+              userManagement:   { label: "User Management",     desc: "App user roles and sessions.",                 flags: {} },
+              settings:         { label: "Settings",            desc: "Store settings and POS config.",               flags: {} },
+              mobilePos:           { label: "POS (Mobile)",          desc: "Mobile point-of-sale.",                  flags: { enableManualEntry: "Manual Entry", enableQuickSale: "Quick Sale" } },
+              mobileDashboard:     { label: "Dashboard (Mobile)",    desc: "Mobile home screen.",                    flags: {} },
+              mobileScanner:       { label: "Barcode Scanner",       desc: "Camera barcode scanner.",                flags: { enableCameraFlash: "Camera Flash", enableManualEntry: "Manual Code" } },
+              mobileProductSearch: { label: "Product Search",        desc: "Search products by name/UPC.",           flags: {} },
+              mobileVendorPrices:  { label: "Vendor Prices (Mobile)",desc: "View vendor pricing on mobile.",         flags: {} },
+              mobilePriceBook:     { label: "Price Book (Mobile)",   desc: "View selling prices on mobile.",         flags: {} },
+              mobileTransactions:  { label: "Transactions (Mobile)", desc: "View transaction history.",              flags: { enableExport: "Export CSV" } },
+              mobileReports:       { label: "Reports (Mobile)",      desc: "Sales and inventory reports.",           flags: {} },
+              mobileAnalytics:     { label: "Analytics (Mobile)",    desc: "Revenue charts and trends.",             flags: {} },
+              mobileSalesTax:      { label: "Sales Tax (Mobile)",    desc: "Sales tax management.",                  flags: {} },
             };
 
-            const knownFeatures = [
-              { key: "enableInvoiceUpload", label: "Invoice Upload", desc: "Allow store managers to upload and review vendor invoices." },
-              { key: "enableLotterySetup", label: "Lottery Setup", desc: "Enable the lottery product creation and management tools." },
-              { key: "enablePriceCompare", label: "Price Comparison", desc: "Show the vendor price comparison tool." },
-              { key: "enableMobileScanner", label: "Mobile Scanner", desc: "Allow mobile app to scan products." },
-            ];
+            const updateRoles = (newRoles: RoleEntry[]) => {
+              try {
+                const np: Record<string, unknown> = configJson.trim() ? JSON.parse(configJson) : {};
+                np.roles = newRoles;
+                setConfigJson(JSON.stringify(np, null, 2));
+              } catch { alert("Cannot update while JSON is invalid."); }
+            };
+
+            const togglePage = (ri: number, app: "electron" | "mobile", pageKey: string) => {
+              const nr = JSON.parse(JSON.stringify(roles)) as RoleEntry[];
+              const p = nr[ri].accessKeys[app].pages.find(p => p.key === pageKey);
+              if (p) p.enabled = !p.enabled;
+              updateRoles(nr);
+            };
+
+            const toggleFlag = (ri: number, app: "electron" | "mobile", pageKey: string, fk: string) => {
+              const nr = JSON.parse(JSON.stringify(roles)) as RoleEntry[];
+              const p = nr[ri].accessKeys[app].pages.find(p => p.key === pageKey);
+              if (p) p.featureFlags[fk] = !p.featureFlags[fk];
+              updateRoles(nr);
+            };
+
+            const renderPlatform = (ri: number, app: "electron" | "mobile", pages: PageEntry[]) => (
+              <div className="mb-2">
+                <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold mb-3 ${
+                  app === "electron" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"
+                }`}>{app === "electron" ? "🖥 Desktop" : "📱 Mobile"}</div>
+                <div className="space-y-1.5">
+                  {pages.map(page => {
+                    const m = PAGE_META[page.key] ?? { label: page.key, desc: "", flags: {} };
+                    const fks = Object.keys(m.flags);
+                    return (
+                      <div key={page.key} className={`rounded-xl border transition-all ${
+                        page.enabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"
+                      }`}>
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900">{m.label}</div>
+                              <div className="text-xs text-gray-400 truncate">{m.desc}</div>
+                            </div>
+                          </div>
+                          <button onClick={() => togglePage(ri, app, page.key)}
+                            className={`ml-4 relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                              page.enabled ? "bg-emerald-500" : "bg-gray-200"
+                            }`} role="switch" aria-checked={page.enabled}>
+                            <span aria-hidden="true" className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                              page.enabled ? "translate-x-4" : "translate-x-0"
+                            }`} />
+                          </button>
+                        </div>
+                        {page.enabled && fks.length > 0 && (
+                          <div className="px-4 pb-3 flex flex-wrap gap-2 border-t border-gray-50 pt-2">
+                            {fks.map(fk => {
+                              const on = !!page.featureFlags[fk];
+                              return (
+                                <button key={fk} onClick={() => toggleFlag(ri, app, page.key, fk)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                                    on ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-400"
+                                  }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-gray-300"}`} />
+                                  {m.flags[fk]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+
+            const ROLE_CHIP: Record<string, string> = {
+              org_admin:      "bg-indigo-50 border-indigo-200 text-indigo-700",
+              store_manager:  "bg-blue-50 border-blue-200 text-blue-700",
+              store_operator: "bg-amber-50 border-amber-200 text-amber-700",
+              viewer:         "bg-gray-50 border-gray-200 text-gray-600",
+            };
 
             return (
-              <div className="space-y-4">
-                {knownFeatures.map(feature => {
-                  const isEnabled = !!flags[feature.key];
-                  return (
-                    <div key={feature.key} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
-                      <div>
-                        <div className="font-medium text-gray-900">{feature.label}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{feature.desc}</div>
-                      </div>
-                      <button
-                        onClick={() => toggleFeature(feature.key)}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isEnabled ? 'bg-emerald-500' : 'bg-gray-200'}`}
-                        role="switch"
-                        aria-checked={isEnabled}
-                      >
-                        <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                      </button>
+              <div className="space-y-6">
+                {roles.map((role, ri) => (
+                  <div key={role.roleId} className="border border-gray-200 rounded-2xl overflow-hidden">
+                    <div className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-100 bg-gray-50/60">
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                        ROLE_CHIP[role.roleId] ?? "bg-gray-50 border-gray-200 text-gray-700"
+                      }`}>{role.roleName}</div>
+                      <code className="text-[11px] font-mono text-gray-400">{role.roleId}</code>
                     </div>
-                  );
-                })}
+                    <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {renderPlatform(ri, "electron", role.accessKeys.electron.pages)}
+                      {renderPlatform(ri, "mobile",   role.accessKeys.mobile.pages)}
+                    </div>
+                  </div>
+                ))}
               </div>
             );
           })()}

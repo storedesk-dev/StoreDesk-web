@@ -38,7 +38,7 @@ export async function GET(req: Request, ctx: Ctx) {
 const CreateAppUserSchema = z.object({
   email: z.string().email(),
   name: z.string().optional(),
-  role: z.enum(["store_operator", "store_manager", "viewer"]),
+  role: z.enum(["org_admin", "store_operator", "store_manager", "viewer"]).optional(),
   storeId: z.string().optional()
 });
 
@@ -78,13 +78,16 @@ export async function POST(req: Request, ctx: Ctx) {
       }
     }
 
-    // 2. Create the Assignment
+    // 2. Determine Role — First user in organization MUST be org_admin
+    const existingCount = await UserAssignmentModel.countDocuments({ organizationId, status: "active" });
+    const assignedRole = (existingCount === 0) ? "org_admin" : (parsed.role || "store_operator");
+
     const assignment = await UserAssignmentModel.create({
       assignmentId: publicId("asn"),
       appUserId: appUser.appUserId,
       organizationId,
       storeId: parsed.storeId,
-      role: parsed.role,
+      role: assignedRole,
       status: "active",
       createdByAdminId: admin.adminId
     });

@@ -696,7 +696,7 @@ export async function createAssignment(
     organizationId: string;
     storeId: string;
     workerInstallationId: string;
-    role: "store_operator" | "store_manager" | "viewer";
+    role: "org_admin" | "store_operator" | "store_manager" | "viewer";
     scopes?: string[];
   }
 ) {
@@ -744,13 +744,17 @@ async function assignmentSummaries(appUserId: string) {
       TenantStoreModel.findOne({ storeId: a.storeId }).lean(),
       WorkerInstallationModel.findOne({ workerInstallationId: a.workerInstallationId }).lean()
     ]);
-    // Parse featureFlags from configJson
-    let featureFlags: Record<string, boolean> = {};
+    // Parse pageAccess and roleAccess from configJson
+    let pageAccess: Record<string, { enabled: boolean }> = {};
+    let roleAccess: Record<string, unknown> | null = null;
     try {
       const raw = (store as Record<string, unknown> | null)?.configJson;
       if (raw && typeof raw === "string") {
         const parsed = JSON.parse(raw);
-        featureFlags = parsed.featureFlags || {};
+        pageAccess = parsed.pageAccess || {};
+        if (Array.isArray(parsed.roles)) {
+          roleAccess = parsed.roles.find((r: Record<string, unknown>) => r.roleId === a.role) || null;
+        }
       }
     } catch { }
     summaries.push({
@@ -763,7 +767,8 @@ async function assignmentSummaries(appUserId: string) {
       workerName: installation?.workerName,
       role: a.role,
       scopes: a.scopes,
-      featureFlags,
+      pageAccess,
+      roleAccess,
       ready: Boolean(
         installation?.status === "active" && installation.firstBootstrapCompletedAt
       ),
@@ -957,13 +962,17 @@ export async function issueClientSession(body: {
 
   const store = await TenantStoreModel.findOne({ storeId: assignment.storeId }).lean();
 
-  // Parse featureFlags from the store's configJson
-  let featureFlags: Record<string, boolean> = {};
+  // Parse pageAccess and roleAccess from the store's configJson
+  let pageAccess: Record<string, { enabled: boolean }> = {};
+  let roleAccess: Record<string, unknown> | null = null;
   try {
     const raw = (store as Record<string, unknown> | null)?.configJson;
     if (raw && typeof raw === "string") {
       const parsed = JSON.parse(raw);
-      featureFlags = parsed.featureFlags || {};
+      pageAccess = parsed.pageAccess || {};
+      if (Array.isArray(parsed.roles)) {
+        roleAccess = parsed.roles.find((r: Record<string, unknown>) => r.roleId === assignment.role) || null;
+      }
     }
   } catch { }
 
@@ -977,7 +986,8 @@ export async function issueClientSession(body: {
     assignmentId: assignment.assignmentId,
     role: assignment.role,
     scopes: assignment.scopes,
-    featureFlags,
+    pageAccess,
+    roleAccess,
     refreshCredential: `${refreshId}.${refreshSecret}`,
     tunnelUrl: (store as Record<string, unknown>)?.tunnelUrl as string | null,
     lanUrl: (installation as Record<string, unknown>)?.lanUrl as string | null
