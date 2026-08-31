@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { requireInternalAdmin } from "@/lib/admin-auth";
 import { jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
+import { deleteCloudflareTunnel } from "@/lib/cloudflare";
 import { 
   OrganizationModel, 
-  StoreModel, 
+  TenantStoreModel, 
   SubscriptionModel, 
   WorkerInstallationModel, 
   SetupKeyModel, 
@@ -41,7 +42,20 @@ export async function DELETE(req: Request, ctx: Ctx) {
     }
 
     // Cascade delete related records
-    await StoreModel.deleteMany({ organizationId });
+    const stores = await TenantStoreModel.find({ organizationId });
+    for (const store of stores) {
+      if (store.tunnelUrl) {
+        try {
+          const urlObj = new URL(store.tunnelUrl);
+          const slug = urlObj.hostname.split('.')[0];
+          await deleteCloudflareTunnel(slug);
+        } catch (err) {
+          console.error(`Failed to delete tunnel for store ${store.storeId}:`, err);
+        }
+      }
+    }
+    
+    await TenantStoreModel.deleteMany({ organizationId });
     await SubscriptionModel.deleteMany({ organizationId });
     await WorkerInstallationModel.deleteMany({ organizationId });
     await SetupKeyModel.deleteMany({ organizationId });

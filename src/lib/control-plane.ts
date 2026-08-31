@@ -465,6 +465,7 @@ export async function redeemSetupKey(body: {
     platform: "windows" | "macos" | "linux";
     workerVersion: string;
     serviceManagerVersion: string;
+    type?: string;
   };
 }) {
   await connectDb();
