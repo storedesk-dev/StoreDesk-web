@@ -105,7 +105,7 @@ export default function AdminOrganizationsPage() {
           <thead className="bg-gray-50/50 text-[var(--muted)] text-xs uppercase tracking-wider border-b border-gray-200/60">
             <tr>
               <th className="px-6 py-5 font-semibold">Name</th>
-              <th className="px-6 py-5 font-semibold">Org ID</th>
+              
               <th className="px-6 py-5 font-semibold">Stores</th>
               <th className="px-6 py-5 font-semibold">Status</th>
               <th className="px-6 py-5 font-semibold text-right">Actions</th>
@@ -128,13 +128,16 @@ export default function AdminOrganizationsPage() {
             ) : (
               organizations.map((org) => (
                 <tr key={org._id} className="hover:bg-gray-50/80 transition-colors group">
-                  <td className="px-6 py-5">
-                    <div className="font-semibold text-gray-900">{org.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">/{org.slug}</div>
+                  <td className="px-6 py-5 flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-gray-900">{org.name}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">/{org.slug}</div>
+                    </div>
+                    <div className="group relative flex items-center justify-center cursor-help ml-2" title={org.organizationId}>
+                      <div className="h-5 w-5 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-xs font-bold">i</div>
+                    </div>
                   </td>
-                  <td className="px-6 py-5 font-mono text-[11px] text-gray-400 bg-gray-50/50 rounded inline-block mt-4 ml-4 mb-4 border border-gray-100">
-                    {org.organizationId}
-                  </td>
+                  
                   <td className="px-6 py-5">
                     <div className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 font-medium">
                       {org.stores?.length || 0}

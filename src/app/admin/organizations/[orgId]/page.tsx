@@ -426,7 +426,7 @@ export default function AdminOrganizationDetailPage() {
                 <thead className="bg-gray-50/50 text-[var(--muted)] text-xs uppercase tracking-wider border-b border-gray-200/60">
                   <tr>
                     <th className="px-8 py-5 font-semibold">Store Name</th>
-                    <th className="px-8 py-5 font-semibold">Store ID</th>
+                    
                     <th className="px-8 py-5 font-semibold">Status</th>
                     <th className="px-8 py-5 font-semibold">Tunnel URL</th>
                     <th className="px-8 py-5 font-semibold text-right">Actions</th>
@@ -443,8 +443,13 @@ export default function AdminOrganizationDetailPage() {
                   ) : (
                     stores.map(store => (
                       <tr key={store._id} className="hover:bg-gray-50/80 transition-colors">
-                        <td className="px-8 py-5 font-medium text-gray-900">{store.name}</td>
-                        <td className="px-8 py-5 font-mono text-[11px] text-gray-500">{store.storeId}</td>
+                        <td className="px-8 py-5 font-medium text-gray-900 flex items-center gap-2">
+                            {store.name}
+                            <div className="group relative flex items-center justify-center cursor-help" title={store.storeId}>
+                              <div className="h-4 w-4 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-[10px] font-bold">i</div>
+                            </div>
+                          </td>
+                        
                         <td className="px-8 py-5"><StatusBadge status={store.status} /></td>
                         <td className="px-8 py-5">
                           {store.tunnelUrl ? (
@@ -773,49 +778,9 @@ export default function AdminOrganizationDetailPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-[var(--sd-blue)]" />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-[600px] border-t border-gray-100">
-                  {/* Left Column: Role Selector & Roster */}
-                  <div className="lg:col-span-4 border-r border-gray-100 p-6 bg-gray-50/40 space-y-4">
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1">
-                      Organization Roles ({orgRoles.length})
-                    </div>
-
-                    <div className="space-y-2">
-                      {orgRoles.map(role => {
-                        const isSelected = (selectedRoleId || orgRoles[0]?.roleId) === role.roleId;
-                        const electronCount = role.accessKeys?.electron?.pages?.filter((p: PageConfigEntry) => p.enabled || p.key === "dashboard" || p.key === "settings").length || 0;
-                        const mobileCount = role.accessKeys?.mobile?.pages?.filter((p: PageConfigEntry) => p.enabled || p.key === "mobileDashboard").length || 0;
-
-                        return (
-                          <div
-                            key={role.roleId}
-                            onClick={() => setSelectedRoleId(role.roleId)}
-                            className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-white border-blue-500 shadow-sm ring-2 ring-blue-500/10"
-                                : "bg-white border-gray-200 hover:border-gray-300"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-sm font-bold text-gray-900">{role.roleName}</span>
-                              <code className="text-[10px] font-mono text-gray-400">{role.roleId}</code>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                                🖥 {electronCount} Desktop Pages
-                              </span>
-                              <span className="text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">
-                                📱 {mobileCount} Mobile Screens
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
+                <div className="flex flex-col min-h-[600px] border-t border-gray-100">
                   {/* Right Column: Platform Tabs & Page/Feature Matrix */}
-                  <div className="lg:col-span-8 bg-white border-l border-gray-100 flex flex-col min-h-[600px]">
+                  <div className="bg-white flex flex-col min-h-[600px]">
                     {(() => {
                       const activeRole = orgRoles.find(r => r.roleId === (selectedRoleId || orgRoles[0]?.roleId)) || orgRoles[0];
                       if (!activeRole) return null;
@@ -865,13 +830,19 @@ export default function AdminOrganizationDetailPage() {
                           {/* Top Header: Role Name & Platform Switcher */}
                           <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white">
                             <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-lg font-bold text-gray-900">{activeRole.roleName}</h4>
-                                <code className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{activeRole.roleId}</code>
+                              <div className="flex items-center gap-3">
+                                <label className="text-sm font-semibold text-gray-700">Role:</label>
+                                <select 
+                                  value={activeRole.roleId} 
+                                  onChange={(e) => setSelectedRoleId(e.target.value)}
+                                  className="form-select text-sm border-gray-300 rounded-lg shadow-sm font-medium py-2 pl-3 pr-10 focus:ring-[var(--sd-blue)] focus:border-[var(--sd-blue)]"
+                                >
+                                  {orgRoles.map(r => (
+                                    <option key={r.roleId} value={r.roleId}>{r.roleName}</option>
+                                  ))}
+                                </select>
                               </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-4">
+                            </div>                 <div className="flex items-center gap-4">
                               {/* Platform Tabs Control */}
                               <div className="inline-flex p-1 bg-gray-100 rounded-xl border border-gray-200">
                                 <button
