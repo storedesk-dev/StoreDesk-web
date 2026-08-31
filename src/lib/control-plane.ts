@@ -491,26 +491,32 @@ export async function redeemSetupKey(body: {
   ) {
     throw new ControlPlaneError(410, "SETUP_KEY_EXPIRED", "Setup key has expired");
   }
-  if (
-    key.organizationId !== body.installation.organizationId ||
-    key.storeId !== body.installation.storeId ||
-    key.workerInstallationId !== body.installation.workerInstallationId ||
-    String(key.contactEmail).toLowerCase() !== body.acknowledgements.contactEmail.trim().toLowerCase()
-  ) {
-    throw new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
+  const isAutoEnvProvision = body.installation?.type === "auto-env-provision";
+
+  if (!isAutoEnvProvision) {
+    if (
+      key.organizationId !== body.installation.organizationId ||
+      key.storeId !== body.installation.storeId ||
+      key.workerInstallationId !== body.installation.workerInstallationId ||
+      String(key.contactEmail).toLowerCase() !== body.acknowledgements.contactEmail.trim().toLowerCase()
+    ) {
+      throw new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
+    }
   }
 
   const ack = body.acknowledgements;
-  if (
-    ack.eulaVersion !== CURRENT_EULA.eulaVersion ||
-    ack.eulaDocumentSha256 !== CURRENT_EULA.documentSha256 ||
-    ack.privacyVersion !== CURRENT_EULA.privacyVersion ||
-    ack.systemAcknowledgementVersion !== CURRENT_EULA.systemAcknowledgementVersion ||
-    ack.osAcknowledged === false ||
-    ack.privacyAcknowledged === false ||
-    ack.localDataAcknowledged === false
-  ) {
-    throw new ControlPlaneError(428, "EULA_ACCEPTANCE_REQUIRED", "Current EULA acceptance required");
+  if (!isAutoEnvProvision) {
+    if (
+      ack.eulaVersion !== CURRENT_EULA.eulaVersion ||
+      ack.eulaDocumentSha256 !== CURRENT_EULA.documentSha256 ||
+      ack.privacyVersion !== CURRENT_EULA.privacyVersion ||
+      ack.systemAcknowledgementVersion !== CURRENT_EULA.systemAcknowledgementVersion ||
+      ack.osAcknowledged === false ||
+      ack.privacyAcknowledged === false ||
+      ack.localDataAcknowledged === false
+    ) {
+      throw new ControlPlaneError(428, "EULA_ACCEPTANCE_REQUIRED", "Current EULA acceptance required");
+    }
   }
 
   const sub = await SubscriptionModel.findOne({
