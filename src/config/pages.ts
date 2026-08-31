@@ -23,12 +23,13 @@ export interface PageDefinition {
   app: App;
   filePath: string;
   defaultEnabled: boolean;
+  alwaysEnabled?: boolean;
   knownFeatureFlags: Record<string, PageFeatureFlagDef>;
 }
 
 export const ELECTRON_PAGES: PageDefinition[] = [
   { key: "pos",            label: "POS Workspace",   description: "Point-of-sale terminal.",                     app: "electron", filePath: "src/pages/POSWorkspacePage.tsx",   defaultEnabled: true,  knownFeatureFlags: { enableRefunds: { label: "Refunds", description: "Allow refunds.", default: true }, enableDiscounts: { label: "Discounts", description: "Allow discounts.", default: true }, enableVoidTransaction: { label: "Void Txn", description: "Allow void.", default: true }, enableCashDrawer: { label: "Cash Drawer", description: "Open cash drawer.", default: true } } },
-  { key: "dashboard",      label: "Dashboard",        description: "Overview cards and setup checklist.",          app: "electron", filePath: "src/pages/DashboardPage.tsx",      defaultEnabled: true,  knownFeatureFlags: {} },
+  { key: "dashboard",      label: "Dashboard",        description: "Overview cards and setup checklist.",          app: "electron", filePath: "src/pages/DashboardPage.tsx",      defaultEnabled: true, alwaysEnabled: true, knownFeatureFlags: {} },
   { key: "products",       label: "Products",         description: "Product catalog management.",                  app: "electron", filePath: "src/pages/ProductDetailPage.tsx",  defaultEnabled: true,  knownFeatureFlags: { enableBulkImport: { label: "Bulk Import", description: "CSV import.", default: false }, enableBarcodeGeneration: { label: "Barcode Gen", description: "Generate barcodes.", default: true } } },
   { key: "vendors",        label: "Vendors",          description: "Vendor directory.",                            app: "electron", filePath: "src/pages/VendorsPage.tsx",        defaultEnabled: true,  knownFeatureFlags: {} },
   { key: "vendorPrices",   label: "Vendor Prices",    description: "Manual vendor price entry.",                   app: "electron", filePath: "src/pages/VendorPricesPage.tsx",   defaultEnabled: true,  knownFeatureFlags: {} },
@@ -38,12 +39,12 @@ export const ELECTRON_PAGES: PageDefinition[] = [
   { key: "transactions",   label: "Transactions",     description: "Transaction history and reporting.",            app: "electron", filePath: "src/pages/TransactionsPage.tsx",   defaultEnabled: true,  knownFeatureFlags: { enableExport: { label: "Export CSV", description: "Export to CSV.", default: true }, enableRefundView: { label: "Refund View", description: "Show refunds.", default: true } } },
   { key: "manageWorker",   label: "Manage Worker",    description: "Edge server status and controls.",             app: "electron", filePath: "src/pages/ManageWorkerPage.tsx",   defaultEnabled: true,  knownFeatureFlags: {} },
   { key: "userManagement", label: "User Management",  description: "App user roles and sessions.",                 app: "electron", filePath: "src/pages/UserManagementPage.tsx", defaultEnabled: false, knownFeatureFlags: {} },
-  { key: "settings",       label: "Settings",         description: "Store settings and POS config.",               app: "electron", filePath: "src/pages/SettingsPage.tsx",       defaultEnabled: true,  knownFeatureFlags: {} },
+  { key: "settings",       label: "Settings",         description: "Store settings and POS config.",               app: "electron", filePath: "src/pages/SettingsPage.tsx",       defaultEnabled: true, alwaysEnabled: true, knownFeatureFlags: {} },
 ];
 
 export const MOBILE_PAGES: PageDefinition[] = [
   { key: "mobilePos",           label: "POS Workspace",         description: "Mobile point-of-sale.",              app: "mobile", filePath: "lib/features/pos/pos_workspace_screen.dart",            defaultEnabled: true,  knownFeatureFlags: { enableManualEntry: { label: "Manual Entry", description: "Manual item entry.", default: true }, enableQuickSale: { label: "Quick Sale", description: "One-tap sale.", default: false } } },
-  { key: "mobileDashboard",     label: "Dashboard",             description: "Mobile home screen.",                app: "mobile", filePath: "lib/features/dashboard/dashboard_screen.dart",          defaultEnabled: true,  knownFeatureFlags: {} },
+  { key: "mobileDashboard",     label: "Dashboard",             description: "Mobile home screen.",                app: "mobile", filePath: "lib/features/dashboard/dashboard_screen.dart",          defaultEnabled: true, alwaysEnabled: true, knownFeatureFlags: {} },
   { key: "mobileScanner",       label: "Barcode Scanner",       description: "Camera barcode scanner.",            app: "mobile", filePath: "lib/features/scanner/scanner_screen.dart",              defaultEnabled: true,  knownFeatureFlags: { enableCameraFlash: { label: "Camera Flash", description: "Flashlight toggle.", default: true }, enableManualEntry: { label: "Manual Code", description: "Manual code entry.", default: true } } },
   { key: "mobileProductSearch", label: "Product Search",        description: "Search products by name/UPC.",       app: "mobile", filePath: "lib/features/products/product_search_screen.dart",      defaultEnabled: true,  knownFeatureFlags: {} },
   { key: "mobileVendorPrices",  label: "Vendor Prices (Mobile)",description: "View vendor pricing on mobile.",    app: "mobile", filePath: "lib/features/products/vendor_prices_screen.dart",       defaultEnabled: true,  knownFeatureFlags: {} },

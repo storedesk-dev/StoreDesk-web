@@ -736,7 +736,13 @@ export default function AdminOrganizationDetailPage() {
               ) : (
                 <div className="p-8 space-y-6">
                   {orgRoles.map((role, ri) => {
+                    const isCorePage = (k: string) => k === "dashboard" || k === "settings" || k === "mobileDashboard";
+
                     const togglePage = (app: "electron" | "mobile", pageKey: string) => {
+                      if (isCorePage(pageKey)) {
+                        alert(`"${pageKey}" is a core system page and is always enabled.`);
+                        return;
+                      }
                       const updated: RoleConfigEntry[] = JSON.parse(JSON.stringify(orgRoles));
                       const p = updated[ri].accessKeys[app].pages.find((p: PageConfigEntry) => p.key === pageKey);
                       if (p) p.enabled = !p.enabled;
@@ -781,24 +787,32 @@ export default function AdminOrganizationDetailPage() {
                               🖥 Desktop (Electron)
                             </div>
                             <div className="space-y-2">
-                              {(role.accessKeys?.electron?.pages || []).map((page: PageConfigEntry) => (
-                                <div key={page.key} className={`rounded-xl border transition-all ${page.enabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
-                                  <div className="flex items-center justify-between px-4 py-2.5">
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                      <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
-                                      <span className="text-sm font-medium text-gray-900 capitalize">{page.key}</span>
+                              {(role.accessKeys?.electron?.pages || []).map((page: PageConfigEntry) => {
+                                const isCore = isCorePage(page.key);
+                                const isEnabled = isCore || page.enabled;
+                                return (
+                                  <div key={page.key} className={`rounded-xl border transition-all ${isEnabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
+                                    <div className="flex items-center justify-between px-4 py-2.5">
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
+                                        <span className="text-sm font-medium text-gray-900 capitalize">{page.key}</span>
+                                        {isCore && (
+                                          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">Always Enabled</span>
+                                        )}
+                                      </div>
+                                      <button
+                                        onClick={() => togglePage("electron", page.key)}
+                                        disabled={isCore}
+                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-emerald-500" : "bg-gray-200"} ${isCore ? "opacity-60 cursor-not-allowed" : ""}`}
+                                        role="switch"
+                                        aria-checked={isEnabled}
+                                      >
+                                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${isEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                                      </button>
                                     </div>
-                                    <button
-                                      onClick={() => togglePage("electron", page.key)}
-                                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${page.enabled ? "bg-emerald-500" : "bg-gray-200"}`}
-                                      role="switch"
-                                      aria-checked={page.enabled}
-                                    >
-                                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${page.enabled ? "translate-x-4" : "translate-x-0"}`} />
-                                    </button>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
 
@@ -808,24 +822,32 @@ export default function AdminOrganizationDetailPage() {
                               📱 Mobile (Flutter)
                             </div>
                             <div className="space-y-2">
-                              {(role.accessKeys?.mobile?.pages || []).map((page: PageConfigEntry) => (
-                                <div key={page.key} className={`rounded-xl border transition-all ${page.enabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
-                                  <div className="flex items-center justify-between px-4 py-2.5">
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                      <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
-                                      <span className="text-sm font-medium text-gray-900 capitalize">{page.key}</span>
+                              {(role.accessKeys?.mobile?.pages || []).map((page: PageConfigEntry) => {
+                                const isCore = isCorePage(page.key);
+                                const isEnabled = isCore || page.enabled;
+                                return (
+                                  <div key={page.key} className={`rounded-xl border transition-all ${isEnabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
+                                    <div className="flex items-center justify-between px-4 py-2.5">
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
+                                        <span className="text-sm font-medium text-gray-900 capitalize">{page.key}</span>
+                                        {isCore && (
+                                          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">Always Enabled</span>
+                                        )}
+                                      </div>
+                                      <button
+                                        onClick={() => togglePage("mobile", page.key)}
+                                        disabled={isCore}
+                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-emerald-500" : "bg-gray-200"} ${isCore ? "opacity-60 cursor-not-allowed" : ""}`}
+                                        role="switch"
+                                        aria-checked={isEnabled}
+                                      >
+                                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${isEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                                      </button>
                                     </div>
-                                    <button
-                                      onClick={() => togglePage("mobile", page.key)}
-                                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${page.enabled ? "bg-emerald-500" : "bg-gray-200"}`}
-                                      role="switch"
-                                      aria-checked={page.enabled}
-                                    >
-                                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${page.enabled ? "translate-x-4" : "translate-x-0"}`} />
-                                    </button>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         </div>
