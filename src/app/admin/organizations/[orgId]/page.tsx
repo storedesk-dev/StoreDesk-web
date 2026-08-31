@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard
+  Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard, Shield, Plus, Trash2
 } from "lucide-react";
 
 type OrgUser = {
@@ -68,6 +68,16 @@ function fmtDate(d?: string) {
   return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
+type PageConfigEntry = { key: string; enabled: boolean; featureFlags: Record<string, boolean> };
+type RoleConfigEntry = {
+  roleName: string;
+  roleId: string;
+  accessKeys: {
+    electron: { pages: PageConfigEntry[] };
+    mobile: { pages: PageConfigEntry[] };
+  };
+};
+
 export default function AdminOrganizationDetailPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const [org, setOrg] = useState<Org | null>(null);
@@ -77,13 +87,18 @@ export default function AdminOrganizationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
   const [subsLoading, setSubsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"stores" | "users" | "subscriptions">("stores");
+  const [activeTab, setActiveTab] = useState<"stores" | "users" | "subscriptions" | "roles">("stores");
   const [isCreatingStore, setIsCreatingStore] = useState(false);
   const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreId, setNewStoreId] = useState("");
   const [newStoreSlug, setNewStoreSlug] = useState("");
   const [createStoreBusy, setCreateStoreBusy] = useState(false);
+
+  // Organization Roles State
+  const [orgRoles, setOrgRoles] = useState<RoleConfigEntry[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesSaving, setRolesSaving] = useState(false);
 
   // New Subscription State
   const [subPlan, setSubPlan] = useState<"trial" | "standard" | "custom">("trial");
@@ -148,12 +163,52 @@ export default function AdminOrganizationDetailPage() {
     }
   }, [orgId]);
 
-  useEffect(() => { if (orgId) loadData(); }, [loadData, orgId]);
+  const loadOrgRoles = useCallback(async () => {
+    setRolesLoading(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/roles`);
+      const data = await res.json();
+      if (data.roles) setOrgRoles(data.roles);
+    } catch (err: unknown) {
+      console.error(err);
+    } finally {
+      setRolesLoading(false);
+    }
+  }, [orgId]);
+
+  const saveOrgRoles = async (newRoles: RoleConfigEntry[]) => {
+    setRolesSaving(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/roles`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roles: newRoles })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOrgRoles(data.roles);
+      } else {
+        alert("Failed to save organization roles");
+      }
+    } catch (err: unknown) {
+      alert("Error saving organization roles: " + (err as Error).message);
+    } finally {
+      setRolesSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (orgId) {
+      loadData();
+      loadOrgRoles();
+    }
+  }, [loadData, loadOrgRoles, orgId]);
 
   useEffect(() => {
     if (activeTab === "users") loadUsers();
     if (activeTab === "subscriptions") loadSubscriptions();
-  }, [activeTab, loadUsers, loadSubscriptions]);
+    if (activeTab === "roles") loadOrgRoles();
+  }, [activeTab, loadUsers, loadSubscriptions, loadOrgRoles]);
 
   const handleCreateStore = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,6 +352,7 @@ export default function AdminOrganizationDetailPage() {
             { key: "stores", label: `Stores (${stores.length})`, icon: Store },
             { key: "users", label: `App Users (${appUsers.length})`, icon: Users },
             { key: "subscriptions", label: `Subscriptions`, icon: CreditCard },
+            { key: "roles", label: `Roles & Access (${orgRoles.length})`, icon: Shield },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -589,6 +645,193 @@ export default function AdminOrganizationDetailPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── Organization Roles Tab ─── */}
+          {activeTab === "roles" && (
+            <div>
+              <div className="px-8 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Organization-Wide Custom Roles</h3>
+                  <p className="text-xs text-gray-500">
+                    Roles created here are saved in the organization database record and shared across all stores in this organization.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={loadOrgRoles}
+                    disabled={rolesLoading}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50 px-3 py-1.5"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${rolesLoading ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={() => {
+                      const rName = prompt("Enter Custom Role Name (e.g. Cashier, Shift Supervisor):");
+                      if (!rName || !rName.trim()) return;
+                      const rId = prompt("Enter Custom Role ID (e.g. cashier, shift_supervisor):", rName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")) || "";
+                      if (!rId || !rId.trim()) return;
+
+                      if (orgRoles.some(r => r.roleId === rId.trim())) {
+                        alert(`Role ID "${rId.trim()}" already exists.`);
+                        return;
+                      }
+
+                      const newRole: RoleConfigEntry = {
+                        roleName: rName.trim(),
+                        roleId: rId.trim(),
+                        accessKeys: {
+                          electron: {
+                            pages: [
+                              { key: "pos",            enabled: true,  featureFlags: { enableRefunds: false, enableDiscounts: false } },
+                              { key: "dashboard",      enabled: true,  featureFlags: {} },
+                              { key: "products",       enabled: true,  featureFlags: {} },
+                              { key: "vendors",        enabled: false, featureFlags: {} },
+                              { key: "vendorPrices",   enabled: false, featureFlags: {} },
+                              { key: "priceBook",      enabled: false, featureFlags: {} },
+                              { key: "pricingRules",   enabled: false, featureFlags: {} },
+                              { key: "costAnalysis",   enabled: false, featureFlags: {} },
+                              { key: "transactions",   enabled: true,  featureFlags: {} },
+                              { key: "manageWorker",   enabled: false, featureFlags: {} },
+                              { key: "userManagement", enabled: false, featureFlags: {} },
+                              { key: "settings",       enabled: false, featureFlags: {} }
+                            ]
+                          },
+                          mobile: {
+                            pages: [
+                              { key: "mobilePos",           enabled: true,  featureFlags: {} },
+                              { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
+                              { key: "mobileScanner",        enabled: true,  featureFlags: {} },
+                              { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
+                              { key: "mobileVendorPrices",   enabled: false, featureFlags: {} },
+                              { key: "mobilePriceBook",      enabled: false, featureFlags: {} },
+                              { key: "mobileTransactions",   enabled: false, featureFlags: {} },
+                              { key: "mobileReports",        enabled: false, featureFlags: {} },
+                              { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
+                              { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
+                            ]
+                          }
+                        }
+                      };
+
+                      saveOrgRoles([...orgRoles, newRole]);
+                    }}
+                    disabled={rolesSaving || rolesLoading}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[var(--sd-blue)] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Custom Role
+                  </button>
+                </div>
+              </div>
+
+              {rolesLoading && orgRoles.length === 0 ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-[var(--sd-blue)]" />
+                </div>
+              ) : (
+                <div className="p-8 space-y-6">
+                  {orgRoles.map((role, ri) => {
+                    const togglePage = (app: "electron" | "mobile", pageKey: string) => {
+                      const updated: RoleConfigEntry[] = JSON.parse(JSON.stringify(orgRoles));
+                      const p = updated[ri].accessKeys[app].pages.find((p: PageConfigEntry) => p.key === pageKey);
+                      if (p) p.enabled = !p.enabled;
+                      saveOrgRoles(updated);
+                    };
+
+                    const deleteRole = () => {
+                      if (role.roleId === "org_admin") {
+                        alert("Cannot delete Organization Admin role.");
+                        return;
+                      }
+                      if (!confirm(`Delete role "${role.roleName}" (${role.roleId})?`)) return;
+                      saveOrgRoles(orgRoles.filter((_, idx) => idx !== ri));
+                    };
+
+                    return (
+                      <div key={role.roleId} className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/60">
+                          <div className="flex items-center gap-3">
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                              role.roleId === "org_admin" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-blue-50 border-blue-200 text-blue-700"
+                            }`}>
+                              {role.roleName}
+                            </div>
+                            <code className="text-xs font-mono text-gray-400">{role.roleId}</code>
+                          </div>
+                          {role.roleId !== "org_admin" && (
+                            <button
+                              onClick={deleteRole}
+                              className="text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-1 rounded hover:bg-red-50 transition-colors inline-flex items-center gap-1"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete Role
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Electron Platform */}
+                          <div>
+                            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold mb-3 bg-blue-50 text-blue-700">
+                              🖥 Desktop (Electron)
+                            </div>
+                            <div className="space-y-2">
+                              {(role.accessKeys?.electron?.pages || []).map((page: PageConfigEntry) => (
+                                <div key={page.key} className={`rounded-xl border transition-all ${page.enabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
+                                  <div className="flex items-center justify-between px-4 py-2.5">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
+                                      <span className="text-sm font-medium text-gray-900 capitalize">{page.key}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => togglePage("electron", page.key)}
+                                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${page.enabled ? "bg-emerald-500" : "bg-gray-200"}`}
+                                      role="switch"
+                                      aria-checked={page.enabled}
+                                    >
+                                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${page.enabled ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Mobile Platform */}
+                          <div>
+                            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold mb-3 bg-purple-50 text-purple-700">
+                              📱 Mobile (Flutter)
+                            </div>
+                            <div className="space-y-2">
+                              {(role.accessKeys?.mobile?.pages || []).map((page: PageConfigEntry) => (
+                                <div key={page.key} className={`rounded-xl border transition-all ${page.enabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
+                                  <div className="flex items-center justify-between px-4 py-2.5">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
+                                      <span className="text-sm font-medium text-gray-900 capitalize">{page.key}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => togglePage("mobile", page.key)}
+                                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${page.enabled ? "bg-emerald-500" : "bg-gray-200"}`}
+                                      role="switch"
+                                      aria-checked={page.enabled}
+                                    >
+                                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${page.enabled ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

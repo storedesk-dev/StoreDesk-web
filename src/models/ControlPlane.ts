@@ -35,7 +35,8 @@ const OrganizationSchema = new Schema(
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     billingEmail: { type: String, lowercase: true, trim: true },
-    status: { type: String, enum: ["pending", "active", "suspended"], default: "active" }
+    status: { type: String, enum: ["pending", "active", "suspended"], default: "active" },
+    roles: { type: Schema.Types.Mixed, default: [] }
   },
   timestamps
 );
