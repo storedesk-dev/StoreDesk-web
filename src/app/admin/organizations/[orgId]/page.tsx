@@ -113,6 +113,7 @@ export default function AdminOrganizationDetailPage() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserName, setNewUserName] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserRole, setNewUserRole] = useState<string>("org_admin");
   const [newUserStoreId, setNewUserStoreId] = useState("");
   const [createUserBusy, setCreateUserBusy] = useState(false);
@@ -300,6 +301,7 @@ export default function AdminOrganizationDetailPage() {
       const payload: Record<string, string> = {
         email: newUserEmail,
         name: newUserName,
+        password: newUserPassword,
         role: newUserRole
       };
       if (newUserStoreId) {
@@ -310,11 +312,16 @@ export default function AdminOrganizationDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      
-      setGeneratedSetupKey(data.setupKey || "User exists and is already enrolled.");
-      loadUsers();
+      if (res.ok) {
+        setIsCreatingUser(false);
+        setNewUserEmail("");
+        setNewUserName("");
+        setNewUserPassword("");
+        loadUsers();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to create user");
+      }
     } catch (err: unknown) {
       console.error(err);
       alert("Failed to create user: " + (err as Error).message);
@@ -1125,6 +1132,17 @@ export default function AdminOrganizationDetailPage() {
                   onChange={e => setNewUserName(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
                   placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={newUserPassword}
+                  onChange={e => setNewUserPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
+                  placeholder="Enter password"
+                  required
                 />
               </div>
               <div>

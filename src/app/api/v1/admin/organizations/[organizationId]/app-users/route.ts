@@ -37,6 +37,7 @@ export async function GET(req: Request, ctx: Ctx) {
 
 const CreateAppUserSchema = z.object({
   email: z.string().email(),
+  password: z.string().optional(),
   name: z.string().optional(),
   role: z.string().optional(),
   storeId: z.string().optional()
@@ -54,28 +55,26 @@ export async function POST(req: Request, ctx: Ctx) {
     // 1. Find or Create the AppUser
     let appUser = await AppUserModel.findOne({ email: parsed.email.toLowerCase() });
     
-    let setupKeyPlaintext = null;
     if (!appUser) {
-      // Issue a setup key for enrollment
-      const setupKey = issueSetupKey();
-      const secretHash = await hashSecret(setupKey.secret);
-      
+      const passwordHash = parsed.password ? await hashSecret(parsed.password) : undefined;
       appUser = await AppUserModel.create({
         appUserId: publicId("apu"),
         email: parsed.email.toLowerCase(),
         name: parsed.name,
-        status: "pending_enrollment",
-        enrollmentSecretHash: secretHash,
-        enrollmentExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        passwordHash,
+        status: parsed.password ? "active" : "pending_enrollment",
         createdByAdminId: admin.adminId
       });
-      setupKeyPlaintext = setupKey.plaintext;
     } else {
-      // Optionally update name if missing
+      // Optionally update name if missing or password if provided
       if (parsed.name && !appUser.name) {
         appUser.name = parsed.name;
-        await appUser.save();
       }
+      if (parsed.password) {
+        appUser.passwordHash = await hashSecret(parsed.password);
+        appUser.status = "active";
+      }
+      await appUser.save();
     }
 
     // 2. Determine Role — First user in organization MUST be org_admin
@@ -94,8 +93,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
     return NextResponse.json({ 
       appUser: safeJson(appUser), 
-      assignment: safeJson(assignment),
-      setupKey: setupKeyPlaintext 
+      assignment: safeJson(assignment)
     });
   } catch (error) {
     return jsonError(error);
