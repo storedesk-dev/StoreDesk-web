@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard, Shield, Plus, Trash2 } from "lucide-react";
+import { Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard, Shield, Plus, Trash2, Monitor, Smartphone } from "lucide-react";
 import { RolePreview } from "./RolePreview";
 import { getPage } from "@/config/pages";
 
@@ -778,7 +778,7 @@ export default function AdminOrganizationDetailPage() {
                   </div>
 
                   {/* Right Column: Platform Tabs & Page/Feature Matrix */}
-                  <div className="lg:col-span-8 p-6 bg-white space-y-6">
+                  <div className="lg:col-span-8 bg-white border-l border-gray-100 flex flex-col min-h-[600px]">
                     {(() => {
                       const activeRole = orgRoles.find(r => r.roleId === (selectedRoleId || orgRoles[0]?.roleId)) || orgRoles[0];
                       if (!activeRole) return null;
@@ -824,138 +824,143 @@ export default function AdminOrganizationDetailPage() {
                       const pageList = activeRole.accessKeys?.[selectedPlatformTab]?.pages || [];
 
                       return (
-                        <div className="space-y-6">
-                          {/* Selected Role Header & Platform Tabs */}
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                        <div className="flex flex-col h-full">
+                          {/* Top Header: Role Name & Platform Switcher */}
+                          <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white">
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="text-base font-bold text-gray-900">{activeRole.roleName}</h4>
-                                <code className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{activeRole.roleId}</code>
+                                <h4 className="text-lg font-bold text-gray-900">{activeRole.roleName}</h4>
+                                <code className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{activeRole.roleId}</code>
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                Select pages and toggle inner feature flags for {selectedPlatformTab === "electron" ? "Desktop (Electron)" : "Mobile (Flutter)"}.
-                              </p>
                             </div>
-
-                            <div className="flex items-center gap-3">
+                            
+                            <div className="flex items-center gap-4">
                               {/* Platform Tabs Control */}
                               <div className="inline-flex p-1 bg-gray-100 rounded-xl border border-gray-200">
                                 <button
                                   onClick={() => setSelectedPlatformTab("electron")}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                                     selectedPlatformTab === "electron"
                                       ? "bg-white text-blue-700 shadow-sm"
-                                      : "text-gray-600 hover:text-gray-900"
+                                      : "text-gray-500 hover:text-gray-900"
                                   }`}
                                 >
-                                  🖥 Desktop (Electron)
+                                  <Monitor className="w-4 h-4" />
+                                  Desktop
                                 </button>
                                 <button
                                   onClick={() => setSelectedPlatformTab("mobile")}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                                     selectedPlatformTab === "mobile"
                                       ? "bg-white text-purple-700 shadow-sm"
-                                      : "text-gray-600 hover:text-gray-900"
+                                      : "text-gray-500 hover:text-gray-900"
                                   }`}
                                 >
-                                  📱 Mobile (Flutter)
+                                  <Smartphone className="w-4 h-4" />
+                                  Mobile
                                 </button>
                               </div>
 
                               {activeRole.roleId !== "org_admin" && (
                                 <button
                                   onClick={deleteRole}
-                                  className="text-xs text-red-500 hover:text-red-700 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors inline-flex items-center gap-1 border border-red-200"
+                                  className="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-2 rounded-lg hover:bg-red-50 transition-colors border border-transparent hover:border-red-100"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Delete
+                                  <Trash2 className="h-4 w-4" />
                                 </button>
                               )}
                             </div>
                           </div>
 
-                          {/* Page & Feature Flag List */}
-                          <div className="space-y-3">
-                            {pageList.map((page: PageConfigEntry) => {
-                              const isCore = isCorePage(page.key);
-                              const isEnabled = isCore || page.enabled;
-                              const pageDef = getPage(page.key);
-                              const flags = pageDef?.knownFeatureFlags || {};
-                              const flagKeys = Object.keys(flags);
+                          {/* Split View Content */}
+                          <div className="grid grid-cols-1 xl:grid-cols-2 flex-1 min-h-0 bg-gray-50/30">
+                            
+                            {/* Left Side: Pages Config */}
+                            <div className="border-r border-gray-100 overflow-y-auto p-5 space-y-4">
+                              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                                Configuration
+                              </div>
+                              <div className="space-y-3">
+                                {pageList.map((page: PageConfigEntry) => {
+                                  const isCore = isCorePage(page.key);
+                                  const isEnabled = isCore || page.enabled;
+                                  const pageDef = getPage(page.key);
+                                  const flags = pageDef?.knownFeatureFlags || {};
+                                  const flagKeys = Object.keys(flags);
 
-                              return (
-                                <div key={page.key} className={`rounded-xl border transition-all ${isEnabled ? "bg-white border-gray-200 shadow-sm" : "bg-gray-50/60 border-gray-100 opacity-55"}`}>
-                                  <div className="flex items-center justify-between px-4 py-3">
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                      <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded shrink-0">{page.key}</code>
-                                      <div>
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm font-bold text-gray-900">{pageDef?.label || page.key}</span>
-                                          {isCore && (
-                                            <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">Always Enabled</span>
-                                          )}
-                                        </div>
-                                        {pageDef?.description && (
-                                          <p className="text-xs text-gray-500 mt-0.5">{pageDef.description}</p>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <button
-                                      onClick={() => togglePage(selectedPlatformTab, page.key)}
-                                      disabled={isCore}
-                                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-emerald-500" : "bg-gray-200"} ${isCore ? "opacity-60 cursor-not-allowed" : ""}`}
-                                      role="switch"
-                                      aria-checked={isEnabled}
-                                    >
-                                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
-                                    </button>
-                                  </div>
-
-                                  {/* Feature Flags Inside Page */}
-                                  {isEnabled && flagKeys.length > 0 && (
-                                    <div className="px-4 pb-3 pt-2 border-t border-gray-100 bg-gray-50/50 rounded-b-xl space-y-2">
-                                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                                        Feature Flags inside {pageDef?.label || page.key}
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {flagKeys.map(fk => {
-                                          const fDef = flags[fk];
-                                          const isFlagActive = page.featureFlags?.[fk] !== undefined ? page.featureFlags[fk] : fDef.default;
-                                          return (
-                                            <div key={fk} className="flex items-center justify-between p-2 rounded-lg bg-white border border-gray-200">
-                                              <div className="pr-2">
-                                                <span className="text-xs font-semibold text-gray-800">{fDef.label}</span>
-                                                <p className="text-[10px] text-gray-400 leading-tight">{fDef.description}</p>
-                                              </div>
-                                              <button
-                                                onClick={() => toggleFlag(selectedPlatformTab, page.key, fk)}
-                                                className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition-colors shrink-0 ${
-                                                  isFlagActive ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-gray-100 text-gray-400 border-gray-200"
-                                                }`}
-                                              >
-                                                {isFlagActive ? "ON" : "OFF"}
-                                              </button>
+                                  return (
+                                    <div key={page.key} className={`rounded-xl border transition-all ${isEnabled ? "bg-white border-gray-200 shadow-sm" : "bg-gray-50/60 border-gray-100 opacity-60"}`}>
+                                      <div className="flex items-center justify-between px-4 py-3">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                          <div>
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-sm font-bold text-gray-900">{pageDef?.label || page.key}</span>
+                                              {isCore && (
+                                                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">Core</span>
+                                              )}
                                             </div>
-                                          );
-                                        })}
+                                            {pageDef?.description && (
+                                              <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{pageDef.description}</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <button
+                                          onClick={() => togglePage(selectedPlatformTab, page.key)}
+                                          disabled={isCore}
+                                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${isEnabled ? "bg-[var(--sd-blue)]" : "bg-gray-200"} ${isCore ? "opacity-60 cursor-not-allowed" : ""}`}
+                                          role="switch"
+                                          aria-checked={isEnabled}
+                                        >
+                                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                                        </button>
                                       </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
 
-                    {/* ROLE VISUAL PREVIEW */}
-                    {(() => {
-                      const activeRole = orgRoles.find(r => r.roleId === (selectedRoleId || orgRoles[0]?.roleId)) || orgRoles[0];
-                      if (!activeRole) return null;
-                      return (
-                        <div className="pt-8 mt-8 border-t border-gray-100">
-                          <RolePreview role={activeRole} />
+                                      {/* Feature Flags Inside Page */}
+                                      {isEnabled && flagKeys.length > 0 && (
+                                        <div className="px-4 pb-3 pt-2 border-t border-gray-100 bg-gray-50/50 rounded-b-xl space-y-2">
+                                          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                            Feature Flags
+                                          </div>
+                                          <div className="grid grid-cols-1 gap-2">
+                                            {flagKeys.map(fk => {
+                                              const fDef = flags[fk];
+                                              const isFlagActive = page.featureFlags?.[fk] !== undefined ? page.featureFlags[fk] : fDef.default;
+                                              return (
+                                                <div key={fk} className="flex items-center justify-between p-2 rounded-lg bg-white border border-gray-200">
+                                                  <div className="pr-2">
+                                                    <span className="text-xs font-semibold text-gray-800">{fDef.label}</span>
+                                                  </div>
+                                                  <button
+                                                    onClick={() => toggleFlag(selectedPlatformTab, page.key, fk)}
+                                                    className={`px-3 py-1 text-[10px] font-bold rounded-md border transition-colors shrink-0 ${
+                                                      isFlagActive ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-gray-100 text-gray-400 border-gray-200"
+                                                    }`}
+                                                  >
+                                                    {isFlagActive ? "ON" : "OFF"}
+                                                  </button>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Right Side: Visual Preview */}
+                            <div className="p-5 flex flex-col bg-gray-100/30">
+                              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                                Live Interface Preview
+                              </div>
+                              <div className="flex-1 bg-white border border-gray-200 rounded-2xl overflow-hidden relative">
+                                <RolePreview role={activeRole} mode={selectedPlatformTab} />
+                              </div>
+                            </div>
+                            
+                          </div>
                         </div>
                       );
                     })()}
