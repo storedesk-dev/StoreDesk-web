@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence, useInView, useMotionValue, useTransform } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { useEffect, useState } from "react";
 import { DeviceStage } from "@/components/DeviceStage";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
@@ -183,40 +183,6 @@ const steps = [
     body: "Protect profit margins with live wholesale vendor cost overlays."
   }
 ];
-
-/** Animated Number Counter Component */
-function AnimatedCounter({ value, prefix = "$", decimals = 2 }: { value: number; prefix?: string; decimals?: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once: true });
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    if (!isInView) return;
-    const start = 0;
-    const duration = 1200; // ms
-    const startTime = performance.now();
-
-    function update(now: number) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(start + eased * (value - start));
-
-      if (progress < 1) {
-        requestAnimationFrame(update);
-      }
-    }
-
-    requestAnimationFrame(update);
-  }, [isInView, value]);
-
-  return (
-    <span ref={ref} className="font-mono font-bold">
-      {prefix}
-      {displayValue.toFixed(decimals)}
-    </span>
-  );
-}
 
 /** Linear-style Spotlight Card Component */
 function SpotlightCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -523,7 +489,7 @@ export function LandingPage() {
             >
               <TrendingUp className="h-4 w-4 text-[#00B36B]" />
               <span className="text-xs font-bold text-slate-900">
-                Live Net Shift Sync: <AnimatedCounter value={356.2} />
+                Live Net Shift Sync: <span className="font-mono font-bold">$356.20</span>
               </span>
             </motion.div>
 
