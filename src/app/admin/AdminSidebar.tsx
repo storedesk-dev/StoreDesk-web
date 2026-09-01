@@ -17,7 +17,7 @@ export function AdminSidebar() {
     <aside className="w-64 border-r border-[var(--border)] bg-white flex flex-col">
       <div className="p-6">
         <Link href="/admin" className="flex items-center">
-          <Image src="/brand/logo-lockup-horizontal.svg" alt="StoreDesk" width={200} height={40} className="h-10 w-auto object-contain" />
+          <Image src="/brand/logo-lockup-horizontal.svg" alt="StoreDesk" width={320} height={64} className="h-16 w-auto object-contain" priority />
         </Link>
       </div>
       <nav className="space-y-2 px-4 py-2 flex-1">

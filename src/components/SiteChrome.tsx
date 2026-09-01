@@ -32,10 +32,10 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
           <Image
             src="/brand/logo-lockup-horizontal.svg"
             alt={SITE.name}
-            width={240}
-            height={48}
+            width={320}
+            height={64}
             priority
-            className="h-12 w-auto object-contain"
+            className="h-16 w-auto object-contain"
           />
         </Link>
 
