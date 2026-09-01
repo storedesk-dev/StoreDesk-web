@@ -1124,7 +1124,7 @@ export default function AdminOrganizationDetailPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
                   placeholder="Enter password"
                   minLength={8}
-                  pattern=".*\\d.*"
+                  pattern=".*[0-9].*"
                   title="Password must be at least 8 characters and include a number"
                   required
                 />

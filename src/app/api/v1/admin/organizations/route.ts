@@ -3,13 +3,21 @@ import { requireInternalAdmin } from "@/lib/admin-auth";
 import { createOrganization, jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
 import { safeJson, issueSetupKey, hashSecret, publicId } from "@/lib/control-plane-security";
-import { AppUserModel, UserAssignmentModel, OrganizationModel } from "@/models/ControlPlane";
+import { AppUserModel, UserAssignmentModel, OrganizationModel, TenantStoreModel } from "@/models/ControlPlane";
 
 export async function GET(req: Request) {
   try {
     await requireInternalAdmin(req);
     await connectDb();
     const rows = await OrganizationModel.find({}).sort({ createdAt: -1 }).lean();
+    
+    // Fetch stores count for each org
+    const orgIds = rows.map(r => r.organizationId);
+    const stores = await TenantStoreModel.find({ organizationId: { $in: orgIds } }).lean();
+    
+    for (const org of rows) {
+      (org as any).stores = stores.filter(s => s.organizationId === org.organizationId);
+    }
     return NextResponse.json({ organizations: safeJson(rows) });
   } catch (error) {
     return jsonError(error);
