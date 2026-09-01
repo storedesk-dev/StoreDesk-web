@@ -100,6 +100,45 @@ export async function writeAudit(input: {
 }
 
 
+export const DEFAULT_ORG_ROLES = [
+  {
+    roleName: "Organization Admin",
+    roleId: "org_admin",
+    accessKeys: {
+      electron: {
+        pages: [
+          { key: "pos",            enabled: true, featureFlags: { enableRefunds: true, enableDiscounts: true, enableVoidTransaction: true, enableCashDrawer: true } },
+          { key: "dashboard",      enabled: true, featureFlags: {} },
+          { key: "products",       enabled: true, featureFlags: { enableBulkImport: true, enableBarcodeGeneration: true } },
+          { key: "vendors",        enabled: true, featureFlags: {} },
+          { key: "vendorPrices",   enabled: true, featureFlags: {} },
+          { key: "priceBook",      enabled: true, featureFlags: {} },
+          { key: "pricingRules",   enabled: true, featureFlags: {} },
+          { key: "costAnalysis",   enabled: true, featureFlags: {} },
+          { key: "transactions",   enabled: true, featureFlags: { enableExport: true, enableRefundView: true } },
+          { key: "manageWorker",   enabled: true, featureFlags: {} },
+          { key: "userManagement", enabled: true, featureFlags: {} },
+          { key: "settings",       enabled: true, featureFlags: {} }
+        ]
+      },
+      mobile: {
+        pages: [
+          { key: "mobilePos",           enabled: true, featureFlags: { enableManualEntry: true, enableQuickSale: true } },
+          { key: "mobileDashboard",      enabled: true, featureFlags: {} },
+          { key: "mobileScanner",        enabled: true, featureFlags: { enableCameraFlash: true, enableManualEntry: true } },
+          { key: "mobileProductSearch",  enabled: true, featureFlags: {} },
+          { key: "mobileVendorPrices",   enabled: true, featureFlags: {} },
+          { key: "mobilePriceBook",      enabled: true, featureFlags: {} },
+          { key: "mobileTransactions",   enabled: true, featureFlags: { enableExport: true } },
+          { key: "mobileReports",        enabled: true, featureFlags: {} },
+          { key: "mobileAnalytics",      enabled: true, featureFlags: {} },
+          { key: "mobileSalesTax",       enabled: true, featureFlags: {} }
+        ]
+      }
+    }
+  }
+];
+
 export async function createOrganization(
   admin: InternalAdminActor,
   body: { name: string; slug?: string; billingEmail?: string }
@@ -119,7 +158,8 @@ export async function createOrganization(
     name: body.name.trim(),
     slug,
     billingEmail: body.billingEmail?.trim().toLowerCase(),
-    status: "active"
+    status: "active",
+    roles: DEFAULT_ORG_ROLES
   });
   await writeAudit({
     organizationId,
@@ -180,6 +220,7 @@ export async function createStore(
     storeNumber?: string;
     address?: string;
     contactEmail?: string;
+    slug?: string;
   }
 ) {
   await connectDb();
@@ -200,7 +241,7 @@ export async function createStore(
   let tunnelUrl: string | undefined;
 
   try {
-    const cf = await provisionCloudflareTunnel(storeId);
+    const cf = await provisionCloudflareTunnel(storeId, body.slug || storeId);
     if (cf) {
       cloudflareToken = cf.cloudflareToken;
       tunnelUrl = cf.tunnelUrl;
@@ -220,6 +261,15 @@ export async function createStore(
     contactEmail: body.contactEmail?.trim().toLowerCase(),
     cloudflareToken,
     tunnelUrl,
+    configJson: JSON.stringify({
+      posIntegration: "verifone_commander",
+      posIpAddress: "",
+      posUsername: "",
+      posPassword: "",
+      featureFlags: {
+        enableBetaScanner: false
+      }
+    }, null, 2),
     status: "active"
   });
   await writeAudit({
@@ -414,7 +464,8 @@ export async function redeemSetupKey(body: {
     workerInstallationId: string;
     platform: "windows" | "macos" | "linux";
     workerVersion: string;
-    serviceManagerVersion: string;
+    electronVersion: string;
+    type?: string;
   };
 }) {
   await connectDb();
@@ -441,26 +492,32 @@ export async function redeemSetupKey(body: {
   ) {
     throw new ControlPlaneError(410, "SETUP_KEY_EXPIRED", "Setup key has expired");
   }
-  if (
-    key.organizationId !== body.installation.organizationId ||
-    key.storeId !== body.installation.storeId ||
-    key.workerInstallationId !== body.installation.workerInstallationId ||
-    String(key.contactEmail).toLowerCase() !== body.acknowledgements.contactEmail.trim().toLowerCase()
-  ) {
-    throw new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
+  const isAutoEnvProvision = body.installation?.type === "auto-env-provision";
+
+  if (!isAutoEnvProvision) {
+    if (
+      key.organizationId !== body.installation.organizationId ||
+      key.storeId !== body.installation.storeId ||
+      key.workerInstallationId !== body.installation.workerInstallationId ||
+      String(key.contactEmail).toLowerCase() !== body.acknowledgements.contactEmail.trim().toLowerCase()
+    ) {
+      throw new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
+    }
   }
 
   const ack = body.acknowledgements;
-  if (
-    ack.eulaVersion !== CURRENT_EULA.eulaVersion ||
-    ack.eulaDocumentSha256 !== CURRENT_EULA.documentSha256 ||
-    ack.privacyVersion !== CURRENT_EULA.privacyVersion ||
-    ack.systemAcknowledgementVersion !== CURRENT_EULA.systemAcknowledgementVersion ||
-    ack.osAcknowledged === false ||
-    ack.privacyAcknowledged === false ||
-    ack.localDataAcknowledged === false
-  ) {
-    throw new ControlPlaneError(428, "EULA_ACCEPTANCE_REQUIRED", "Current EULA acceptance required");
+  if (!isAutoEnvProvision) {
+    if (
+      ack.eulaVersion !== CURRENT_EULA.eulaVersion ||
+      ack.eulaDocumentSha256 !== CURRENT_EULA.documentSha256 ||
+      ack.privacyVersion !== CURRENT_EULA.privacyVersion ||
+      ack.systemAcknowledgementVersion !== CURRENT_EULA.systemAcknowledgementVersion ||
+      ack.osAcknowledged === false ||
+      ack.privacyAcknowledged === false ||
+      ack.localDataAcknowledged === false
+    ) {
+      throw new ControlPlaneError(428, "EULA_ACCEPTANCE_REQUIRED", "Current EULA acceptance required");
+    }
   }
 
   const sub = await SubscriptionModel.findOne({
@@ -534,7 +591,7 @@ export async function redeemSetupKey(body: {
   installation.status = "active";
   installation.platform = body.installation.platform;
   installation.workerVersion = body.installation.workerVersion;
-  installation.serviceManagerVersion = body.installation.serviceManagerVersion;
+  installation.electronVersion = body.installation.electronVersion;
   installation.workerCredentialId = credentialId;
   installation.eulaAcceptanceId = eulaAcceptanceId;
   installation.activatedAt = new Date();
@@ -686,7 +743,7 @@ export async function createAssignment(
     organizationId: string;
     storeId: string;
     workerInstallationId: string;
-    role: "store_operator" | "store_manager" | "viewer";
+    role: string;
     scopes?: string[];
   }
 ) {
@@ -734,6 +791,28 @@ async function assignmentSummaries(appUserId: string) {
       TenantStoreModel.findOne({ storeId: a.storeId }).lean(),
       WorkerInstallationModel.findOne({ workerInstallationId: a.workerInstallationId }).lean()
     ]);
+    // Parse pageAccess and roleAccess: Organization.roles first, fallback to store.configJson, then DEFAULT_ORG_ROLES
+    let pageAccess: Record<string, { enabled: boolean }> = {};
+    let roleAccess: Record<string, unknown> | null = null;
+    const orgRoles = Array.isArray((org as Record<string, unknown> | null)?.roles)
+      ? ((org as Record<string, unknown>).roles as Record<string, unknown>[])
+      : [];
+    if (orgRoles.length > 0) {
+      roleAccess = orgRoles.find(r => r.roleId === a.role) || null;
+    }
+    try {
+      const raw = (store as Record<string, unknown> | null)?.configJson;
+      if (raw && typeof raw === "string") {
+        const parsed = JSON.parse(raw);
+        pageAccess = parsed.pageAccess || {};
+        if (!roleAccess && Array.isArray(parsed.roles)) {
+          roleAccess = parsed.roles.find((r: Record<string, unknown>) => r.roleId === a.role) || null;
+        }
+      }
+    } catch { }
+    if (!roleAccess) {
+      roleAccess = DEFAULT_ORG_ROLES.find(r => r.roleId === a.role) || DEFAULT_ORG_ROLES[0];
+    }
     summaries.push({
       assignmentId: a.assignmentId,
       organizationId: a.organizationId,
@@ -744,6 +823,8 @@ async function assignmentSummaries(appUserId: string) {
       workerName: installation?.workerName,
       role: a.role,
       scopes: a.scopes,
+      pageAccess,
+      roleAccess,
       ready: Boolean(
         installation?.status === "active" && installation.firstBootstrapCompletedAt
       ),
@@ -935,7 +1016,36 @@ export async function issueClientSession(body: {
     expiresAt: relay.expiresAt
   });
 
-  const store = await TenantStoreModel.findOne({ storeId: assignment.storeId }).lean();
+  const [store, org] = await Promise.all([
+    TenantStoreModel.findOne({ storeId: assignment.storeId }).lean(),
+    OrganizationModel.findOne({ organizationId: assignment.organizationId }).lean()
+  ]);
+
+  // Parse pageAccess and roleAccess from Organization.roles or store's configJson
+  let pageAccess: Record<string, { enabled: boolean }> = {};
+  let roleAccess: Record<string, unknown> | null = null;
+
+  const orgRoles = Array.isArray((org as Record<string, unknown> | null)?.roles)
+    ? ((org as Record<string, unknown>).roles as Record<string, unknown>[])
+    : [];
+  if (orgRoles.length > 0) {
+    roleAccess = orgRoles.find(r => r.roleId === assignment.role) || null;
+  }
+
+  try {
+    const raw = (store as Record<string, unknown> | null)?.configJson;
+    if (raw && typeof raw === "string") {
+      const parsed = JSON.parse(raw);
+      pageAccess = parsed.pageAccess || {};
+      if (!roleAccess && Array.isArray(parsed.roles)) {
+        roleAccess = parsed.roles.find((r: Record<string, unknown>) => r.roleId === assignment.role) || null;
+      }
+    }
+  } catch { }
+
+  if (!roleAccess) {
+    roleAccess = DEFAULT_ORG_ROLES.find(r => r.roleId === assignment.role) || DEFAULT_ORG_ROLES[0];
+  }
 
   return {
     contractVersion: CONTRACT_VERSION,
@@ -945,8 +1055,10 @@ export async function issueClientSession(body: {
     storeId: assignment.storeId,
     workerInstallationId: assignment.workerInstallationId,
     assignmentId: assignment.assignmentId,
-    role: "app_user",
+    role: assignment.role,
     scopes: assignment.scopes,
+    pageAccess,
+    roleAccess,
     refreshCredential: `${refreshId}.${refreshSecret}`,
     tunnelUrl: (store as Record<string, unknown>)?.tunnelUrl as string | null,
     lanUrl: (installation as Record<string, unknown>)?.lanUrl as string | null

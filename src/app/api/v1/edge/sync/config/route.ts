@@ -74,15 +74,34 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Store not found" }, { status: 404 });
     }
 
-    const { WorkerInstallationModel } = await import("@/models/ControlPlane");
+    const { WorkerInstallationModel, OrganizationModel } = await import("@/models/ControlPlane");
     const installation = await WorkerInstallationModel.findOne({
       organizationId: worker.organizationId,
       storeId: worker.storeId,
       workerInstallationId: worker.workerInstallationId
     }).lean();
 
+    const organization = await OrganizationModel.findOne({
+      organizationId: worker.organizationId
+    }).lean();
+
+    let parsedConfig = {};
+    if (store.configJson && store.configJson.trim()) {
+      try {
+        parsedConfig = JSON.parse(store.configJson);
+      } catch {
+        // Ignore unparseable
+      }
+    }
+    
+    // Inject orgRoles into the config JSON
+    const fullConfigJson = JSON.stringify({
+      ...parsedConfig,
+      orgRoles: organization?.roles || []
+    });
+
     return NextResponse.json({ 
-      configJson: store.configJson,
+      configJson: fullConfigJson,
       cloudflareToken: installation?.cloudflareToken,
       tunnelUrl: installation?.tunnelUrl
     });

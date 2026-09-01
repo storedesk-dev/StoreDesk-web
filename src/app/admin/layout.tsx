@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Building2, Users, LayoutDashboard } from "lucide-react";
+import { Building2, LayoutDashboard } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Admin | StoreDesk Control Plane",
@@ -35,13 +35,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <Building2 className="h-4 w-4" />
             Organizations
-          </Link>
-          <Link
-            href="/admin/users"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
-          >
-            <Users className="h-4 w-4" />
-            AppUsers
           </Link>
         </nav>
       </aside>

@@ -22,7 +22,13 @@ export default function AdminOrganizationsPage() {
   const [newOrgName, setNewOrgName] = useState("");
   const [newOrgSlug, setNewOrgSlug] = useState("");
   const [newOrgEmail, setNewOrgEmail] = useState("");
+  const [newOwnerEmail, setNewOwnerEmail] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  
+  // Setup Key Modal State
+  const [generatedSetupKey, setGeneratedSetupKey] = useState<string | null>(null);
+  const [isSetupKeyModalOpen, setIsSetupKeyModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   useEffect(() => {
     loadOrganizations();
@@ -51,15 +57,23 @@ export default function AdminOrganizationsPage() {
         body: JSON.stringify({
           name: newOrgName,
           slug: newOrgSlug,
-          billingEmail: newOrgEmail
+          billingEmail: newOrgEmail,
+          ownerEmail: newOwnerEmail
         })
       });
       if (res.ok) {
+        const data = await res.json();
         setIsModalOpen(false);
         setNewOrgName("");
         setNewOrgSlug("");
         setNewOrgEmail("");
+        setNewOwnerEmail("");
         loadOrganizations();
+        
+        if (data.setupKey) {
+          setGeneratedSetupKey(data.setupKey);
+          setIsSetupKeyModalOpen(true);
+        }
       } else {
         alert("Failed to create organization");
       }
@@ -91,7 +105,7 @@ export default function AdminOrganizationsPage() {
           <thead className="bg-gray-50/50 text-[var(--muted)] text-xs uppercase tracking-wider border-b border-gray-200/60">
             <tr>
               <th className="px-6 py-5 font-semibold">Name</th>
-              <th className="px-6 py-5 font-semibold">Org ID</th>
+              
               <th className="px-6 py-5 font-semibold">Stores</th>
               <th className="px-6 py-5 font-semibold">Status</th>
               <th className="px-6 py-5 font-semibold text-right">Actions</th>
@@ -114,13 +128,16 @@ export default function AdminOrganizationsPage() {
             ) : (
               organizations.map((org) => (
                 <tr key={org._id} className="hover:bg-gray-50/80 transition-colors group">
-                  <td className="px-6 py-5">
-                    <div className="font-semibold text-gray-900">{org.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">/{org.slug}</div>
+                  <td className="px-6 py-5 flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-gray-900">{org.name}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">/{org.slug}</div>
+                    </div>
+                    <div className="group relative flex items-center justify-center cursor-help ml-2" title={org.organizationId}>
+                      <div className="h-5 w-5 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-xs font-bold">i</div>
+                    </div>
                   </td>
-                  <td className="px-6 py-5 font-mono text-[11px] text-gray-400 bg-gray-50/50 rounded inline-block mt-4 ml-4 mb-4 border border-gray-100">
-                    {org.organizationId}
-                  </td>
+                  
                   <td className="px-6 py-5">
                     <div className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 font-medium">
                       {org.stores?.length || 0}
@@ -194,6 +211,20 @@ export default function AdminOrganizationsPage() {
                     placeholder="billing@acme.com"
                   />
                 </div>
+                <div className="pt-4 border-t border-gray-100">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Initial Organization Admin (Optional)</h3>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Owner Email</label>
+                  <input 
+                    type="email" 
+                    value={newOwnerEmail}
+                    onChange={e => setNewOwnerEmail(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] focus:border-transparent outline-none transition-all"
+                    placeholder="admin@acme.com"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    If provided, this user will automatically be created and assigned as a Manager for all stores in this organization. A one-time Setup Key will be generated.
+                  </p>
+                </div>
               </form>
             </div>
             
@@ -202,7 +233,7 @@ export default function AdminOrganizationsPage() {
                 <button 
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -210,13 +241,54 @@ export default function AdminOrganizationsPage() {
                   type="submit"
                   form="create-org-form"
                   disabled={isCreating}
-                  className="px-4 py-2 text-sm font-medium bg-[var(--sd-blue)] text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-[var(--sd-blue)] text-white font-medium rounded-lg shadow-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center"
                 >
-                  {isCreating && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isCreating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Create
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Setup Key Modal */}
+      {isSetupKeyModalOpen && generatedSetupKey && (
+        <div className="fixed inset-0 z-[60] overflow-hidden flex items-center justify-center">
+          <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setIsSetupKeyModalOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8">
+            <div className="absolute top-4 right-4">
+              <button onClick={() => setIsSetupKeyModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="text-center mb-6">
+              <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Building2 className="h-8 w-8 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Created!</h2>
+              <p className="text-gray-600">
+                The Organization has been created and the Owner App User is ready. Share this one-time setup key with them so they can securely log in and set their password.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-6">
+              <div className="text-center font-mono text-3xl font-bold tracking-widest text-[var(--sd-blue)] break-all">
+                {generatedSetupKey}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(generatedSetupKey);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="w-full bg-[var(--sd-blue)] text-white py-3 rounded-xl font-semibold shadow-md hover:bg-blue-700 transition-all flex justify-center items-center gap-2"
+            >
+              {copied ? "Copied to Clipboard!" : "Copy Setup Key"}
+            </button>
           </div>
         </div>
       )}

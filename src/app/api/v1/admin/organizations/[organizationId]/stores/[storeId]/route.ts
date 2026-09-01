@@ -27,12 +27,12 @@ export async function GET(req: Request, ctx: Ctx) {
 import { z } from "zod";
 
 const ConfigSchema = z.object({
-  posIntegration: z.literal("verifone_commander"),
+  posIntegration: z.string().optional(),
   posIpAddress: z.string().optional(),
   posUsername: z.string().optional(),
   posPassword: z.string().optional(),
   featureFlags: z.record(z.string(), z.boolean()).optional()
-}).strict();
+}).catchall(z.any());
 
 export async function PUT(req: Request, ctx: Ctx) {
   try {
@@ -69,6 +69,43 @@ export async function PUT(req: Request, ctx: Ctx) {
     await store.save();
 
     return NextResponse.json({ store: safeJson(store) });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+import { WorkerInstallationModel, SetupKeyModel } from "@/models/ControlPlane";
+import { deleteCloudflareTunnel } from "@/lib/cloudflare";
+
+export async function DELETE(req: Request, ctx: Ctx) {
+  try {
+    await requireInternalAdmin(req);
+    const { organizationId, storeId } = await ctx.params;
+    
+    await connectDb();
+    
+    const store = await TenantStoreModel.findOne({ organizationId, storeId });
+    if (!store) {
+      return NextResponse.json({ error: "Store not found" }, { status: 404 });
+    }
+
+    if (store.tunnelUrl) {
+      try {
+        const urlObj = new URL(store.tunnelUrl);
+        const tunnelSlug = urlObj.hostname.split('.')[0];
+        if (tunnelSlug) {
+          await deleteCloudflareTunnel(tunnelSlug);
+        }
+      } catch (err) {
+        console.warn("[delete store] Failed to delete tunnel gracefully:", err);
+      }
+    }
+
+    await TenantStoreModel.deleteOne({ organizationId, storeId });
+    await WorkerInstallationModel.deleteMany({ organizationId, storeId });
+    await SetupKeyModel.deleteMany({ organizationId, storeId });
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     return jsonError(error);
   }

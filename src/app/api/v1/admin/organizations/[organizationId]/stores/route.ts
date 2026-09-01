@@ -29,6 +29,7 @@ export async function POST(req: Request, ctx: Ctx) {
       storeNumber?: string;
       address?: string;
       contactEmail?: string;
+      slug?: string;
     };
     
     if (!body.name?.trim()) {
@@ -55,7 +56,8 @@ export async function POST(req: Request, ctx: Ctx) {
       name: body.name,
       storeNumber: body.storeNumber,
       address: body.address,
-      contactEmail: body.contactEmail
+      contactEmail: body.contactEmail,
+      slug: body.slug
     });
     return NextResponse.json({ store }, { status: 201 });
   } catch (error) {

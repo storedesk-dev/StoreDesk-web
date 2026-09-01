@@ -35,7 +35,8 @@ const OrganizationSchema = new Schema(
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     billingEmail: { type: String, lowercase: true, trim: true },
-    status: { type: String, enum: ["pending", "active", "suspended"], default: "active" }
+    status: { type: String, enum: ["pending", "active", "suspended"], default: "active" },
+    roles: { type: Schema.Types.Mixed, default: [] }
   },
   timestamps
 );
@@ -105,7 +106,7 @@ const WorkerInstallationSchema = new Schema(
     },
     platform: { type: String, enum: ["windows", "macos", "linux"] },
     workerVersion: String,
-    serviceManagerVersion: String,
+    electronVersion: String,
     workerCredentialId: String,
     eulaAcceptanceId: String,
     activatedAt: Date,
@@ -233,7 +234,7 @@ const UserAssignmentSchema = new Schema(
     organizationId: id,
     storeId: id,
     workerInstallationId: id,
-    role: { type: String, enum: ["store_operator", "store_manager", "viewer"], required: true },
+    role: { type: String, required: true },
     scopes: { type: [String], default: ["relay:request"] },
     status: { type: String, enum: ["active", "revoked"], default: "active" },
     revokedAt: Date,

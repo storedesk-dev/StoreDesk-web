@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-export async function provisionCloudflareTunnel(storeId: string): Promise<{
+export async function provisionCloudflareTunnel(storeId: string, tunnelSlug: string): Promise<{
   cloudflareToken: string;
   tunnelUrl: string;
 } | null> {
@@ -12,7 +12,7 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
     return null;
   }
 
-  const tunnelName = `storedesk-${storeId}`;
+  const tunnelName = tunnelSlug;
   // Generate a cryptographically secure 32-byte secret for the tunnel
   const tunnelSecret = crypto.randomBytes(32).toString("base64");
 
@@ -48,12 +48,12 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
   console.info(`[cloudflare] Tunnel created successfully. ID: ${tunnelId}`);
 
   const tunnelDomain = process.env.CLOUDFLARE_TUNNEL_DOMAIN?.trim() || "tunnels.storedesk.net";
-  const tunnelUrl = `https://${storeId}.${tunnelDomain}`;
+  const tunnelUrl = `https://${tunnelSlug}.${tunnelDomain}`;
 
   // 2. Create the DNS record (CNAME) pointing to the tunnel if zone ID is provided
   const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
   if (zoneId) {
-    console.info(`[cloudflare] Creating DNS CNAME record for ${storeId}.${tunnelDomain}...`);
+    console.info(`[cloudflare] Creating DNS CNAME record for ${tunnelSlug}.${tunnelDomain}...`);
     try {
       const dnsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`, {
         method: "POST",
@@ -63,7 +63,7 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
         },
         body: JSON.stringify({
           type: "CNAME",
-          name: `${storeId}.${tunnelDomain}`,
+          name: `${tunnelSlug}.${tunnelDomain}`,
           content: `${tunnelId}.cfargotunnel.com`,
           ttl: 1,
           proxied: true
@@ -83,8 +83,109 @@ export async function provisionCloudflareTunnel(storeId: string): Promise<{
     }
   }
 
+  // 3. Configure the Tunnel routing (Published Application / Public Hostname)
+  console.info(`[cloudflare] Configuring tunnel routing for ${tunnelSlug}.${tunnelDomain} -> http://localhost:4310 ...`);
+  try {
+    const configRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        config: {
+          ingress: [
+            {
+              hostname: `${tunnelSlug}.${tunnelDomain}`,
+              service: "http://localhost:4310"
+            },
+            {
+              service: "http_status:404"
+            }
+          ]
+        }
+      })
+    });
+
+    const configData = (await configRes.json()) as { success?: boolean; errors?: Array<{ message?: string }> };
+    if (!configRes.ok || !configData.success) {
+      const errMsg = configData.errors?.[0]?.message || "Failed to configure tunnel routing";
+      console.warn(`[cloudflare:warn] Tunnel configuration warning: ${errMsg}`);
+    } else {
+      console.info("[cloudflare] Tunnel routing configured successfully.");
+    }
+  } catch (configErr: unknown) {
+    const msg = configErr instanceof Error ? configErr.message : String(configErr);
+    console.warn(`[cloudflare:warn] Failed to configure tunnel routing: ${msg}`);
+  }
+
   return {
     cloudflareToken: tunnelToken,
     tunnelUrl
   };
+}
+
+export async function deleteCloudflareTunnel(tunnelSlug: string): Promise<boolean> {
+  const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+
+  if (!token || !accountId) {
+    console.info("[cloudflare] Missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID. Skipping tunnel deletion.");
+    return false;
+  }
+
+  console.info(`[cloudflare] Deleting tunnel "${tunnelSlug}"...`);
+
+  try {
+    // 1. Fetch tunnel by name to get its ID
+    const listRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel?name=${tunnelSlug}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const listData = (await listRes.json()) as { success?: boolean; result?: Array<{ id: string }> };
+    
+    const tunnels = listData.result || [];
+    if (tunnels.length > 0) {
+      const tunnelId = tunnels[0].id;
+      // Delete the tunnel
+      const delRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel/${tunnelId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!delRes.ok) {
+        console.warn(`[cloudflare:warn] Failed to delete tunnel ${tunnelId}`);
+      } else {
+        console.info(`[cloudflare] Tunnel ${tunnelId} deleted successfully.`);
+      }
+    } else {
+      console.info(`[cloudflare] Tunnel "${tunnelSlug}" not found. Moving on.`);
+    }
+
+    // 2. Delete DNS CNAME records associated with this tunnel slug
+    const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
+    if (zoneId) {
+      const tunnelDomain = process.env.CLOUDFLARE_TUNNEL_DOMAIN?.trim() || "tunnels.storedesk.net";
+      const recordName = `${tunnelSlug}.${tunnelDomain}`;
+      
+      const dnsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?name=${recordName}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const dnsData = (await dnsRes.json()) as { success?: boolean; result?: Array<{ id: string }> };
+      
+      const records = dnsData.result || [];
+      for (const record of records) {
+        const dnsDelRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${record.id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (dnsDelRes.ok) {
+          console.info(`[cloudflare] DNS record ${record.id} for ${recordName} deleted successfully.`);
+        }
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`[cloudflare:error] Failed to delete tunnel "${tunnelSlug}":`, error);
+    return false;
+  }
 }
