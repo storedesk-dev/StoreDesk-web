@@ -452,16 +452,12 @@ export async function redeemSetupKey(body: {
     eulaDocumentSha256: string;
     privacyVersion: string;
     systemAcknowledgementVersion: string;
-    contactEmail: string;
     acceptedAt: string;
     osAcknowledged?: boolean;
     privacyAcknowledged?: boolean;
     localDataAcknowledged?: boolean;
   };
   installation: {
-    organizationId: string;
-    storeId: string;
-    workerInstallationId: string;
     platform: "windows" | "macos" | "linux";
     workerVersion: string;
     electronVersion: string;
@@ -469,13 +465,14 @@ export async function redeemSetupKey(body: {
   };
 }) {
   await connectDb();
+  
+  const parsed = parseSetupKey(body.setupKey);
   const correlationId = publicId("corr");
-  enforceRateLimit(`redeem:${body.installation.workerInstallationId}`, {
+  enforceRateLimit(`redeem:${parsed.keyId}`, {
     limit: 20,
     windowMs: 60_000
   });
 
-  const parsed = parseSetupKey(body.setupKey);
   const key = await SetupKeyModel.findOne({ keyId: parsed.keyId })
     .select("+secretHash")
     .lean();
@@ -492,33 +489,8 @@ export async function redeemSetupKey(body: {
   ) {
     throw new ControlPlaneError(410, "SETUP_KEY_EXPIRED", "Setup key has expired");
   }
-  const isAutoEnvProvision = body.installation?.type === "auto-env-provision";
-
-  if (!isAutoEnvProvision) {
-    if (
-      key.organizationId !== body.installation.organizationId ||
-      key.storeId !== body.installation.storeId ||
-      key.workerInstallationId !== body.installation.workerInstallationId ||
-      String(key.contactEmail).toLowerCase() !== body.acknowledgements.contactEmail.trim().toLowerCase()
-    ) {
-      throw new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
-    }
-  }
 
   const ack = body.acknowledgements;
-  if (!isAutoEnvProvision) {
-    if (
-      ack.eulaVersion !== CURRENT_EULA.eulaVersion ||
-      ack.eulaDocumentSha256 !== CURRENT_EULA.documentSha256 ||
-      ack.privacyVersion !== CURRENT_EULA.privacyVersion ||
-      ack.systemAcknowledgementVersion !== CURRENT_EULA.systemAcknowledgementVersion ||
-      ack.osAcknowledged === false ||
-      ack.privacyAcknowledged === false ||
-      ack.localDataAcknowledged === false
-    ) {
-      throw new ControlPlaneError(428, "EULA_ACCEPTANCE_REQUIRED", "Current EULA acceptance required");
-    }
-  }
 
   const sub = await SubscriptionModel.findOne({
     organizationId: key.organizationId,
@@ -575,62 +547,58 @@ export async function redeemSetupKey(body: {
     source: "setup_key_redeem"
   });
 
-  const credentialId = publicId("wcred");
-  const secret = randomSecret(32);
+  const workerCredentialId = publicId("wkrc");
+  const credentialSecret = randomSecret(32);
+  const secretHash = await hashSecret(credentialSecret);
+
+  installation.workerCredentialId = workerCredentialId;
+  installation.status = "active";
+  installation.firstBootstrapCompletedAt = new Date();
+  installation.platform = body.installation.platform;
+  installation.workerVersion = body.installation.workerVersion;
+  installation.electronVersion = body.installation.electronVersion;
+  await installation.save();
+
   await WorkerCredentialModel.create({
-    credentialId,
+    workerCredentialId,
+    secretHash,
     organizationId: key.organizationId,
     storeId: key.storeId,
     workerInstallationId: key.workerInstallationId,
-    secretHash: await hashSecret(secret),
-    keyId: key.keyId,
     status: "active",
     issuedAt: new Date()
   });
 
-  installation.status = "active";
-  installation.platform = body.installation.platform;
-  installation.workerVersion = body.installation.workerVersion;
-  installation.electronVersion = body.installation.electronVersion;
-  installation.workerCredentialId = credentialId;
-  installation.eulaAcceptanceId = eulaAcceptanceId;
-  installation.activatedAt = new Date();
-  await installation.save();
-
-  await writeAudit({
-    organizationId: String(key.organizationId),
-    storeId: String(key.storeId),
-    workerInstallationId: String(key.workerInstallationId),
-    actorType: "worker",
-    actorId: credentialId,
+  await AuditEventModel.create({
+    eventId: publicId("aud"),
+    organizationId: key.organizationId,
+    storeId: key.storeId,
+    actorType: "system",
+    actorId: "setup_flow",
     action: "setup_key.redeem",
-    targetType: "worker_credential",
-    targetId: credentialId,
-    correlationId
+    targetType: "WorkerInstallation",
+    targetId: key.workerInstallationId,
+    correlationId,
+    details: {
+      setupKeyId: key.keyId,
+      workerCredentialId,
+      contactEmail: key.contactEmail
+    }
   });
-
-  const offlineGraceUntil = new Date(
-    new Date(sub.entitlementExpiresAt).getTime() + Number(sub.offlineGraceDays || 0) * 86400000
-  );
 
   return {
     contractVersion: CONTRACT_VERSION,
+    workerCredential: `${workerCredentialId}.${credentialSecret}`,
+    workerCredentialId,
+    organizationId: key.organizationId,
+    storeId: key.storeId,
+    workerInstallationId: key.workerInstallationId,
+    cloudflareToken: (installation as Record<string, unknown>).cloudflareToken,
     store: {
-      storeId: key.storeId,
       organizationId: key.organizationId,
-      workerInstallationId: key.workerInstallationId,
-      status: "active"
-    },
-    subscription: {
-      status: sub.status,
-      entitlementExpiresAt: sub.entitlementExpiresAt,
-      offlineGraceUntil
-    },
-    workerCredential: `${credentialId}.${secret}`,
-    workerCredentialId: credentialId,
-    cloudflareToken: store?.cloudflareToken ?? null,
-    tunnelUrl: store?.tunnelUrl ?? null,
-    issuedAt: new Date().toISOString()
+      storeId: key.storeId,
+      workerInstallationId: key.workerInstallationId
+    }
   };
 }
 

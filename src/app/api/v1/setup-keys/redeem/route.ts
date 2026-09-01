@@ -4,7 +4,7 @@ import { jsonError, redeemSetupKey } from "@/lib/control-plane";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    if (!body?.setupKey || !body?.acknowledgements || !body?.installation) {
+    if (!body?.setupKey || !body?.acknowledgements) {
       return NextResponse.json(
         {
           error: {
