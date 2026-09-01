@@ -1,3 +1,4 @@
+import { useToast } from "@/components/ToastContext";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,6 +8,7 @@ import { ArrowLeft, Loader2, Save, Server, ShieldCheck, Activity, KeyRound, Copy
 import { JsonEditor } from "../../../../components/JsonEditor";
 
 export default function AdminStoreDetailPage() {
+  const { toast } = useToast();
   const { orgId, storeId } = useParams();
     
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -214,15 +216,15 @@ export default function AdminStoreDetailPage() {
         })
       });
       if (res.ok) {
-        alert("Store updated successfully");
+        toast("Store updated successfully", "success");
         loadData();
       } else {
         const err = await res.json();
-        alert(`Failed to save: ${err.error || 'Unknown error'}`);
+        toast(`Failed to save: ${err.error || 'Unknown error'}`, "error");
       }
     } catch (err: unknown) {
       console.error(err);
-      alert("Error saving store");
+      toast("Error saving store", "error");
     } finally {
       setSaving(false);
     }
@@ -242,10 +244,10 @@ export default function AdminStoreDetailPage() {
         setGeneratedKey(data.setupKey);
         setKeyExpiresAt(data.expiresAt);
       } else {
-        alert(data.error || "Failed to generate key");
+        toast(data.error?.message || typeof data.error === "string" ? data.error : (data.error?.code || "Failed to generate key"), "error");
       }
     } catch {
-      alert("Error generating setup key");
+      toast("Error generating setup key", "error");
     } finally {
       setIsGeneratingKey(false);
     }
@@ -259,15 +261,15 @@ export default function AdminStoreDetailPage() {
         method: "DELETE"
       });
       if (res.ok) {
-        alert("Tunnel configuration deleted");
+        toast("Tunnel configuration deleted", "success");
         setTunnelUrl("");
         loadData();
       } else {
         const err = await res.json();
-        alert(`Failed to delete tunnel: ${err.error || 'Unknown error'}`);
+        toast(`Failed to delete tunnel: ${err.error || 'Unknown error'}`, "error");
       }
     } catch {
-      alert("Error deleting tunnel");
+      toast("Error deleting tunnel", "error");
     } finally {
       setIsDeletingTunnel(false);
     }
@@ -281,14 +283,14 @@ export default function AdminStoreDetailPage() {
         method: "DELETE"
       });
       if (res.ok) {
-        alert("Store deleted");
+        toast("Store deleted", "success");
         window.location.href = `/admin/organizations/${orgId}`;
       } else {
         const err = await res.json();
-        alert(`Failed to delete store: ${err.error || 'Unknown error'}`);
+        toast(`Failed to delete store: ${err.error || 'Unknown error'}`, "error");
       }
     } catch {
-      alert("Error deleting store");
+      toast("Error deleting store", "error");
     } finally {
       setIsDeletingStore(false);
     }
@@ -386,7 +388,7 @@ export default function AdminStoreDetailPage() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(store.cloudflareToken);
-                      alert("Token copied to clipboard");
+                      toast("Token copied to clipboard", "success");
                     }}
                     className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
                     title="Copy Token"
@@ -467,7 +469,7 @@ export default function AdminStoreDetailPage() {
                 const np: Record<string, unknown> = configJson.trim() ? JSON.parse(configJson) : {};
                 np.roles = newRoles;
                 setConfigJson(JSON.stringify(np, null, 2));
-              } catch { alert("Cannot update while JSON is invalid."); }
+              } catch { toast("Cannot update while JSON is invalid.", "error"); }
             };
 
             const togglePage = (ri: number, app: "electron" | "mobile", pageKey: string) => {
@@ -544,7 +546,7 @@ export default function AdminStoreDetailPage() {
               if (!rId || !rId.trim()) return;
 
               if (roles.some(r => r.roleId === rId.trim())) {
-                alert(`Role ID "${rId.trim()}" already exists.`);
+                toast(`Role ID "${rId.trim()}" already exists.`, "error");
                 return;
               }
 
@@ -590,7 +592,7 @@ export default function AdminStoreDetailPage() {
             const deleteRole = (ri: number) => {
               const target = roles[ri];
               if (target.roleId === "org_admin") {
-                alert("Cannot delete the Organization Admin role.");
+                toast("Cannot delete the Organization Admin role.", "error");
                 return;
               }
               if (!confirm(`Delete role "${target.roleName}" (${target.roleId})?`)) return;
