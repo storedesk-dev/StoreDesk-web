@@ -3,7 +3,7 @@ import { requireInternalAdmin } from "@/lib/admin-auth";
 import { jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
 import { AppUserModel, UserAssignmentModel } from "@/models/ControlPlane";
-import { safeJson, issueSetupKey, hashSecret, publicId } from "@/lib/control-plane-security";
+import { safeJson, hashSecret, publicId } from "@/lib/control-plane-security";
 import { z } from "zod";
 
 type Ctx = { params: Promise<{ organizationId: string }> };

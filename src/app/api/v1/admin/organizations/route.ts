@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const stores = await TenantStoreModel.find({ organizationId: { $in: orgIds } }).lean();
     
     for (const org of rows) {
-      (org as any).stores = stores.filter(s => s.organizationId === org.organizationId);
+      (org as Record<string, unknown>).stores = stores.filter(s => s.organizationId === org.organizationId);
     }
     return NextResponse.json({ organizations: safeJson(rows) });
   } catch (error) {

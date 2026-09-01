@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, UserCircle } from "lucide-react";
-import Image from "next/image";
 
 export default function AdminHeader() {
   const pathname = usePathname();
