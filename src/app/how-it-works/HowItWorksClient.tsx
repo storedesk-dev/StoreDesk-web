@@ -34,7 +34,7 @@ const steps = [
 
 export function HowItWorksClient() {
   return (
-    <MarketingShell eyebrow="How it works" title="How StoreDesk powers your store">
+    <MarketingShell title="How StoreDesk powers your store">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="inline-flex rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] p-2.5 text-white shadow-md">

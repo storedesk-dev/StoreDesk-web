@@ -27,7 +27,7 @@ const PRINCIPLES = [
 
 export function AboutClient() {
   return (
-    <MarketingShell eyebrow="About" title="Why we built StoreDesk — for convenience store operators">
+    <MarketingShell title="Why we built StoreDesk for convenience store operators">
       <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-8">
           <motion.section
