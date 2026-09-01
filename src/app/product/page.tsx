@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { ProductClient } from "./ProductClient";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-desk-prod.vercel.app";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://storedesk.dev";
 
 export const metadata: Metadata = {
-  title: "StoreDesk Features — Price Book, Vendor Cost Comparison & Mobile Scanner",
+  title: "Everything at the counter — built for real store operations",
   description:
-    "Explore StoreDesk features: Price Book management, vendor cost comparison, multi-pack math, pricing rules, and StoreDesk Mobile barcode scanner. Built for Verifone Commander stores.",
+    "Explore StoreDesk features: Price Book management, supplier cost comparison, invoice extraction review, StoreDesk Mobile scanning app, and Verifone Commander sync.",
   keywords: [
     "StoreDesk features",
     "StoreDesk Price Book",
@@ -14,17 +14,16 @@ export const metadata: Metadata = {
     "StoreDesk Worker",
     "Verifone Commander backoffice",
     "convenience store price book",
-    "vendor cost comparison",
-    "c-store barcode scanning",
-    "margin tracking c-store"
+    "vendor cost analysis",
+    "c-store barcode scanning"
   ],
   alternates: {
     canonical: `${siteUrl}/product`
   },
   openGraph: {
-    title: "StoreDesk Features — Price Book, Vendor Cost & Mobile Scanner",
+    title: "Everything at the counter — built for real store operations",
     description:
-      "Price Book management, vendor cost comparison, margin & markup pricing rules, and StoreDesk Mobile barcode scanner for convenience stores.",
+      "Price Book, Cost & Profit Analysis, Invoice Review, Store Reports, StoreDesk Mobile scanning app, and Verifone Commander sync.",
     url: `${siteUrl}/product`,
     images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.png`, width: 1200, height: 400, alt: "StoreDesk Product Features" }]
   }
