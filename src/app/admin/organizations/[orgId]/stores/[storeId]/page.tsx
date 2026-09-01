@@ -676,7 +676,7 @@ export default function AdminStoreDetailPage() {
               <div>
                 <h3 className="font-medium text-emerald-900">Generate Worker Setup Key</h3>
                 <p className="text-sm text-emerald-700/80 mt-1 max-w-md">
-                  Issue a one-time 6-digit key for the store owner to activate their physical Edge server.
+                  Issue a one-time setup key for the store owner to activate their physical Edge server.
                   This requires the Cloudflare Tunnel URL to be configured and saved first.
                 </p>
               </div>
@@ -693,27 +693,32 @@ export default function AdminStoreDetailPage() {
                     <><KeyRound className="h-4 w-4" /> Issue Setup Key</>
                   )}
                 </button>
-              ) : (
-                <div className="bg-white border border-emerald-200 rounded-xl p-4 flex-shrink-0 text-center shadow-sm">
-                  <div className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1">One-Time Key</div>
-                  <div className="text-3xl font-mono font-bold tracking-widest text-gray-900 mb-2">
+              ) : null}
+            </div>
+
+            {generatedKey && (
+              <div className="mt-4 bg-white border border-emerald-200 rounded-xl p-3 shadow-sm flex items-center gap-3 w-full">
+                <div className="bg-emerald-50 text-emerald-600 p-2 rounded-lg flex-shrink-0">
+                  <KeyRound className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-0.5">One-Time Setup Key</div>
+                  <div className="text-sm font-mono text-gray-900 truncate" title={generatedKey}>
                     {generatedKey}
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-xs text-gray-500">
-                      Expires: {new Date(keyExpiresAt!).toLocaleTimeString()}
-                    </span>
-                    <button 
-                      onClick={copyToClipboard}
-                      className="text-emerald-600 hover:text-emerald-700 flex items-center gap-1 text-xs font-medium bg-emerald-50 px-2 py-1 rounded-md"
-                    >
-                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                      {copied ? "Copied" : "Copy"}
-                    </button>
-                  </div>
                 </div>
-              )}
-            </div>
+                <div className="text-xs text-gray-500 whitespace-nowrap hidden sm:block px-2">
+                  Expires: {new Date(keyExpiresAt!).toLocaleTimeString()}
+                </div>
+                <button 
+                  onClick={copyToClipboard}
+                  className="flex-shrink-0 flex items-center justify-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors cursor-pointer"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            )}
             
             {!tunnelUrl && (
               <div className="mt-3 text-xs font-medium text-amber-600 flex items-center gap-1.5">
