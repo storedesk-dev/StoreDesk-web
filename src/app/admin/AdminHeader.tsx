@@ -27,18 +27,6 @@ export default function AdminHeader() {
   return (
     <header className="sticky top-0 z-10 flex h-16 w-full items-center justify-between border-b border-[var(--border)] bg-white/80 px-6 backdrop-blur-md">
       <div className="flex items-center gap-4">
-        {/* Brand Logo (Horizontal) */}
-        <div className="hidden sm:flex items-center gap-2 pr-4 border-r border-[var(--border)]">
-          <Image
-            src="/brand/logo-lockup-horizontal.svg"
-            alt="StoreDesk"
-            width={240}
-            height={48}
-            className="h-12 w-auto object-contain"
-            priority
-          />
-        </div>
-
         {/* Dynamic Breadcrumbs */}
         <nav className="flex items-center space-x-2 text-sm font-medium text-[var(--muted)]">
           {breadcrumbs.map((crumb, index) => {
