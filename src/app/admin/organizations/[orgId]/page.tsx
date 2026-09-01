@@ -298,6 +298,14 @@ export default function AdminOrganizationDetailPage() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newUserPassword.length < 8) {
+      toast("Password must be at least 8 characters", "error");
+      return;
+    }
+    if (!/\d/.test(newUserPassword)) {
+      toast("Password must include a number", "error");
+      return;
+    }
     setCreateUserBusy(true);
     try {
       const payload: Record<string, string> = {
@@ -1115,6 +1123,9 @@ export default function AdminOrganizationDetailPage() {
                   onChange={e => setNewUserPassword(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] outline-none"
                   placeholder="Enter password"
+                  minLength={8}
+                  pattern=".*\\d.*"
+                  title="Password must be at least 8 characters and include a number"
                   required
                 />
               </div>
