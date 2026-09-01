@@ -747,7 +747,6 @@ export default function AdminOrganizationDetailPage() {
                               { key: "vendors",        enabled: false, featureFlags: {} },
                               { key: "vendorPrices",   enabled: false, featureFlags: {} },
                               { key: "priceBook",      enabled: false, featureFlags: {} },
-                              { key: "pricingRules",   enabled: false, featureFlags: {} },
                               { key: "costAnalysis",   enabled: false, featureFlags: {} },
                               { key: "transactions",   enabled: true,  featureFlags: {} },
                               { key: "manageWorker",   enabled: false, featureFlags: {} },

@@ -113,7 +113,6 @@ export const DEFAULT_ORG_ROLES = [
           { key: "vendors",        enabled: true, featureFlags: {} },
           { key: "vendorPrices",   enabled: true, featureFlags: {} },
           { key: "priceBook",      enabled: true, featureFlags: {} },
-          { key: "pricingRules",   enabled: true, featureFlags: {} },
           { key: "costAnalysis",   enabled: true, featureFlags: {} },
           { key: "transactions",   enabled: true, featureFlags: { enableExport: true, enableRefundView: true } },
           { key: "manageWorker",   enabled: true, featureFlags: {} },
