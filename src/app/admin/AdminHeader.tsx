@@ -32,9 +32,9 @@ export default function AdminHeader() {
           <Image
             src="/brand/logo-lockup-horizontal.svg"
             alt="StoreDesk"
-            width={160}
-            height={36}
-            className="h-9 w-auto object-contain"
+            width={240}
+            height={48}
+            className="h-12 w-auto object-contain"
             priority
           />
         </div>
