@@ -48,7 +48,12 @@ export async function POST(req: Request, ctx: Ctx) {
     const admin = await requireInternalAdmin(req);
     const { organizationId } = await ctx.params;
     const body = await req.json();
-    const parsed = CreateAppUserSchema.parse(body);
+    let parsed;
+    try {
+      parsed = CreateAppUserSchema.parse(body);
+    } catch (zodError: any) {
+      return NextResponse.json({ error: { message: zodError.errors[0]?.message || "Validation failed", code: "VALIDATION_FAILED" } }, { status: 400 });
+    }
 
     await connectDb();
 

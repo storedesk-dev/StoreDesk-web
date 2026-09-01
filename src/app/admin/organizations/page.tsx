@@ -1,3 +1,4 @@
+import { useToast } from "@/components/ToastContext";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,6 +15,7 @@ interface OrganizationItem {
 }
 
 export default function AdminOrganizationsPage() {
+  const { toast } = useToast();
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,7 +77,7 @@ export default function AdminOrganizationsPage() {
           setIsSetupKeyModalOpen(true);
         }
       } else {
-        alert("Failed to create organization");
+        toast("Failed to create organization", "error");
       }
     } catch (err) {
       console.error(err);

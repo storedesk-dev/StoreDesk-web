@@ -1,3 +1,4 @@
+import { useToast } from "@/components/ToastContext";
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -79,6 +80,7 @@ export type RoleConfigEntry = {
 };
 
 export default function AdminOrganizationDetailPage() {
+  const { toast } = useToast();
   const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
   const [org, setOrg] = useState<Org | null>(null);
@@ -192,10 +194,10 @@ export default function AdminOrganizationDetailPage() {
         const data = await res.json();
         setOrgRoles(data.roles);
       } else {
-        alert("Failed to save organization roles");
+        toast("Failed to save organization roles", "error");
       }
     } catch (err: unknown) {
-      alert("Error saving organization roles: " + (err as Error).message);
+      toast("Error saving organization roles: " + (err as Error).message, "error");
     } finally {
       setRolesSaving(false);
     }
@@ -231,10 +233,10 @@ export default function AdminOrganizationDetailPage() {
         loadData();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to create store");
+        toast(data.error?.message || typeof data.error === "string" ? data.error : (data.error?.code || "Failed to create store"), "error");
       }
     } catch {
-      alert("Failed to create store");
+      toast("Failed to create store", "error");
     } finally {
       setCreateStoreBusy(false);
     }
@@ -259,7 +261,7 @@ export default function AdminOrganizationDetailPage() {
         loadSubscriptions();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to create subscription");
+        toast(data.error?.message || typeof data.error === "string" ? data.error : (data.error?.code || "Failed to create subscription"), "error");
       }
     } catch (err: unknown) {
       setSubPlan("trial");
@@ -268,7 +270,7 @@ export default function AdminOrganizationDetailPage() {
       setSubDays(30);
       loadSubscriptions();
       console.error(err);
-      alert("Failed to create subscription: " + (err as Error).message);
+      toast("Failed to create subscription: " + (err as Error).message, "error");
     } finally {
       setSubsLoading(false);
     }
@@ -287,10 +289,10 @@ export default function AdminOrganizationDetailPage() {
         router.push("/admin/organizations");
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to delete organization");
+        toast(data.error?.message || typeof data.error === "string" ? data.error : (data.error?.code || "Failed to delete organization"), "error");
       }
     } catch {
-      alert("Failed to delete organization");
+      toast("Failed to delete organization", "error");
     }
   };
 
@@ -320,11 +322,11 @@ export default function AdminOrganizationDetailPage() {
         loadUsers();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to create user");
+        toast(data.error?.message || typeof data.error === "string" ? data.error : (data.error?.code || "Failed to create user"), "error");
       }
     } catch (err: unknown) {
       console.error(err);
-      alert("Failed to create user: " + (err as Error).message);
+      toast("Failed to create user: " + (err as Error).message, "error");
     } finally {
       setCreateUserBusy(false);
     }
@@ -721,7 +723,7 @@ export default function AdminOrganizationDetailPage() {
                       if (!rId || !rId.trim()) return;
 
                       if (orgRoles.some(r => r.roleId === rId.trim())) {
-                        alert(`Role ID "${rId.trim()}" already exists.`);
+                        toast(`Role ID "${rId.trim()}" already exists.`, "error");
                         return;
                       }
 
@@ -790,7 +792,7 @@ export default function AdminOrganizationDetailPage() {
 
                       const togglePage = (app: "electron" | "mobile", pageKey: string) => {
                         if (isCorePage(pageKey)) {
-                          alert(`"${pageKey}" is a core system page and is always enabled.`);
+                          toast(`"${pageKey}" is a core system page and is always enabled.`, "error");
                           return;
                         }
                         const updated: RoleConfigEntry[] = JSON.parse(JSON.stringify(orgRoles));
@@ -814,7 +816,7 @@ export default function AdminOrganizationDetailPage() {
 
                       const deleteRole = () => {
                         if (activeRole.roleId === "org_admin") {
-                          alert("Cannot delete Organization Admin role.");
+                          toast("Cannot delete Organization Admin role.", "error");
                           return;
                         }
                         if (!confirm(`Delete role "${activeRole.roleName}" (${activeRole.roleId})?`)) return;
@@ -1193,7 +1195,7 @@ export default function AdminOrganizationDetailPage() {
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(generatedSetupKey);
-                  alert("Setup Key Copied!");
+                  toast("Setup Key Copied!", "success");
                 }}
                 className="px-6 py-2.5 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
               >
