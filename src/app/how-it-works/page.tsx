@@ -4,7 +4,7 @@ import { HowItWorksClient } from "./HowItWorksClient";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://storedesk.dev";
 
 export const metadata: Metadata = {
-  title: "How StoreDesk Works — Architecture, Store Engine & Mobile Scanning",
+  title: "How StoreDesk powers your store",
   description:
     "Discover how StoreDesk powers your convenience store: StoreDesk Worker on store computer, Desktop admin dashboard, and StoreDesk Mobile scanner on store Wi-Fi.",
   keywords: [
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     canonical: `${siteUrl}/how-it-works`
   },
   openGraph: {
-    title: "How StoreDesk Works — Store Engine, Desktop & Mobile",
+    title: "How StoreDesk powers your store",
     description:
       "Store Engine on store PC, Desktop management, and Mobile floor scanning over store Wi-Fi. Local, fast, and private.",
     url: `${siteUrl}/how-it-works`,

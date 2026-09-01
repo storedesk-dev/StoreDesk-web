@@ -4,7 +4,7 @@ import { ProductClient } from "./ProductClient";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://storedesk.dev";
 
 export const metadata: Metadata = {
-  title: "StoreDesk Features — Price Book, Cost Analysis & Mobile Scanner",
+  title: "Everything at the counter — built for real store operations",
   description:
     "Explore StoreDesk features: Price Book management, supplier cost comparison, invoice extraction review, StoreDesk Mobile scanning app, and Verifone Commander sync.",
   keywords: [
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     canonical: `${siteUrl}/product`
   },
   openGraph: {
-    title: "StoreDesk Features — Price Book, Cost Analysis & Mobile Scanner",
+    title: "Everything at the counter — built for real store operations",
     description:
       "Price Book, Cost & Profit Analysis, Invoice Review, Store Reports, StoreDesk Mobile scanning app, and Verifone Commander sync.",
     url: `${siteUrl}/product`,
