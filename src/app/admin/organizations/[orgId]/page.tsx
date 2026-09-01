@@ -1,5 +1,5 @@
-import { useToast } from "@/components/ToastContext";
 "use client";
+import { useToast } from "@/components/ToastContext";
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";

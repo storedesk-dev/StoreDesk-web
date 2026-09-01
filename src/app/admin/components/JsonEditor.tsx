@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { Check, X, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
