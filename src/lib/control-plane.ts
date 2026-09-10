@@ -105,7 +105,6 @@ export const DEFAULT_ORG_ROLES = [
           { key: "dashboard",      enabled: true, featureFlags: {} },
           { key: "products",       enabled: true, featureFlags: { enableBulkImport: true, enableBarcodeGeneration: true } },
           { key: "vendors",        enabled: true, featureFlags: {} },
-          { key: "vendorPrices",   enabled: true, featureFlags: {} },
           { key: "priceBook",      enabled: true, featureFlags: {} },
           { key: "costAnalysis",   enabled: true, featureFlags: {} },
           { key: "transactions",   enabled: true, featureFlags: { enableExport: true, enableRefundView: true } },

@@ -72,15 +72,6 @@ export const ALL_PAGES: PageDefinition[] = [
     knownFeatureFlags: {}
   },
   {
-    key: "vendorPrices",
-    label: "Vendor Prices",
-    description: "Manual vendor price entry and price history per variant.",
-    app: "electron",
-    filePath: "src/pages/VendorPricesPage.tsx",
-    defaultEnabled: true,
-    knownFeatureFlags: {}
-  },
-  {
     key: "priceBook",
     label: "Price Book",
     description: "Suggested and manual selling price management across all variants.",
