@@ -51,8 +51,8 @@ export function DeviceStage() {
           <Scan className="h-4 w-4" />
         </span>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Scan Ready</p>
-          <p className="text-xs font-extrabold text-[#0B1F4D]">Instant UPC Lookup</p>
+          <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">On the floor</p>
+          <p className="text-[13px] font-extrabold text-[#0B1F4D]">Scan a shelf tag</p>
         </div>
       </motion.div>
 
@@ -65,8 +65,8 @@ export function DeviceStage() {
           <BarChart3 className="h-4 w-4" />
         </span>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Best Vendor</p>
-          <p className="text-xs font-extrabold text-[#00B36B]">Lowest Cost Per Unit</p>
+          <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">From the register</p>
+          <p className="text-[13px] font-extrabold text-[#00875F]">Sales by department</p>
         </div>
       </motion.div>
 
@@ -102,11 +102,11 @@ export function DeviceStage() {
               </div>
             </div>
 
-            {/* Core Sales Tax & Analytics Mobile Dashboard UI Screenshot */}
+            {/* Phone app dashboard: sales by department, then live transactions */}
             <div className="relative overflow-hidden bg-slate-900">
               <Image
-                src="/screenshots/mobile-app-5.jpeg"
-                alt="StoreDesk Mobile Sales Tax & Analytics Dashboard UI"
+                src="/screenshots/mobile-app-2.jpeg"
+                alt="StoreDesk phone app dashboard: today's net sales by department and live transactions"
                 width={440}
                 height={900}
                 className="h-auto w-full object-cover transition-transform duration-500 hover:scale-105"

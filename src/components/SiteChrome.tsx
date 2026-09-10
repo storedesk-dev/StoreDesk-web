@@ -68,7 +68,7 @@ export function SiteHeader() {
             className="h-7 w-7 object-contain drop-shadow-[0_2px_6px_rgba(26,99,244,0.25)]"
           />
           {/* The lockup's wordmark, set as live text so it stays crisp on glass. */}
-          <span className="sd-wordmark whitespace-nowrap font-[family-name:var(--font-display)] text-[17px] font-extrabold uppercase tracking-[0.03em]">
+          <span className="sd-wordmark hidden whitespace-nowrap md:inline font-[family-name:var(--font-display)] text-[17px] font-extrabold uppercase tracking-[0.03em]">
             Store Desk
           </span>
         </Link>

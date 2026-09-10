@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Figtree, JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastContext";
 import { CAPABILITIES, SITE } from "@/lib/site";
@@ -8,20 +8,14 @@ import { SITE_URL } from "@/lib/metadata";
 /*
  * Type system.
  *
- * Figtree for reading: open apertures and a tall x-height keep 16–18px body
- * copy easy on a back-office monitor. Bricolage Grotesque for headings: a
- * grotesque with some ink-trap character, so a page title reads as a brand
- * rather than a form label. JetBrains Mono for PLUs, prices and margins, where
- * digits have to line up.
+ * Plus Jakarta Sans for everything people read: sturdy at 800 for headings,
+ * even and dark at 400-500 for body copy. One family keeps the pages calm;
+ * the first attempt paired a quirky display face with a light body and read
+ * as both "funky" and thin. JetBrains Mono is kept for code only — prices use
+ * tabular figures from the sans (`.sd-num`).
  */
-const sans = Figtree({
+const sans = Plus_Jakarta_Sans({
   variable: "--font-sans",
-  subsets: ["latin"],
-  display: "swap"
-});
-
-const display = Bricolage_Grotesque({
-  variable: "--font-display",
   subsets: ["latin"],
   display: "swap"
 });
@@ -123,7 +117,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${sans.variable} ${display.variable} ${mono.variable} antialiased`}>
+      <body className={`${sans.variable} ${mono.variable} antialiased`}>
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

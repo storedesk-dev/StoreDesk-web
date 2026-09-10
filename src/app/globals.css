@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  --font-display: var(--font-sans);
   --sd-blue: #1a63f4;
   --sd-blue-shadow: #0e43d8;
   --sd-green: #00a87b;
@@ -18,7 +19,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-display: var(--font-display);
+  --font-display: var(--font-sans);
 }
 
 body {
@@ -35,8 +36,9 @@ h1,
 h2,
 h3,
 h4 {
-  font-family: var(--font-display), var(--font-sans), "Segoe UI", system-ui, sans-serif;
-  letter-spacing: -0.025em;
+  font-family: var(--font-sans), "Segoe UI", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   line-height: 1.12;
   color: var(--foreground);
 }
@@ -95,8 +97,9 @@ h4 {
 /* Marketing reading sizes. Body copy under 16px was the main reason pages felt thin. */
 .sd-lede {
   font-size: clamp(1.0625rem, 1.2vw, 1.1875rem);
+  font-weight: 500;
   line-height: 1.6;
-  color: var(--muted);
+  color: #3b4a60;
 }
 .sd-eyebrow {
   font-size: 12.5px;
@@ -108,18 +111,18 @@ h4 {
 .sd-h1 {
   font-size: clamp(2.35rem, 4.6vw, 3.6rem);
   line-height: 1.03;
-  letter-spacing: -0.035em;
-  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-weight: 800;
   text-wrap: balance;
 }
 .sd-h2 {
   font-size: clamp(1.75rem, 3vw, 2.4rem);
   line-height: 1.08;
-  letter-spacing: -0.03em;
-  font-weight: 700;
+  letter-spacing: -0.035em;
+  font-weight: 800;
   text-wrap: balance;
 }
 .sd-num {
-  font-family: var(--font-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
