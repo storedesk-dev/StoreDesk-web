@@ -5,6 +5,7 @@ import { TenantStoreModel, WorkerInstallationModel, SetupKeyModel } from "@/mode
 import { issueSetupKey, hashSecret, publicId } from "@/lib/control-plane-security";
 import { writeAudit } from "@/lib/control-plane";
 import { z } from "zod";
+import { SITE } from "@/lib/site";
 
 const generateKeySchema = z.object({
   organizationId: z.string(),
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
         subscriptionId: store.subscriptionId,
         workerInstallationId,
         workerName: "Primary Edge Server",
-        contactEmail: store.contactEmail || "admin@storedesk.net",
+        contactEmail: store.contactEmail || SITE.email,
         status: "awaiting_activation"
       });
     }

@@ -74,8 +74,8 @@ export function DeviceStage() {
       <motion.div
         className="relative z-10 w-[275px] sm:w-[295px]"
         style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-        initial={{ opacity: 0, y: 36, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={{ y: 36, scale: 0.95 }}
+        animate={{ y: 0, scale: 1 }}
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
       >
         {/* Phone Outer Metallic Chassis with Dual Bevel */}

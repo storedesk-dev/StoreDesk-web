@@ -24,8 +24,8 @@ export function MarketingShell({
 }) {
   const reduceMotion = useReducedMotion();
   const rise = (delay: number) => ({
-    initial: { opacity: 0, y: reduceMotion ? 0 : 10 },
-    animate: { opacity: 1, y: 0 },
+    initial: { y: reduceMotion ? 0 : 10 },
+    animate: { y: 0 },
     transition: { duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : delay, ease: [0.22, 1, 0.36, 1] as const }
   });
 

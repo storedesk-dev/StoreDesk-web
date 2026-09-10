@@ -10,8 +10,8 @@
 
 export const SITE = {
   name: "StoreDesk",
-  email: "hello@storedesk.net",
-  supportEmail: "support@storedesk.net",
+  email: "storedesk.dev@gmail.com",
+  supportEmail: "storedesk.dev@gmail.com",
   domain: "storedesk.net",
   tagline: "Back-office software for convenience stores and gas stations",
   /** One sentence, used as the meta description and the hero subhead. */
@@ -56,8 +56,8 @@ export function contactMailto(options?: { subject?: string; body?: string }) {
 }
 
 export const NAV = [
-  { href: "/product", label: "What it does" },
+  { href: "/product", label: "Product" },
   { href: "/how-it-works", label: "How it works" },
-  { href: "/about", label: "Why we built it" },
+  { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" }
 ] as const;

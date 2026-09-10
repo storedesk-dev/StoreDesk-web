@@ -76,8 +76,8 @@ export function HowItWorksClient() {
         {STEPS.map((step, index) => (
           <motion.li
             key={step.n}
-            initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ y: reduceMotion ? 0 : 10 }}
+            whileInView={{ y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{
               duration: reduceMotion ? 0 : 0.4,

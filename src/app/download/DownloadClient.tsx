@@ -13,8 +13,8 @@ const RELEASE_BASE = `https://github.com/TRUPALIX9/StoreDesk/releases/download/$
 export function DownloadClient() {
   const reduceMotion = useReducedMotion();
   const rise = (delay: number) => ({
-    initial: { opacity: 0, y: reduceMotion ? 0 : 12 },
-    animate: { opacity: 1, y: 0 },
+    initial: { y: reduceMotion ? 0 : 12 },
+    animate: { y: 0 },
     transition: {
       duration: reduceMotion ? 0 : 0.42,
       delay: reduceMotion ? 0 : delay,
