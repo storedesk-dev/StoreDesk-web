@@ -5,7 +5,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2, Save, Server, ShieldCheck, Activity, KeyRound, Copy, Check, Settings2 } from "lucide-react";
-import { JsonEditor } from "../../../../components/JsonEditor";
+import { ALL_PAGES } from "@/config/pages";
+
+interface PageEntry {
+  key: string;
+  enabled: boolean;
+  featureFlags: Record<string, boolean>;
+}
+interface RoleEntry {
+  roleName: string;
+  roleId: string;
+  accessKeys: { electron: { pages: PageEntry[] }; mobile: { pages: PageEntry[] } };
+}
 
 export default function AdminStoreDetailPage() {
   const { toast } = useToast();
@@ -24,6 +35,25 @@ export default function AdminStoreDetailPage() {
 
   // Editable fields
   const [configJson, setConfigJson] = useState("");
+
+  /**
+   * Roles live on the Organization, not in the store's configJson.
+   *
+   * This editor previously read and wrote `configJson.roles`, which nothing
+   * reads: `assignmentSummaries`, `issueClientSession` and `buildEdgeConfigJson`
+   * all resolve roles from `Organization.roles`. Every toggle an operator made
+   * here was saved somewhere with no effect.
+   */
+  const [orgRoles, setOrgRoles] = useState<RoleEntry[]>([]);
+  const [rolesSaving, setRolesSaving] = useState(false);
+
+  // Register credentials, set here and delivered to the store's Worker.
+  const [posHost, setPosHost] = useState("");
+  const [posUser, setPosUser] = useState("");
+  const [posPassword, setPosPassword] = useState("");
+  const [posPasswordOnFile, setPosPasswordOnFile] = useState(false);
+  const [posSecretStorage, setPosSecretStorage] = useState(true);
+  const [posSaving, setPosSaving] = useState(false);
   const [licensePlan, setLicensePlan] = useState("");
   const [tunnelUrl, setTunnelUrl] = useState("");
 
@@ -201,10 +231,79 @@ export default function AdminStoreDetailPage() {
       if (data.store.tunnelUrl) {
         checkTunnelStatus();
       }
+      void loadRoles();
+      void loadPosCredentials();
     } catch (err: unknown) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadRoles() {
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/roles`);
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.roles)) setOrgRoles(data.roles as RoleEntry[]);
+    } catch {
+      toast("Could not load roles for this organization.", "error");
+    }
+  }
+
+  async function saveRoles(next: RoleEntry[]) {
+    setOrgRoles(next);
+    setRolesSaving(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/roles`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roles: next })
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || "Save failed");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not save role access.", "error");
+      void loadRoles();
+    } finally {
+      setRolesSaving(false);
+    }
+  }
+
+  async function loadPosCredentials() {
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}/pos-credentials`);
+      const data = await res.json();
+      if (!res.ok) return;
+      setPosHost(data.posIpAddress || "");
+      setPosUser(data.posUsername || "");
+      setPosPasswordOnFile(Boolean(data.passwordOnFile));
+      setPosSecretStorage(data.secretStorageAvailable !== false);
+    } catch {
+      /* non-fatal: the section shows empty fields */
+    }
+  }
+
+  async function savePosCredentials() {
+    setPosSaving(true);
+    try {
+      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}/pos-credentials`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          posIpAddress: posHost.trim(),
+          posUsername: posUser.trim(),
+          // Omitted when blank, so the stored password survives a host edit.
+          ...(posPassword ? { posPassword } : {})
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || "Save failed");
+      setPosPassword("");
+      setPosPasswordOnFile(Boolean(data.passwordOnFile));
+      toast("Register settings saved. The store's Worker picks them up on its next sync.", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not save register settings.", "error");
+    } finally {
+      setPosSaving(false);
     }
   }
 
@@ -457,49 +556,40 @@ export default function AdminStoreDetailPage() {
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
           <div className="flex items-center gap-2 mb-1">
             <Settings2 className="h-5 w-5 text-indigo-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Role Access & Page Flags</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Role access</h2>
+            {rolesSaving ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+              </span>
+            ) : null}
           </div>
           <p className="text-sm text-gray-500 mb-6">
-            Each role has its own page access list and per-page feature flags. The app reads the matching role at login and only shows those pages.
+            Each role gets its own list of pages. Changes save as you toggle them, and
+            apply the next time someone with that role signs in.
           </p>
 
           {(() => {
-            interface PageEntry { key: string; enabled: boolean; featureFlags: Record<string, boolean> }
-            interface RoleEntry { roleName: string; roleId: string; accessKeys: { electron: { pages: PageEntry[] }; mobile: { pages: PageEntry[] } } }
+            const roles = orgRoles;
 
-            let parsed: Record<string, unknown> = {};
-            try { parsed = configJson.trim() ? JSON.parse(configJson) : {}; } catch { }
-            const roles = (parsed.roles as RoleEntry[]) || [];
-
-            const PAGE_META: Record<string, { label: string; desc: string; flags: Record<string, string> }> = {
-              pos:              { label: "POS Workspace",       desc: "Point-of-sale terminal.",                     flags: { enableRefunds: "Refunds", enableDiscounts: "Discounts", enableVoidTransaction: "Void Txn", enableCashDrawer: "Cash Drawer" } },
-              dashboard:        { label: "Dashboard",           desc: "Overview cards and setup checklist.",          flags: {} },
-              products:         { label: "Products",            desc: "Product catalog management.",                  flags: { enableBulkImport: "Bulk Import", enableBarcodeGeneration: "Barcode Gen" } },
-              vendors:          { label: "Vendors",             desc: "Vendor directory.",                            flags: {} },
-              vendorPrices:     { label: "Vendor Prices",       desc: "Manual vendor price entry.",                   flags: {} },
-              priceBook:        { label: "Price Book",          desc: "Selling price management.",                    flags: {} },
-              costAnalysis:     { label: "Cost Analysis",       desc: "Cross-vendor cost comparison.",               flags: {} },
-              transactions:     { label: "Transactions",        desc: "Transaction history and reporting.",           flags: { enableExport: "Export CSV", enableRefundView: "Refund View" } },
-              manageWorker:     { label: "Manage Worker",       desc: "Edge server status and controls.",             flags: {} },
-              settings:         { label: "Settings",            desc: "Store settings and POS config.",               flags: {} },
-              mobilePos:           { label: "POS (Mobile)",          desc: "Mobile point-of-sale.",                  flags: { enableManualEntry: "Manual Entry", enableQuickSale: "Quick Sale" } },
-              mobileDashboard:     { label: "Dashboard (Mobile)",    desc: "Mobile home screen.",                    flags: {} },
-              mobileScanner:       { label: "Barcode Scanner",       desc: "Camera barcode scanner.",                flags: { enableCameraFlash: "Camera Flash", enableManualEntry: "Manual Code" } },
-              mobileProductSearch: { label: "Product Search",        desc: "Search products by name/UPC.",           flags: {} },
-              mobileVendorPrices:  { label: "Vendor Prices (Mobile)",desc: "View vendor pricing on mobile.",         flags: {} },
-              mobilePriceBook:     { label: "Price Book (Mobile)",   desc: "View selling prices on mobile.",         flags: {} },
-              mobileTransactions:  { label: "Transactions (Mobile)", desc: "View transaction history.",              flags: { enableExport: "Export CSV" } },
-              mobileReports:       { label: "Reports (Mobile)",      desc: "Sales and inventory reports.",           flags: {} },
-              mobileAnalytics:     { label: "Analytics (Mobile)",    desc: "Revenue charts and trends.",             flags: {} },
-              mobileSalesTax:      { label: "Sales Tax (Mobile)",    desc: "Sales tax management.",                  flags: {} },
-            };
+            // Labels, descriptions and flags come from the generated registry
+            // mirror. This was a hand-maintained fourth copy of the page list,
+            // so a new page silently rendered with a raw key and no toggles.
+            const PAGE_META: Record<string, { label: string; desc: string; flags: Record<string, string> }> =
+              Object.fromEntries(
+                ALL_PAGES.map((page) => [
+                  page.key,
+                  {
+                    label: page.label,
+                    desc: page.description,
+                    flags: Object.fromEntries(
+                      Object.entries(page.knownFeatureFlags).map(([flag, def]) => [flag, def.label])
+                    )
+                  }
+                ])
+              );
 
             const updateRoles = (newRoles: RoleEntry[]) => {
-              try {
-                const np: Record<string, unknown> = configJson.trim() ? JSON.parse(configJson) : {};
-                np.roles = newRoles;
-                setConfigJson(JSON.stringify(np, null, 2));
-              } catch { toast("Cannot update while JSON is invalid.", "error"); }
+              void saveRoles(newRoles);
             };
 
             const togglePage = (ri: number, app: "electron" | "mobile", pageKey: string) => {
@@ -677,20 +767,76 @@ export default function AdminStoreDetailPage() {
           })()}
         </div>
 
-        {/* Configuration JSON */}
+        {/* Register credentials */}
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <ShieldCheck className="h-5 w-5 text-amber-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Advanced Configuration</h2>
+          <div className="flex items-center gap-2 mb-1">
+            <Server className="h-5 w-5 text-blue-500" />
+            <h2 className="text-lg font-semibold text-gray-900">Register connection</h2>
           </div>
-          <p className="text-sm text-gray-500 mb-4">
-            Paste raw JSON configuration overrides for this store. These settings will override global configurations for edge deployments and integrations.
+          <p className="text-sm text-gray-500 mb-5">
+            The Verifone Commander this store reads prices and sales from. Saved here, it
+            reaches the store&apos;s Worker automatically — no need to read it down the phone.
           </p>
-          <JsonEditor 
-            value={configJson} 
-            onChange={setConfigJson} 
-            placeholder={'{\n  "posIntegration": "verifone_commander",\n  "posIpAddress": "",\n  "posUsername": "",\n  "posPassword": "",\n  "featureFlags": {}\n}'}
-          />
+
+          {!posSecretStorage && (
+            <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+              This deployment has no <code className="font-mono">STORE_SECRET_KEY</code>, so a
+              register password cannot be stored. Address and username still save.
+            </div>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Register address</label>
+              <input
+                type="text"
+                value={posHost}
+                onChange={(event) => setPosHost(event.target.value)}
+                placeholder="192.168.31.11"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Just the IP is enough — StoreDesk adds https and port 443.
+              </p>
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <input
+                type="text"
+                value={posUser}
+                onChange={(event) => setPosUser(event.target.value)}
+                placeholder="MANAGER"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">Needs the vPLUs permission.</p>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input
+                type="password"
+                value={posPassword}
+                onChange={(event) => setPosPassword(event.target.value)}
+                placeholder={posPasswordOnFile ? "Saved — leave blank to keep it" : "Enter the register password"}
+                disabled={!posSecretStorage}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Encrypted before it is stored, and sent only to this store&apos;s Worker.
+                It is never shown again.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              onClick={() => void savePosCredentials()}
+              disabled={posSaving || !posHost.trim() || !posUser.trim()}
+              className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+            >
+              {posSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {posSaving ? "Saving…" : "Save register connection"}
+            </button>
+          </div>
         </div>
 
         {/* Setup & Activation Panel */}

@@ -4,26 +4,28 @@ import { buildEdgeConfigJson, jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
 import { TenantStoreModel } from "@/models/ControlPlane";
 import { ControlPlaneError, safeJson } from "@/lib/control-plane-security";
+import { isStoreSecretConfigured, openStoreSecret, sealStoreSecret } from "@/lib/store-secrets";
 import { z } from "zod";
 
 /**
  * Store configuration the edge may push up.
  *
- * `posPassword` is deliberately absent and is rejected by `.strict()`. The
- * register password is a purely local secret: the Worker is the only thing that
- * ever dials the register, and it does so over the store LAN. Sending it to the
- * control plane put a plaintext POS credential in Atlas, in this request body,
- * in `configJson`, and — because `configJson` is handed to every client of the
- * store — in front of every signed-in user. None of that bought anything.
+ * `posPassword` is accepted so an operator can set the register credential from
+ * any surface — desktop, phone, or the control plane — and have it reach every
+ * other one. It is never stored the way it arrives:
  *
- * The password is entered once in the desktop app's Settings page and stays on
- * the store PC. Host and username are ordinary configuration and may sync.
+ *   - encrypted at rest in its own `select: false` field, not in `configJson`;
+ *   - stripped from `configJson`, which is handed to every signed-in client;
+ *   - returned only to the store's own authenticated Worker, over TLS.
+ *
+ * A client can set it. No client can read it back.
  */
 const EdgeConfigSchema = z
   .object({
     posIntegration: z.literal("verifone_commander"),
     posIpAddress: z.string().optional(),
     posUsername: z.string().optional(),
+    posPassword: z.string().optional(),
     featureFlags: z.record(z.string(), z.boolean()).optional()
   })
   .strict();
@@ -31,17 +33,15 @@ const EdgeConfigSchema = z
 export async function PUT(req: Request) {
   try {
     const worker = await authenticateWorker(req);
-    const raw = (await req.json()) as Record<string, unknown>;
+    const body = EdgeConfigSchema.parse(await req.json());
 
-    if ("posPassword" in raw) {
+    if (body.posPassword && !isStoreSecretConfigured()) {
       throw new ControlPlaneError(
-        400,
-        "REQUEST_INVALID",
-        "posPassword is not accepted: register credentials stay on the store PC"
+        503,
+        "STORE_SECRET_UNAVAILABLE",
+        "STORE_SECRET_KEY is not set on this deployment, so a register password cannot be stored."
       );
     }
-
-    const body = EdgeConfigSchema.parse(raw);
 
     await connectDb();
     const store = await TenantStoreModel.findOne({
@@ -58,11 +58,16 @@ export async function PUT(req: Request) {
         /* an unparseable stored config is replaced wholesale */
       }
     }
-    const merged: Record<string, unknown> = { ...current, ...body };
-    // Scrub any password left in the store document by an older build.
+    // The password takes the encrypted path; everything else is ordinary config.
+    const { posPassword, ...publicConfig } = body;
+    const merged: Record<string, unknown> = { ...current, ...publicConfig };
+    // Scrub any plaintext password left in the document by an older build.
     delete merged.posPassword;
 
     store.configJson = JSON.stringify(merged, null, 2);
+    if (posPassword) {
+      store.set("posPasswordCipher", sealStoreSecret(posPassword));
+    }
     await store.save();
 
     return NextResponse.json({ store: safeJson(store.toObject()) });
@@ -89,7 +94,7 @@ export async function GET(req: Request) {
       organizationId: worker.organizationId,
       storeId: worker.storeId
     })
-      .select("+cloudflareToken")
+      .select("+cloudflareToken +posPasswordCipher")
       .lean();
     if (!store) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Store not found");
 
@@ -97,7 +102,11 @@ export async function GET(req: Request) {
       {
         configJson: await buildEdgeConfigJson(worker.organizationId, store),
         cloudflareToken: store.cloudflareToken ? String(store.cloudflareToken) : null,
-        tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null
+        tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null,
+        // Delivered here and nowhere else. The caller is this store's own
+        // Worker, proven by its credential; `configJson` above deliberately
+        // does not contain it, because that blob reaches every client.
+        posPassword: openStoreSecret(store.posPasswordCipher)
       },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );

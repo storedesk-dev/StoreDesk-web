@@ -78,7 +78,14 @@ const TenantStoreSchema = new Schema(
     // Bearer credential for the store hostname. Never selected by default —
     // read it explicitly (`.select("+cloudflareToken")`) at the two places
     // that are allowed to: the audited admin reveal, and edge config sync.
-    cloudflareToken: { type: String, trim: true, select: false }
+    cloudflareToken: { type: String, trim: true, select: false },
+    /**
+     * Verifone Commander password, AES-256-GCM encrypted (see lib/store-secrets).
+     * Set from the control plane or pushed up by the Worker; delivered only to
+     * the authenticated Worker, never to a browser or a phone, and never inside
+     * configJson — that blob reaches every signed-in client of the store.
+     */
+    posPasswordCipher: { type: String, select: false }
   },
   timestamps
 );
