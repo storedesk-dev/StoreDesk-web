@@ -1,14 +1,28 @@
 name: CI
 
+# Public repo: runs cost no Actions minutes, so develop and production are
+# both checked. Docs-only pushes are skipped. See docs/ci.md in the parent repo.
+
 on:
   push:
     branches: [production, develop]
+    paths-ignore: ['**.md', 'docs/**']
   pull_request:
     branches: [production, develop]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
