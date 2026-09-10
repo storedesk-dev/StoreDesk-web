@@ -13,10 +13,10 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-xl font-bold text-[var(--ink)]">Local-First Store Data Architecture</h2>
+          <h2 className="text-xl font-bold text-[var(--ink)]">Where your store data lives</h2>
           <p>
-            In the store, catalog and ops data are intended to stay on the backoffice PC running StoreDesk Worker. 
-            StoreDesk Desktop and Mobile talk only to that local Worker — not to a shared cloud product database.
+            Your catalogue, prices and sales history are stored on the back-office PC in your store. The desktop
+            and phone apps read them from that PC — there is no shared cloud database holding your store&apos;s figures.
           </p>
         </section>
 
@@ -27,10 +27,10 @@ export default function PrivacyPage() {
           </p>
           <ul className="list-disc pl-5 space-y-1">
             <li>
-              <strong>Camera Permission:</strong> Used exclusively for scanning product UPC barcodes, QR codes, and vendor invoice items in real time.
+              <strong>Camera Permission:</strong> Used only to scan product barcodes on the shop floor. Nothing the camera sees is stored or sent anywhere.
             </li>
             <li>
-              <strong>Media & Photos Permission:</strong> Used solely when a user explicitly chooses to select a stored barcode photo or vendor invoice image from device storage.
+              <strong>Media & Photos Permission:</strong> Used only when you choose a saved photo of a barcode to look up. The image is read on the phone and not uploaded.
             </li>
           </ul>
           <p>

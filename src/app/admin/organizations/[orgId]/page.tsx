@@ -8,6 +8,9 @@ import { Store, Users, ArrowLeft, Loader2, UserPlus, RefreshCw, Mail, CreditCard
 import { RolePreview } from "./RolePreview";
 import { getPage } from "@/config/pages";
 
+/** Matches cloudflare.ts's default; override with NEXT_PUBLIC_TUNNEL_DOMAIN. */
+const TUNNEL_DOMAIN = process.env.NEXT_PUBLIC_TUNNEL_DOMAIN ?? "tunnels.storedesk.net";
+
 type OrgUser = {
   appUserId: string;
   email: string;
@@ -233,7 +236,11 @@ export default function AdminOrganizationDetailPage() {
         loadData();
       } else {
         const data = await res.json();
-        toast(data.error?.message || typeof data.error === "string" ? data.error : (data.error?.code || "Failed to create store"), "error");
+        const message =
+          typeof data.error === "string"
+            ? data.error
+            : data.error?.message || data.error?.code || "Could not create the store.";
+        toast(message, "error");
       }
     } catch {
       toast("Failed to create store", "error");
@@ -426,6 +433,12 @@ export default function AdminOrganizationDetailPage() {
                 <p className="text-sm text-gray-500">Stores provisioned under this organization.</p>
                 <button
                   onClick={() => setIsCreatingStore(true)}
+                  disabled={!subscriptions.some((sub) => sub.status === "active" || sub.status === "trialing")}
+                  title={
+                    subscriptions.some((sub) => sub.status === "active" || sub.status === "trialing")
+                      ? undefined
+                      : "Add a plan or trial on the Billing tab first"
+                  }
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--sd-blue)] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                 >
                   <Store className="h-4 w-4" />
@@ -1235,7 +1248,7 @@ export default function AdminOrganizationDetailPage() {
             className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold">Provision New Store</h2>
+              <h2 className="text-lg font-bold">Add a store</h2>
               <button 
                 type="button" 
                 onClick={() => setIsCreatingStore(false)}
@@ -1257,7 +1270,9 @@ export default function AdminOrganizationDetailPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Store ID / Number</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Store number <span className="font-normal text-gray-400">(optional)</span>
+                </label>
                 <input
                   type="text"
                   value={newStoreId}
@@ -1267,7 +1282,9 @@ export default function AdminOrganizationDetailPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tunnel Slug</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone app address <span className="font-normal text-gray-400">(optional)</span>
+                </label>
                 <div className="flex rounded-xl border border-gray-200 overflow-hidden focus-within:border-[var(--sd-blue)]">
                   <input
                     type="text"
@@ -1277,10 +1294,13 @@ export default function AdminOrganizationDetailPage() {
                     placeholder="e.g. hop-in"
                   />
                   <span className="bg-gray-50 border-l border-gray-200 px-3 py-2 text-sm text-gray-500 font-mono flex-shrink-0">
-                    .storedesk.net
+                    .{TUNNEL_DOMAIN}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Leave empty to auto-generate from Store ID</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Where the phone app reaches this store. Leave blank and it is made from the store
+                  name — letters, numbers and hyphens only.
+                </p>
               </div>
             </div>
             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">

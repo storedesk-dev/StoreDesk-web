@@ -1,39 +1,64 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
+/**
+ * Frame for every page except the landing page.
+ *
+ * The header block is a grid ground with a rule under it, not a blurred
+ * gradient — see `.sd-hero-wash`. `lede` exists so a page can say what it is in
+ * a sentence instead of dropping the reader straight into body copy.
+ */
 export function MarketingShell({
   children,
   title,
-  eyebrow
+  eyebrow,
+  lede
 }: {
   children: ReactNode;
   title: string;
   eyebrow?: string;
+  lede?: string;
 }) {
+  const reduceMotion = useReducedMotion();
+  const rise = (delay: number) => ({
+    initial: { opacity: 0, y: reduceMotion ? 0 : 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : delay, ease: [0.22, 1, 0.36, 1] as const }
+  });
+
   return (
     <div className="min-h-screen text-[var(--foreground)]">
-      <SiteHeader solid />
-      <div className="relative overflow-hidden border-b border-[var(--border)] sd-hero-wash">
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/80 to-transparent" />
-        <div className="relative mx-auto max-w-6xl px-6 py-14 md:py-20">
+      <SiteHeader />
+      <div className="sd-hero-wash relative border-b border-[var(--border)]">
+        <div className="relative mx-auto max-w-6xl px-6 py-16 md:py-20">
           {eyebrow ? (
-            <p className="mb-4 inline-flex rounded-full bg-gradient-to-r from-[#1A63F4]/15 to-[#00A87B]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--sd-blue)]">
+            <motion.p
+              {...rise(0)}
+              className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#1A63F4]"
+            >
               {eyebrow}
-            </p>
+            </motion.p>
           ) : null}
           <motion.h1
-            className="max-w-3xl text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
+            {...rise(0.06)}
+            className="max-w-3xl text-balance text-[32px] font-semibold leading-[1.1] tracking-[-0.02em] md:text-[44px]"
           >
             {title}
           </motion.h1>
+          {lede ? (
+            <motion.p
+              {...rise(0.12)}
+              className="mt-5 max-w-2xl text-[17px] leading-relaxed text-[var(--muted)]"
+            >
+              {lede}
+            </motion.p>
+          ) : null}
         </div>
       </div>
-      <div className="mx-auto max-w-6xl px-6 py-12 md:py-14">{children}</div>
+      <div className="mx-auto max-w-6xl px-6 py-14 md:py-16">{children}</div>
       <SiteFooter />
     </div>
   );

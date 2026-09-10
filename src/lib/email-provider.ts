@@ -1,3 +1,57 @@
+import { SITE } from "@/lib/site";
+
+/**
+ * Setup keys expire on a clock the recipient can read. Rendered in Eastern time
+ * with the zone named, because StoreDesk's stores are US convenience stores and
+ * a raw UTC ISO string ("2026-09-11T02:44:00.000Z") reads as noise — or as the
+ * wrong day — to someone opening this on a phone in a back office.
+ */
+function formatExpiry(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short"
+  }).format(date);
+}
+
+/**
+ * The first message a new customer ever receives from StoreDesk.
+ *
+ * It previously gave them a key and no instructions, described the setup in
+ * internal terms ("StoreDesk Worker", "permanent Worker credential"), and told
+ * them to contact support without saying how. It now says what the key is for,
+ * exactly what to do with it, when it runs out, and who to ask.
+ */
+export function setupKeyEmailText(message: SetupKeyMessage): string {
+  return [
+    `Hello ${message.recipientName},`,
+    "",
+    `${message.organizationName} has set up StoreDesk for ${message.storeName}. Here is the key you need to finish installing it on the store's back-office PC.`,
+    "",
+    `    ${message.setupKey}`,
+    "",
+    "To use it:",
+    `  1. On the back-office PC, download StoreDesk from https://${SITE.domain}/download`,
+    "  2. Run the installer and open StoreDesk.",
+    "  3. When it asks for a setup key, paste the key above.",
+    "",
+    `The key works once and expires ${formatExpiry(message.expiresAt)}.`,
+    "If it runs out before you get to it, just reply and we will send a new one.",
+    "",
+    "Keep this email to yourself — anyone with the key can connect a computer to your store.",
+    "",
+    `Questions? Reply to this email or write to ${SITE.supportEmail}.`,
+    "",
+    "— StoreDesk",
+    "",
+    "If you were not expecting this, you can ignore it; nothing happens until the key is used."
+  ].join("\n");
+}
+
 export type SetupKeyMessage = {
   to: string;
   recipientName: string;
@@ -32,17 +86,10 @@ class ResendEmailProvider implements EmailProvider {
       body: JSON.stringify({
         from: this.from,
         to: [message.to],
-        subject: `StoreDesk setup key for ${message.storeName}`,
-        text: [
-          `Hello ${message.recipientName},`,
-          "",
-          `${message.organizationName} authorized StoreDesk Worker setup for ${message.storeName}.`,
-          `Setup key: ${message.setupKey}`,
-          `Expires: ${message.expiresAt.toISOString()}`,
-          "",
-          "This key is single-use. It is not a permanent Worker credential.",
-          "If you did not expect this message, contact StoreDesk support."
-        ].join("\n")
+        subject: `Your StoreDesk setup key for ${message.storeName}`,
+        // Replies go to a person, so "reply to this email" in the body is true.
+        reply_to: SITE.supportEmail,
+        text: setupKeyEmailText(message)
       })
     });
     const data = (await response.json().catch(() => ({}))) as { id?: string; message?: string };

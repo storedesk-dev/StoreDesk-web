@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Source_Sans_3, Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastContext";
+import { SITE } from "@/lib/site";
+import { SITE_URL } from "@/lib/metadata";
 
 const sans = Source_Sans_3({
   variable: "--font-sans",
@@ -15,76 +17,43 @@ const mono = Source_Code_Pro({
   weight: ["400", "600"]
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-desk-prod.vercel.app";
+const siteUrl = SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "StoreDesk — Local-First C-Store Backoffice, Price Book & POS Integration",
-    template: "%s | StoreDesk"
+    default: "StoreDesk — back-office software for convenience stores",
+    template: "%s · StoreDesk"
   },
-  description:
-    "StoreDesk — local-first convenience store and gas station backoffice software. Run StoreDesk Worker on your store PC with Desktop management and Mobile barcode scanning. Price Book, Vendor Cost tracking, and Verifone Commander sync.",
+  description: SITE.summary,
   applicationName: "StoreDesk",
-  keywords: [
-    "StoreDesk",
-    "StoreDesk Trupal",
-    "Trupal StoreDesk",
-    "StoreDesk Worker",
-    "StoreDesk Mobile",
-    "StoreDesk Desktop",
-    "StoreDesk Web",
-    "StoreDesk Install",
-    "StoreDesk Download",
-    "StoreDesk setup",
-    "c-store backoffice software",
-    "convenience store price book",
-    "gas station backoffice software",
-    "Verifone Commander backoffice",
-    "vendor cost comparison",
-    "barcode scanning c-store",
-    "convenience store software",
-    "c-store price book margin tracking"
-  ],
-  authors: [
-    { name: "Trupal (StoreDesk)", url: siteUrl },
-    { name: "StoreDesk Team", url: siteUrl }
-  ],
-  creator: "Trupal",
+  // No keywords array. Search engines have ignored the meta keywords tag for
+  // over a decade, and the previous list read as keyword stuffing to anyone who
+  // viewed source.
+  authors: [{ name: "StoreDesk" }],
   publisher: "StoreDesk",
-  alternates: {
-    canonical: siteUrl
-  },
+  alternates: { canonical: siteUrl },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: siteUrl,
     siteName: "StoreDesk",
-    title: "StoreDesk — Local-First C-Store Backoffice & Price Book Software",
-    description:
-      "StoreDesk: StoreDesk Worker on your store PC, Desktop management, and Mobile floor scanner. Price Book, vendor costs, POS reports, and Verifone Commander integration.",
+    title: "StoreDesk — back-office software for convenience stores",
+    description: SITE.summary,
     images: [
       {
         url: `${siteUrl}/brand/logo-lockup-horizontal.png`,
         width: 1200,
         height: 400,
-        alt: "StoreDesk C-Store Platform"
+        alt: "StoreDesk"
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
-    title: "StoreDesk — Local-First C-Store Backoffice Software",
-    description:
-      "StoreDesk: Worker on your store PC, Desktop dashboard, and Mobile floor scanner. Built for convenience stores & gas stations.",
+    title: "StoreDesk — back-office software for convenience stores",
+    description: SITE.summary,
     images: [`${siteUrl}/brand/logo-lockup-horizontal.png`]
-  },
-  icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/brand/logo-mark.png", type: "image/jpeg" }
-    ],
-    apple: [{ url: "/brand/logo-mark.png", type: "image/jpeg" }]
   },
   verification: {
     google: "ELm9u6dJOxQAaNx5-2-a8-u1wsPVVsjgEBJD9TDN3Jw"
@@ -92,12 +61,7 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1
-    }
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 }
   }
 };
 
@@ -110,21 +74,8 @@ const jsonLd = {
       "name": "StoreDesk",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Windows, macOS, Android",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "description":
-        "Local-first desktop, edge worker, and mobile backoffice platform for convenience stores and gas stations.",
-      "author": {
-        "@type": "Person",
-        "name": "Trupal"
-      },
-      "creator": {
-        "@type": "Organization",
-        "name": "StoreDesk"
-      }
+      "description": SITE.summary,
+      "creator": { "@type": "Organization", "name": "StoreDesk" }
     },
     {
       "@type": "Organization",
@@ -139,7 +90,7 @@ const jsonLd = {
       "@id": `${siteUrl}/#website`,
       "url": siteUrl,
       "name": "StoreDesk",
-      "description": "StoreDesk Web — C-Store Backoffice, Price Book & POS Integration",
+      "description": SITE.summary,
       "publisher": {
         "@id": `${siteUrl}/#organization`
       }

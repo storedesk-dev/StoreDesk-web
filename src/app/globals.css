@@ -52,11 +52,31 @@ h4 {
   background: linear-gradient(135deg, rgba(26, 99, 244, 0.14), rgba(0, 168, 123, 0.12));
 }
 
+/*
+ * Page-header ground.
+ *
+ * A faint grid rather than a blurred gradient. Two soft radial washes over a
+ * pale ground read as "AI landing page" on sight, and they gave every header
+ * the same shapeless blue-green smear regardless of the page. A grid suits the
+ * subject — this is software for counting stock and reconciling tills — and it
+ * gives the type an edge to sit against.
+ */
 .sd-hero-wash {
-  background:
-    radial-gradient(ellipse 70% 55% at 12% 10%, rgba(26, 99, 244, 0.28), transparent 55%),
-    radial-gradient(ellipse 60% 50% at 88% 20%, rgba(0, 168, 123, 0.22), transparent 50%),
-    linear-gradient(165deg, #dce8ff 0%, #eef6ff 40%, #e3f8ef 100%);
+  background-color: #FBFCFD;
+  background-image:
+    linear-gradient(to right, rgba(23, 32, 42, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(23, 32, 42, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  background-position: center top;
+}
+
+/* Fades the grid out at the edges so it never competes with the content. */
+.sd-hero-wash::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 90% 70% at 50% 0%, transparent 30%, #FBFCFD 92%);
 }
 
 .perspective-\[1200px\] {

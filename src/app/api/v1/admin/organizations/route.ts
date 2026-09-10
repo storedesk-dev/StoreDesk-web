@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireInternalAdmin } from "@/lib/admin-auth";
-import { createOrganization, jsonError } from "@/lib/control-plane";
+import { createOrganization, jsonError, provisionAppUser } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
-import { safeJson, issueSetupKey, hashSecret, publicId } from "@/lib/control-plane-security";
-import { AppUserModel, UserAssignmentModel, OrganizationModel, TenantStoreModel } from "@/models/ControlPlane";
+import { ControlPlaneError, safeJson } from "@/lib/control-plane-security";
+import { OrganizationModel, TenantStoreModel } from "@/models/ControlPlane";
 
 export async function GET(req: Request) {
   try {
@@ -40,38 +40,31 @@ export async function POST(req: Request) {
       billingEmail: body.billingEmail
     });
 
-    let setupKeyPlaintext = null;
+    // The optional owner goes through the canonical AppUser path.
+    //
+    // This block used to hand-roll the user with an `apu_` id — but
+    // `enrollAppUser` only accepts `appu_`, so the owner's enrollment always
+    // failed. It also returned a *worker* setup key rather than an enrollment
+    // credential, and created an assignment with no store or installation,
+    // which `issueClientSession` can never resolve into a session. The owner is
+    // now created properly and assigned to stores once those stores exist.
+    let enrollmentCredential: string | null = null;
+    let ownerNotice: string | null = null;
 
     if (body.ownerEmail?.trim()) {
-      const email = body.ownerEmail.trim().toLowerCase();
-      let appUser = await AppUserModel.findOne({ email });
-
-      if (!appUser) {
-        const setupKey = issueSetupKey();
-        const secretHash = await hashSecret(setupKey.secret);
-        
-        appUser = await AppUserModel.create({
-          appUserId: publicId("apu"),
-          email,
-          status: "pending_enrollment",
-          enrollmentSecretHash: secretHash,
-          enrollmentExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-          createdByAdminId: admin.adminId
-        });
-        setupKeyPlaintext = setupKey.plaintext;
+      try {
+        const owner = await provisionAppUser(admin, { email: body.ownerEmail });
+        enrollmentCredential = owner.enrollmentCredential;
+      } catch (error) {
+        if (error instanceof ControlPlaneError && error.code === "RESOURCE_EXISTS") {
+          ownerNotice = "That email already has a StoreDesk account. Assign it to this organization's stores from the Users tab.";
+        } else {
+          throw error;
+        }
       }
-
-      await UserAssignmentModel.create({
-        assignmentId: publicId("asn"),
-        appUserId: appUser.appUserId,
-        organizationId: organization.organizationId,
-        role: "org_admin", // Organization Owner role
-        status: "active",
-        createdByAdminId: admin.adminId
-      });
     }
 
-    return NextResponse.json({ organization, setupKey: setupKeyPlaintext }, { status: 201 });
+    return NextResponse.json({ organization, enrollmentCredential, ownerNotice }, { status: 201 });
   } catch (error) {
     return jsonError(error);
   }

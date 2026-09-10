@@ -203,6 +203,26 @@ export async function createSubscription(
   return safeJson(doc.toObject());
 }
 
+/**
+ * Turn anything an operator types into a valid DNS label.
+ *
+ * The tunnel hostname is `<label>.<tunnel domain>`. When the slug was left
+ * blank, `createStore` fell back to the generated `store_<hex>` id — and an
+ * underscore is not allowed in a hostname label, so the tunnel's DNS record
+ * could not be created. Labels are lowercase letters, digits and hyphens,
+ * no leading or trailing hyphen, at most 63 characters (RFC 1035).
+ */
+export function toDnsLabel(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63)
+    .replace(/-+$/, "");
+}
+
 export async function createStore(
   admin: InternalAdminActor,
   organizationId: string,
@@ -233,7 +253,15 @@ export async function createStore(
   let tunnelUrl: string | undefined;
 
   try {
-    const cf = await provisionCloudflareTunnel(storeId, body.slug || storeId);
+    // Prefer what the operator typed, then the store's name, then its number.
+    // The generated storeId is a last resort and still passes through
+    // toDnsLabel, which strips the underscore that made it an invalid hostname.
+    const tunnelLabel =
+      toDnsLabel(body.slug ?? "") ||
+      toDnsLabel(body.name ?? "") ||
+      toDnsLabel(body.storeNumber ?? "") ||
+      toDnsLabel(storeId);
+    const cf = await provisionCloudflareTunnel(storeId, tunnelLabel);
     if (cf) {
       cloudflareToken = cf.cloudflareToken;
       tunnelUrl = cf.tunnelUrl;

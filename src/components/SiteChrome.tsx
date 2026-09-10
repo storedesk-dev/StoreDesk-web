@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { NAV, SITE, contactMailto } from "@/lib/site";
 
 const NAV_ITEMS = [{ href: "/", label: "Home" }, ...NAV] as const;
@@ -14,122 +14,159 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SiteHeader({ solid = false }: { solid?: boolean }) {
+/**
+ * Site header.
+ *
+ * Two deliberate changes from the previous version:
+ *
+ * The bar is 56px instead of 88px. It held a 64px-tall lockup on a single line,
+ * which spent a tenth of a laptop viewport on a logo. The mark carries the
+ * identity at small sizes; the wordmark sits beside it and drops on mobile.
+ *
+ * The background is one flat surface, not a gradient behind a blur behind
+ * another gradient. Stacking those made the type sit on an inconsistent ground
+ * and cost a compositing layer on every scroll frame.
+ */
+export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname() || "/";
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Close the mobile menu on navigation, or it stays open behind the new page.
+  useEffect(() => setOpen(false), [pathname]);
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b border-white/40 shadow-sm shadow-blue-500/10 backdrop-blur-xl ${
-        solid
-          ? "bg-gradient-to-r from-white/95 via-[#eef4ff]/95 to-[#e8faf3]/95"
-          : "bg-gradient-to-r from-white/90 via-[#eef4ff]/85 to-[#e8faf3]/90"
+      className={`sticky top-0 z-50 bg-white/85 backdrop-blur-md transition-shadow duration-200 ${
+        scrolled ? "border-b border-[var(--border)] shadow-[0_1px_12px_rgba(23,32,42,0.06)]" : "border-b border-transparent"
       }`}
     >
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#1A63F4]/50 to-[#00A87B]/50" />
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
-        <Link href="/" className="shrink-0">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label={`${SITE.name} home`}>
           <Image
-            src="/brand/logo-lockup-horizontal.svg"
-            alt={SITE.name}
-            width={320}
+            src="/brand/logo-mark.png"
+            alt=""
+            width={64}
             height={64}
             priority
-            className="h-16 w-auto object-contain"
+            className="h-7 w-7 object-contain"
           />
+          <span className="text-[17px] font-semibold tracking-tight text-[var(--foreground)]">
+            Store<span className="text-[#00A87B]">Desk</span>
+          </span>
         </Link>
 
         <LayoutGroup id="site-nav">
-          <nav className="relative hidden items-center rounded-full bg-white/70 p-1 shadow-inner ring-1 ring-[var(--border)] md:flex">
+          <nav className="hidden flex-1 items-center gap-0.5 md:flex">
             {NAV_ITEMS.map((item) => {
               const active = isActive(pathname, item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`relative z-10 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-                    active ? "text-white" : "text-[var(--muted)] hover:text-[var(--sd-blue)]"
+                  className={`relative rounded-lg px-3 py-1.5 text-[14px] font-medium transition-colors ${
+                    active
+                      ? "text-[var(--foreground)]"
+                      : "text-[var(--muted)] hover:text-[var(--foreground)]"
                   }`}
                 >
+                  {item.label}
                   {active ? (
                     <motion.span
-                      layoutId="nav-active-chip"
-                      className="absolute inset-0 -z-10 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] shadow-md shadow-blue-500/30"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      layoutId="nav-underline"
+                      className="absolute inset-x-3 -bottom-[13px] h-[2px] rounded-full bg-[#1A63F4]"
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : { type: "spring", stiffness: 400, damping: 32 }
+                      }
                     />
                   ) : null}
-                  <span className="relative">{item.label}</span>
                 </Link>
               );
             })}
           </nav>
         </LayoutGroup>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="ml-auto hidden items-center gap-2 md:flex">
+          <a
+            href={contactMailto({ subject: "StoreDesk enquiry" })}
+            className="rounded-lg px-3 py-1.5 text-[14px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+          >
+            Talk to us
+          </a>
           <Link
             href="/download"
-            className="rounded-full bg-white px-3.5 py-1.5 text-sm font-bold text-[#1A63F4] shadow-sm ring-1 ring-inset ring-[#1A63F4]/20 hover:bg-[#1A63F4]/5"
+            className="rounded-lg bg-[#1A63F4] px-3.5 py-1.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#0E43D8]"
           >
-            Download
+            Get StoreDesk
           </Link>
-          <a
-            href={contactMailto({ subject: "StoreDesk inquiry" })}
-            className="rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3.5 py-1.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 hover:brightness-105"
-          >
-            Email us
-          </a>
         </div>
 
         <button
           type="button"
-          className="rounded-lg border border-[var(--border)] bg-white/80 px-3 py-1.5 text-sm font-semibold text-[var(--foreground)] md:hidden"
-          onClick={() => setOpen((v) => !v)}
+          className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-[var(--foreground)] md:hidden"
+          onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
+          aria-label={open ? "Close menu" : "Open menu"}
         >
-          Menu
+          <span className="relative block h-3.5 w-5">
+            <motion.span
+              className="absolute left-0 block h-[2px] w-5 rounded bg-current"
+              animate={open ? { top: 6, rotate: 45 } : { top: 0, rotate: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18 }}
+            />
+            <motion.span
+              className="absolute left-0 top-[6px] block h-[2px] w-5 rounded bg-current"
+              animate={{ opacity: open ? 0 : 1 }}
+              transition={{ duration: reduceMotion ? 0 : 0.12 }}
+            />
+            <motion.span
+              className="absolute left-0 block h-[2px] w-5 rounded bg-current"
+              animate={open ? { top: 6, rotate: -45 } : { top: 12, rotate: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18 }}
+            />
+          </span>
         </button>
       </div>
 
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {open ? (
           <motion.nav
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-[var(--border)] bg-white/95 md:hidden"
+            transition={{ duration: reduceMotion ? 0 : 0.22, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden border-t border-[var(--border)] bg-white md:hidden"
           >
-            <div className="flex flex-col gap-1 px-4 py-3">
-              {NAV_ITEMS.map((item) => {
-                const active = isActive(pathname, item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${
-                      active
-                        ? "bg-gradient-to-r from-[#1A63F4] to-[#00A87B] text-white"
-                        : "text-[var(--foreground)]"
-                    }`}
-                    onClick={() => setOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+            <div className="flex flex-col gap-0.5 px-4 py-3">
+              {NAV_ITEMS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`rounded-lg px-3 py-2.5 text-[15px] font-medium ${
+                    isActive(pathname, item.href)
+                      ? "bg-[#1A63F4]/8 text-[#1A63F4]"
+                      : "text-[var(--foreground)]"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
               <Link
                 href="/download"
-                className="mt-2 block rounded-lg bg-[#1A63F4]/10 px-3 py-2 text-center text-sm font-semibold text-[#1A63F4]"
-                onClick={() => setOpen(false)}
+                className="mt-2 rounded-lg bg-[#1A63F4] px-3 py-2.5 text-center text-[15px] font-semibold text-white"
               >
-                Download
+                Get StoreDesk
               </Link>
-              <a
-                href={contactMailto({ subject: "StoreDesk inquiry" })}
-                className="mt-2 block rounded-lg bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3 py-2 text-center text-sm font-bold text-white shadow-sm"
-                onClick={() => setOpen(false)}
-              >
-                Email us
-              </a>
             </div>
           </motion.nav>
         ) : null}
@@ -140,49 +177,80 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
 
 export function SiteFooter() {
   return (
-    <footer className="relative overflow-hidden border-t border-[var(--border)] bg-gradient-to-br from-[#0E43D8] via-[#1A63F4] to-[#00A87B] px-6 py-12 text-white">
-      <div className="pointer-events-none absolute -right-20 top-0 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-16 bottom-0 h-48 w-48 rounded-full bg-[#28C88B]/25 blur-3xl" />
-      <div className="relative mx-auto grid max-w-6xl gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
+    <footer className="border-t border-[var(--border)] bg-[#F8FAFC] px-6 py-14">
+      <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
-          <Image
-            src="/brand/logo-lockup-horizontal.svg"
-            alt={SITE.name}
-            width={160}
-            height={34}
-            className="mb-3 h-8 w-auto object-contain"
-          />
-          <p className="max-w-sm text-sm text-white/85">{SITE.tagline}</p>
-          <p className="mt-2 text-xs font-medium text-white/75">
-            StoreDesk — Local-First C-Store Backoffice, Price Book &amp; POS Integration.
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/brand/logo-mark.png"
+              alt=""
+              width={64}
+              height={64}
+              className="h-7 w-7 object-contain"
+            />
+            <span className="text-[17px] font-semibold tracking-tight text-[var(--foreground)]">
+              Store<span className="text-[#00A87B]">Desk</span>
+            </span>
+          </div>
+          <p className="mt-3 max-w-sm text-[14px] leading-relaxed text-[var(--muted)]">
+            {SITE.tagline}. Built by people who have worked the counter.
           </p>
         </div>
+
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-white/70">Explore</p>
-          <ul className="mt-3 space-y-2 text-sm">
-            {NAV_ITEMS.map((item) => (
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+            Product
+          </p>
+          <ul className="mt-3.5 space-y-2.5 text-[14px]">
+            {NAV_ITEMS.slice(1).map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="hover:text-white">
+                <Link
+                  href={item.href}
+                  className="text-[var(--foreground)] transition-colors hover:text-[#1A63F4]"
+                >
                   {item.label}
                 </Link>
               </li>
             ))}
+            <li>
+              <Link href="/download" className="text-[var(--foreground)] transition-colors hover:text-[#1A63F4]">
+                Download
+              </Link>
+            </li>
           </ul>
         </div>
+
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-white/70">Contact</p>
-          <a href={contactMailto()} className="mt-3 block text-sm font-semibold underline decoration-white/40 hover:decoration-white">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+            Get in touch
+          </p>
+          <a
+            href={contactMailto()}
+            className="mt-3.5 block text-[14px] font-medium text-[#1A63F4] hover:underline"
+          >
             {SITE.email}
           </a>
-          <div className="mt-4 flex gap-4 text-xs text-white/75">
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-          </div>
+          <ul className="mt-3.5 space-y-2.5 text-[14px]">
+            <li>
+              <Link href="/privacy" className="text-[var(--muted)] transition-colors hover:text-[var(--foreground)]">
+                Privacy
+              </Link>
+            </li>
+            <li>
+              <Link href="/terms" className="text-[var(--muted)] transition-colors hover:text-[var(--foreground)]">
+                Terms
+              </Link>
+            </li>
+          </ul>
         </div>
       </div>
-      <p className="relative mx-auto mt-10 max-w-6xl text-center text-xs text-white/65">
-        © {new Date().getFullYear()} StoreDesk. Built for convenience stores &amp; gas stations.
-      </p>
+
+      <div className="mx-auto mt-12 max-w-6xl border-t border-[var(--border)] pt-6">
+        <p className="text-[13px] text-[var(--muted)]">
+          © {new Date().getFullYear()} StoreDesk. Verifone and Commander are trademarks of
+          Verifone, Inc. StoreDesk is not affiliated with Verifone.
+        </p>
+      </div>
     </footer>
   );
 }

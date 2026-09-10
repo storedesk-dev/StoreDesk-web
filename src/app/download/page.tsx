@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
 import { DownloadClient } from "./DownloadClient";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Download StoreDesk Desktop and Mobile",
-  description: "Download the StoreDesk Windows PC setup and the Android Mobile APK.",
-  keywords: ["StoreDesk Install", "StoreDesk Download", "StoreDesk setup", "StoreDesk Desktop", "StoreDesk Mobile"]
-};
+export const metadata = pageMetadata({
+  title: "Download StoreDesk",
+  description:
+    "StoreDesk for Windows and Android. Install on the back-office PC first, then add the phone app for the shop floor.",
+  path: "/download"
+});
 
 export default function DownloadPage() {
   return <DownloadClient />;

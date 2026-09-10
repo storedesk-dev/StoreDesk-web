@@ -1,98 +1,97 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Mail, MessageSquare, Wrench } from "lucide-react";
 import { MarketingShell } from "@/components/MarketingShell";
-import { VerifoneBadge } from "@/components/VerifoneBadge";
 import { SITE, contactMailto } from "@/lib/site";
-import { motion } from "framer-motion";
-import { Clock3, Mail, MessageSquareText, Store } from "lucide-react";
+
+/**
+ * Contact.
+ *
+ * A mailto, not a form. There is no ticketing system behind this, and a form
+ * that quietly drops into an inbox is a worse experience than a link that opens
+ * the sender's own mail client with a useful subject line already filled in.
+ */
+
+const REASONS = [
+  {
+    icon: <MessageSquare className="h-5 w-5" />,
+    title: "Thinking about it",
+    body: "Whether StoreDesk fits your setup, what the register needs to have, how long it takes to get going.",
+    subject: "StoreDesk — would this work for my store?",
+    cta: "Ask a question"
+  },
+  {
+    icon: <Wrench className="h-5 w-5" />,
+    title: "Already running it",
+    body: "Something not working, a register that will not connect, or a setup key that has expired.",
+    subject: "StoreDesk — support",
+    cta: "Get help"
+  },
+  {
+    icon: <Mail className="h-5 w-5" />,
+    title: "Something else",
+    body: "A feature you need, a bill, or anything the other two do not cover.",
+    subject: "StoreDesk enquiry",
+    cta: "Send a message"
+  }
+];
 
 export function ContactClient() {
-  const [name, setName] = useState("");
-  const [store, setStore] = useState("");
-  const [message, setMessage] = useState("");
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    window.location.href = contactMailto({
-      subject: `StoreDesk inquiry — ${store || name || "store"}`,
-      body: `Name: ${name}\nStore: ${store}\n\n${message}\n\n— sent from storedesk.dev contact form`
-    });
-  }
+  const reduceMotion = useReducedMotion();
 
   return (
-    <MarketingShell eyebrow="Contact" title="We read every message">
-      <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="space-y-4">
+    <MarketingShell
+      eyebrow="Contact"
+      title="Talk to the people who built it"
+      lede="Small team, no call centre. Whoever replies has worked on the code."
+    >
+      <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--border)] md:grid-cols-3">
+        {REASONS.map((reason, index) => (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] p-6 text-white shadow-lg shadow-blue-500/25"
+            key={reason.title}
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{
+              duration: reduceMotion ? 0 : 0.4,
+              delay: reduceMotion ? 0 : index * 0.06,
+              ease: [0.22, 1, 0.36, 1]
+            }}
+            className="flex flex-col bg-white p-7"
           >
-            <Mail className="h-8 w-8 opacity-90" />
-            <h2 className="mt-3 text-xl font-bold">Open your mail app</h2>
-            <p className="mt-2 text-sm text-white/85">
-              To is pre-filled with <strong>{SITE.email}</strong>. Subject starts as “StoreDesk inquiry”.
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1A63F4]/8 text-[#1A63F4]">
+              {reason.icon}
+            </span>
+            <h2 className="mt-4 text-[16px] font-semibold tracking-tight">{reason.title}</h2>
+            <p className="mt-2 flex-1 text-[14px] leading-relaxed text-[var(--muted)]">
+              {reason.body}
             </p>
             <a
-              href={contactMailto({ subject: "StoreDesk inquiry" })}
-              className="mt-5 inline-flex rounded-full bg-white px-5 py-2.5 text-sm font-bold text-[var(--sd-blue)]"
+              href={contactMailto({ subject: reason.subject })}
+              className="mt-5 inline-flex w-fit items-center gap-1.5 text-[14px] font-semibold text-[#1A63F4] hover:underline"
             >
-              Email {SITE.email}
+              {reason.cta}
+              <span aria-hidden>→</span>
             </a>
           </motion.div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              { icon: Clock3, t: "Reply window", d: "Usually 1–2 business days" },
-              { icon: Store, t: "Setup help", d: "Worker, Desktop, Mobile" },
-              { icon: MessageSquareText, t: "Topics", d: "Install, Commander, scanning" },
-              { icon: Mail, t: "Channel", d: "Email only for now" }
-            ].map((c) => {
-              const Icon = c.icon;
-              return (
-                <div key={c.t} className="rounded-xl border border-[var(--border)] bg-white/95 p-4 shadow-sm">
-                  <Icon className="h-5 w-5 text-[var(--sd-blue)]" />
-                  <p className="mt-2 text-sm font-bold">{c.t}</p>
-                  <p className="text-xs text-[var(--muted)]">{c.d}</p>
-                </div>
-              );
-            })}
-          </div>
-          <VerifoneBadge />
-        </div>
-
-        <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-[var(--border)] bg-white p-6 shadow-md">
-          <p className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
-            <MessageSquareText className="h-4 w-4 text-[var(--sd-green)]" />
-            Optional details for the email body
-          </p>
-          <input
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm"
-            placeholder="Your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm"
-            placeholder="Store / company"
-            value={store}
-            onChange={(e) => setStore(e.target.value)}
-          />
-          <textarea
-            className="min-h-[160px] w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm"
-            placeholder="How can we help?"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-gradient-to-r from-[#1A63F4] to-[#00A87B] py-2.5 text-sm font-bold text-white"
-          >
-            Open email to {SITE.email}
-          </button>
-        </form>
+        ))}
       </div>
+
+      <section className="mt-14 rounded-2xl border border-[var(--border)] bg-[#FBFCFD] p-8 md:p-10">
+        <h2 className="text-[19px] font-semibold tracking-tight">Or just email us</h2>
+        <a
+          href={contactMailto()}
+          className="mt-2 inline-block text-[18px] font-medium text-[#1A63F4] hover:underline"
+        >
+          {SITE.email}
+        </a>
+        <p className="mt-5 max-w-2xl text-[14.5px] leading-relaxed text-[var(--muted)]">
+          If you are writing about a problem, it helps to say which part you are using — the
+          desktop app, the phone app, or the setup on the store PC — and roughly when it
+          started. If a screen showed an error, a photo of it saves a round trip.
+        </p>
+      </section>
     </MarketingShell>
   );
 }

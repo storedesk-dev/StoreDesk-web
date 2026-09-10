@@ -1,5 +1,6 @@
 "use client";
 import { useToast } from "@/components/ToastContext";
+import { SITE } from "@/lib/site";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -27,7 +28,7 @@ export default function AdminOrganizationsPage() {
   const [newOwnerEmail, setNewOwnerEmail] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   
-  // Setup Key Modal State
+  // Owner enrollment code, shown once after the organization is created
   const [generatedSetupKey, setGeneratedSetupKey] = useState<string | null>(null);
   const [isSetupKeyModalOpen, setIsSetupKeyModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -72,12 +73,20 @@ export default function AdminOrganizationsPage() {
         setNewOwnerEmail("");
         loadOrganizations();
         
-        if (data.setupKey) {
-          setGeneratedSetupKey(data.setupKey);
+        // The route now returns an enrollment credential for a new owner, or a
+        // notice when that email already has an account. It used to return a
+        // worker setup key that the owner's enrollment could never accept.
+        if (data.ownerNotice) {
+          toast(data.ownerNotice, "info");
+        }
+        if (data.enrollmentCredential) {
+          setGeneratedSetupKey(data.enrollmentCredential);
           setIsSetupKeyModalOpen(true);
+        } else {
+          toast(`${data.organization?.name ?? "Organization"} created.`, "success");
         }
       } else {
-        toast("Failed to create organization", "error");
+        toast("Could not create the organization. Check the name is not already taken.", "error");
       }
     } catch (err) {
       console.error(err);
@@ -91,7 +100,7 @@ export default function AdminOrganizationsPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Organizations</h1>
-          <p className="text-[var(--muted)] mt-1">Manage tenants, stores, and control plane hierarchy.</p>
+          <p className="text-[var(--muted)] mt-1">Every customer, their plan and their stores.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
@@ -193,15 +202,23 @@ export default function AdminOrganizationsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Short name <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
                   <input 
                     type="text" 
-                    required
                     value={newOrgSlug}
                     onChange={e => setNewOrgSlug(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] focus:border-transparent outline-none transition-all"
-                    placeholder="e.g. acme-corp"
+                    placeholder={
+                      newOrgName.trim()
+                        ? newOrgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+                        : "made from the name"
+                    }
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Used in admin links. Leave blank and it is made from the name.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Billing Email</label>
@@ -214,8 +231,10 @@ export default function AdminOrganizationsPage() {
                   />
                 </div>
                 <div className="pt-4 border-t border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Initial Organization Admin (Optional)</h3>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Owner Email</label>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                    Owner <span className="font-normal text-gray-400">(optional)</span>
+                  </h3>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Owner&apos;s email</label>
                   <input 
                     type="email" 
                     value={newOwnerEmail}
@@ -224,7 +243,9 @@ export default function AdminOrganizationsPage() {
                     placeholder="admin@acme.com"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    If provided, this user will automatically be created and assigned as a Manager for all stores in this organization. A one-time Setup Key will be generated.
+                    Creates their StoreDesk account and gives you a one-time enrollment code to send them.
+                    They choose their own password with it. Give them access to specific stores from the
+                    Users tab once those stores exist.
                   </p>
                 </div>
               </form>
@@ -254,31 +275,35 @@ export default function AdminOrganizationsPage() {
         </div>
       )}
 
-      {/* Setup Key Modal */}
+      {/* Owner enrollment code */}
       {isSetupKeyModalOpen && generatedSetupKey && (
         <div className="fixed inset-0 z-[60] overflow-hidden flex items-center justify-center">
           <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setIsSetupKeyModalOpen(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8">
-            <div className="absolute top-4 right-4">
-              <button onClick={() => setIsSetupKeyModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="text-center mb-6">
-              <div className="h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Building2 className="h-8 w-8 text-green-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Created!</h2>
-              <p className="text-gray-600">
-                The Organization has been created and the Owner App User is ready. Share this one-time setup key with them so they can securely log in and set their password.
-              </p>
-            </div>
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-8">
+            <button
+              onClick={() => setIsSetupKeyModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-6">
-              <div className="text-center font-mono text-3xl font-bold tracking-widest text-[var(--sd-blue)] break-all">
+            <div className="h-12 w-12 bg-emerald-50 rounded-xl flex items-center justify-center mb-4">
+              <Building2 className="h-6 w-6 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900">Organization created</h2>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              Send the owner this enrollment code. They open{" "}
+              <span className="font-medium text-gray-900">{SITE.domain}/enroll</span>,
+              paste it in, and choose their own password. It works once and expires in 48 hours.
+            </p>
+
+            {/* An enrollment credential is ~70 characters; it has to wrap
+                cleanly rather than render as a letter-spaced wall of text. */}
+            <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <code className="block break-all font-mono text-[13px] leading-relaxed text-gray-900">
                 {generatedSetupKey}
-              </div>
+              </code>
             </div>
 
             <button
@@ -287,10 +312,14 @@ export default function AdminOrganizationsPage() {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
               }}
-              className="w-full bg-[var(--sd-blue)] text-white py-3 rounded-xl font-semibold shadow-md hover:bg-blue-700 transition-all flex justify-center items-center gap-2"
+              className="mt-4 w-full bg-[var(--sd-blue)] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
             >
-              {copied ? "Copied to Clipboard!" : "Copy Setup Key"}
+              {copied ? "Copied" : "Copy enrollment code"}
             </button>
+            <p className="mt-3 text-xs leading-relaxed text-gray-500">
+              This is the only time it is shown. Send it to the owner directly — not in a group chat —
+              since anyone holding it can take over the account before they do.
+            </p>
           </div>
         </div>
       )}

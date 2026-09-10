@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { DeviceStage } from "@/components/DeviceStage";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
@@ -26,51 +26,14 @@ import {
 } from "lucide-react";
 
 /** Official Tech Brand SVG Logos */
-function ReactElectronLogo() {
-  return (
-    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="2.2" fill="#61DAFB" />
-      <ellipse cx="12" cy="12" rx="7.5" ry="3" stroke="#61DAFB" strokeWidth="1.5" transform="rotate(30 12 12)" />
-      <ellipse cx="12" cy="12" rx="7.5" ry="3" stroke="#61DAFB" strokeWidth="1.5" transform="rotate(90 12 12)" />
-      <ellipse cx="12" cy="12" rx="7.5" ry="3" stroke="#61DAFB" strokeWidth="1.5" transform="rotate(150 12 12)" />
-    </svg>
-  );
-}
-
-function NodeJsLogo() {
-  return (
-    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
-      <path d="M12 2L3.5 7v10L12 22l8.5-5V7L12 2z" fill="#5FA04E" opacity="0.2" stroke="#5FA04E" strokeWidth="1.5" />
-      <path d="M12 6.5L6.5 9.75v6.5L12 19.5l5.5-3.25v-6.5L12 6.5z" fill="#5FA04E" />
-    </svg>
-  );
-}
-
-function GcpCloudLogo() {
-  return (
-    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
-      <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="#4285F4" />
-    </svg>
-  );
-}
-
-function NextMongoLogo() {
-  return (
-    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l7 9h-1.5l-5.5-7.2v7.2H11z" fill="#0B1F4D" />
-      <path d="M13.5 6.5l3.5 4.5" stroke="#47A248" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 /** Rotating words for hero focus pill — all grounded in features the app actually has */
 const FLIP_WORDS = [
-  "Know your true cost before you buy",
-  "Track vendor price changes over time",
-  "Find the best vendor for every product",
-  "Stop losing money on vendor hikes",
-  "Scan any barcode on the floor instantly",
-  "Set smart margins with pricing rules"
+  "Know what you paid before you reprice",
+  "See every supplier's price on one item",
+  "Spot the items you are losing money on",
+  "Scan a shelf tag and get the margin",
+  "File your ST-3 without retyping it",
+  "Keep trading when the internet drops"
 ];
 
 /** App screens — grounded in features that exist in StoreDesk Mobile today */
@@ -80,7 +43,7 @@ const validatedScreens = [
     src: "/screenshots/mobile-app-1.jpeg",
     title: "StoreDesk Login",
     subtitle: "Secure Store Authentication",
-    desc: "Sign in with your organization-provisioned AppUser credentials. Accounts are set up when your store license is created — no self-registration.",
+    desc: "Staff sign in with an account you set up for them. There is no public sign-up, and you choose which screens each person can open.",
     tag: "Auth",
     icon: Smartphone
   },
@@ -89,7 +52,7 @@ const validatedScreens = [
     src: "/screenshots/mobile-app-2.jpeg",
     title: "Barcode Scanner",
     subtitle: "Instant UPC Camera Lookup",
-    desc: "Aim at any shelf barcode and get the product name, your vendor's cost, the suggested selling price, and your margin — instantly.",
+    desc: "Point the camera at a shelf tag. The item, what you paid, what it sells for and the margin, without walking back to the office.",
     tag: "Scan First",
     icon: Scan
   },
@@ -98,7 +61,7 @@ const validatedScreens = [
     src: "/screenshots/mobile-app-3.jpeg",
     title: "Product Details",
     subtitle: "Cost & Margin Breakdown",
-    desc: "See the full product card: unit size, pack quantity, selling price, and your calculated cost per unit. Know your margin before you touch the shelf label.",
+    desc: "Pack size, unit size, shelf price and cost per unit on one card — so a 24-pack and a 12-pack of the same drink are actually comparable.",
     tag: "Price Book",
     icon: Search
   },
@@ -107,7 +70,7 @@ const validatedScreens = [
     src: "/screenshots/mobile-app-4.jpeg",
     title: "Vendor Price Comparison",
     subtitle: "Best Supplier, Lowest Cost",
-    desc: "Compare every vendor's price for this product side-by-side. The best supplier is highlighted so you know exactly who to order from.",
+    desc: "Every supplier you buy this item from, cheapest per unit first. Useful standing in front of the shelf with a rep on the phone.",
     tag: "Vendor Compare",
     icon: DollarSign
   },
@@ -116,105 +79,45 @@ const validatedScreens = [
     src: "/screenshots/mobile-app-5.jpeg",
     title: "Price Book Search",
     subtitle: "Full Catalog On Your Phone",
-    desc: "Browse or search your full product catalog from anywhere in the store. Filter by name, brand, or category without going back to the office.",
+    desc: "Your whole catalogue, searchable by name or barcode, filtered by department. Works anywhere in the store.",
     tag: "Catalog",
     icon: Tag
   },
   {
     id: "pricing",
     src: "/screenshots/mobile-app-6.jpeg",
-    title: "Suggested Selling Price",
-    subtitle: "Margin Rules Applied",
-    desc: "StoreDesk calculates a suggested retail price from your pricing rules — margin %, markup %, or fixed amount — so your prices always protect your profit.",
-    tag: "Pricing",
+    title: "Suggested selling price",
+    subtitle: "Worked from your real cost",
+    desc: "From the cheapest current supplier cost and your target margin, StoreDesk works back to a shelf price — so you can see what you would have to charge before you print the label.",
+    tag: "Margin",
     icon: Store
-  }
-];
-
-const techStack = [
-  {
-    name: "StoreDesk Desktop",
-    role: "Price Book & Vendor Command Center",
-    desc: "React + Electron dashboard for managers. Add products, set vendor prices, compare costs, and apply margin rules — all from your back-office PC.",
-    LogoComponent: ReactElectronLogo,
-    badge: "Desktop App"
-  },
-  {
-    name: "StoreDesk Worker",
-    role: "Local API Server",
-    desc: "Node.js + Express + MongoDB running on your back-office PC. All store data lives on your hardware — not in a shared cloud database.",
-    LogoComponent: NodeJsLogo,
-    badge: "Local Server"
-  },
-  {
-    name: "StoreDesk Cloud Hub",
-    role: "License & Account Sync",
-    desc: "Lightweight relay on GCP that keeps your store license active and desktop/mobile accounts synchronized. No product data ever leaves your store.",
-    LogoComponent: GcpCloudLogo,
-    badge: "Cloud Hub"
-  },
-  {
-    name: "StoreDesk Web",
-    role: "License Portal",
-    desc: "Secure web portal for managing store licenses, billing, and provisioning AppUser accounts when a new store is onboarded.",
-    LogoComponent: NextMongoLogo,
-    badge: "Web Portal"
   }
 ];
 
 const steps = [
   {
     n: "01",
-    title: "Install StoreDesk Worker",
-    body: "Run the installer on your back-office Windows PC. It starts a local server and MongoDB database — no internet required after setup."
+    title: "Install on the back-office PC",
+    body: "Run the installer on the Windows PC that can reach your register. Your catalogue and sales history are stored on that machine, not in the cloud."
   },
   {
     n: "02",
-    title: "Build Your Price Book",
-    body: "Add your products and product variants. Enter your vendor names and the prices they charge per pack, case, or unit."
+    title: "Pull in your price book",
+    body: "Point StoreDesk at your Commander and it reads the whole PLU list. Then add what each supplier charges you — per case, pack or unit."
   },
   {
     n: "03",
-    title: "Connect Your Phone",
-    body: "Log in to StoreDesk Mobile from any Android phone on your store Wi-Fi. No pairing QR needed — sign in as your org AppUser."
+    title: "Sign in on your phone",
+    body: "Install the Android app and sign in with the account you were given. It reaches your store securely from anywhere — it does not need to be on the store Wi-Fi."
   },
   {
     n: "04",
-    title: "Scan & Protect Your Margins",
-    body: "Scan shelf barcodes to see cost, best vendor, and your exact margin. Stop selling below cost before the next price hike hits."
+    title: "Walk the floor",
+    body: "Scan a shelf tag to see the price, the cheapest supplier and the margin. Catch the items you are selling below cost before the next delivery."
   }
 ];
 
 /** Linear-style Spotlight Card Component */
-function SpotlightCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  function handleMouseMove({ currentTarget, clientX, clientY }: React.MouseEvent) {
-    const { left, top } = currentTarget.getBoundingClientRect();
-    mouseX.set(clientX - left);
-    mouseY.set(clientY - top);
-  }
-
-  return (
-    <div
-      className={`group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:border-[#1D4ED8] hover:shadow-md ${className}`}
-      onMouseMove={handleMouseMove}
-    >
-      <motion.div
-        className="pointer-events-none absolute -inset-px rounded-xl opacity-0 transition duration-300 group-hover:opacity-100"
-        style={{
-          background: useTransform(
-            [mouseX, mouseY],
-            ([x, y]) => `radial-gradient(400px circle at ${x}px ${y}px, rgba(0,179,107,0.12), transparent 80%)`
-          )
-        }}
-      />
-      <div className="relative z-10">{children}</div>
-    </div>
-  );
-}
-
 /** Interactive Single 3D Phone Circular Carousel Component */
 function MobileShowcaseCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -403,13 +306,17 @@ function MobileShowcaseCarousel() {
 
 export function LandingPage() {
   const [flipIndex, setFlipIndex] = useState(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    // A line that rewrites itself every three seconds is hostile to anyone who
+    // has asked the OS to reduce motion, so it simply holds on the first line.
+    if (reduceMotion) return;
     const timer = setInterval(() => {
       setFlipIndex((prev) => (prev + 1) % FLIP_WORDS.length);
-    }, 3000);
+    }, 3200);
     return () => clearInterval(timer);
-  }, []);
+  }, [reduceMotion]);
 
   return (
     <div className="min-h-screen bg-white text-[#0B1F4D] antialiased selection:bg-[#00B36B] selection:text-white">
@@ -548,9 +455,9 @@ export function LandingPage() {
           <div className="px-6 pb-8 md:pb-0">
             <div className="sticky top-28">
               <div className="mb-3 h-1.5 w-14 rounded-full bg-[#00B36B]" />
-              <h2 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D] md:text-4xl">Why StoreDesk exists</h2>
+              <h2 className="text-3xl font-extrabold tracking-tight text-[#0B1F4D] md:text-4xl">What it is for</h2>
               <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700">
-                Read-only Price Book reference and margin overlays built specifically for convenience stores and gas stations.
+                Three things the register cannot tell you on its own.
               </p>
             </div>
           </div>
@@ -568,10 +475,10 @@ export function LandingPage() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00B36B] text-white font-bold shadow-sm">
                   <ShieldCheck className="h-5 w-5" />
                 </span>
-                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">Protect profit margins against rising costs</h3>
+                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">See your margin before you reprice</h3>
               </div>
               <p className="mt-4 text-base font-normal leading-relaxed text-slate-700">
-                Retail prices live on your cash register while true wholesale costs are tracked in your Price Book. StoreDesk connects those two worlds so true per-unit profit margins are transparent before changing shelf labels.
+                The register knows what each item sells for. Your invoices know what it cost. StoreDesk puts those two numbers side by side, per unit, so you can see the margin before you change a shelf tag.
               </p>
             </motion.article>
 
@@ -586,10 +493,10 @@ export function LandingPage() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1D4ED8] text-white font-bold shadow-sm">
                   <Zap className="h-5 w-5" />
                 </span>
-                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">Read-only POS register integration</h3>
+                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">It only reads from the register</h3>
               </div>
               <p className="mt-4 text-base font-normal leading-relaxed text-slate-700">
-                Integrates safely with Verifone Commander via read-only register streams (<code className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8] border border-slate-200">vPLUs</code>, <code className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8] border border-slate-200">vrubyrept</code>, <code className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8] border border-slate-200">vtransset</code>). Zero risk to register configurations or cash register performance.
+                StoreDesk reads prices and sales from your Verifone Commander and never writes back. Nothing it does can change a price at the till or slow a lane during a rush — if StoreDesk stopped tomorrow, the store would keep trading.
               </p>
             </motion.article>
 
@@ -604,10 +511,10 @@ export function LandingPage() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00B36B] text-white font-bold shadow-sm">
                   <BarChart3 className="h-5 w-5" />
                 </span>
-                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">Fast floor access & scan lookup</h3>
+                <h3 className="text-xl font-extrabold text-[#0B1F4D] sm:text-2xl">Answers on the shop floor</h3>
               </div>
               <p className="mt-4 text-base font-normal leading-relaxed text-slate-700">
-                Scan barcodes anywhere in the store to instantly inspect wholesale cost per item, department tax breakdown, best supplier cost, and suggested retail price.
+                Scan a shelf tag anywhere in the store to see what you paid, the cheapest supplier, and what you would need to charge to hit your margin.
               </p>
             </motion.article>
           </div>
@@ -627,42 +534,6 @@ export function LandingPage() {
 
         {/* Single 3D Phone Circular Showcase Carousel */}
         <MobileShowcaseCarousel />
-      </section>
-
-      {/* 5. ARCHITECTURE OVERVIEW (Background: Light Ice-Blue #F0F8FF) */}
-      <section className="bg-[#F0F8FF] py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="text-center">
-            <span className="inline-flex rounded-full bg-[#00B36B]/15 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[#00B36B]">
-              SYSTEM TOPOGRAPHY
-            </span>
-            <h2 className="mt-3 text-[#0B1F4D] text-3xl font-extrabold tracking-tight md:text-4xl">
-              Modern Event-Driven Technology Stack
-            </h2>
-          </div>
-
-          {/* 4-Column Grid with Tech Brand SVG Logos */}
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {techStack.map((tech) => {
-              const Logo = tech.LogoComponent;
-              return (
-                <SpotlightCard key={tech.name}>
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex rounded-xl bg-[#0B1F4D] p-2.5 text-white shadow-md ring-1 ring-slate-800">
-                      <Logo />
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-[#0B1F4D]">
-                      {tech.badge}
-                    </span>
-                  </div>
-                  <h3 className="mt-4 text-base font-bold text-[#0B1F4D]">{tech.name}</h3>
-                  <p className="text-xs font-semibold text-[#1D4ED8]">{tech.role}</p>
-                  <p className="mt-2 text-xs font-medium leading-relaxed text-slate-700">{tech.desc}</p>
-                </SpotlightCard>
-              );
-            })}
-          </div>
-        </div>
       </section>
 
       {/* 6. HOW IT WORKS (Background: White to Light Gradient) */}

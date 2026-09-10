@@ -17,15 +17,15 @@ export default function TermsPage() {
 
         <h2 className="text-xl font-bold text-[var(--ink)]">2. POS Integrations</h2>
         <p>
-          StoreDesk Worker relies on secure, local-network integrations with your Verifone Commander. 
+          StoreDesk connects to your Verifone Commander over your store network. 
           Use of these integrations must respect Verifone policies and your local network security configurations. 
-          You are responsible for ensuring your store PC remains connected to the POS subnet and that firewalls allow outbound Cloud Hub syncing.
+          You are responsible for ensuring your store PC remains connected to the POS subnet and that its firewall allows the outbound HTTPS connection StoreDesk uses for licensing and for the phone app.
         </p>
 
         <h2 className="text-xl font-bold text-[var(--ink)]">3. Data Source of Truth</h2>
         <p>
-          StoreDesk operates on a local-first philosophy. Your local StoreDesk Worker PC is the source of truth for all
-          pricing and vendor cost data. Product data, vendor prices, and pricing rules are stored on your hardware
+          StoreDesk keeps your data in your store. The back-office PC running StoreDesk is the source of truth for all
+          pricing and vendor cost data. Product data, vendor prices and sales history are stored on your hardware
           and are not shared with third parties.
         </p>
 

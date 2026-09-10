@@ -1,105 +1,136 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
+import { Laptop, Monitor, Server, Smartphone } from "lucide-react";
 import { MarketingShell } from "@/components/MarketingShell";
+import { PLANS } from "@/lib/site";
 
-import { VerifoneBadge } from "@/components/VerifoneBadge";
-import { motion } from "framer-motion";
-import {
-  HardDrive,
-  Laptop,
-  Server,
-  Smartphone,
-  Download
-} from "lucide-react";
+/**
+ * How the pieces fit together, in the order an owner meets them.
+ *
+ * Deliberately not an architecture diagram. The reader is a store owner
+ * deciding whether this is worth an afternoon, not an engineer reviewing a
+ * design. The names used are the ones they will see on screen.
+ */
 
-
-const steps = [
+const STEPS = [
   {
-    title: "Step 1: Install StoreDesk Worker",
-    detail: "Download and run the StoreDesk Worker installer on your back-office Windows PC. It starts a local Node.js server and MongoDB database — no internet required after setup.",
-    icon: Download
+    n: "01",
+    title: "Install it on the back-office PC",
+    body: "The same computer you already use for paperwork. StoreDesk installs like any other Windows program and runs quietly in the background.",
+    note: `You will get a setup key by email. It is good for ${PLANS.setupKeyHours} hours and can only be used once — if it expires, we send another.`
   },
   {
-    title: "Step 2: Build Your Price Book",
-    detail: "Open StoreDesk Desktop and add your products, product variants, and vendors. Enter the prices each vendor charges per pack, case, or unit. StoreDesk calculates your true cost per item automatically.",
-    icon: Laptop
+    n: "02",
+    title: "Point it at your register",
+    body: "Enter the Commander's address on your store network, plus the username and password you already use for it. StoreDesk pulls in the whole PLU list — usually under a minute, even for ten thousand items.",
+    note: "The account only needs permission to view PLUs. StoreDesk never writes back to the register."
   },
   {
-    title: "Step 3: Walk the Floor with StoreDesk Mobile",
-    detail: "Log in from any Android phone on your store Wi-Fi. Scan shelf barcodes to see your vendor cost, suggested selling price, and which supplier has the best deal — right where you need it.",
-    icon: Smartphone
+    n: "03",
+    title: "Add what you pay",
+    body: "Enter your supplier costs against the items you buy from them. This is the part the register does not know, and it is what turns a price list into a margin report.",
+    note: "Enter by case or by pack — StoreDesk works out the per-unit cost so suppliers are actually comparable."
+  },
+  {
+    n: "04",
+    title: "Take it to the floor",
+    body: "Sign in on your phone and scan a shelf tag. You see the price, the cost and the margin standing right in front of the item.",
+    note: "Staff sign in with their own account. You decide which screens each person can open."
+  }
+];
+
+const PIECES = [
+  {
+    icon: <Server className="h-5 w-5" />,
+    name: "The part on your PC",
+    role: "Holds your catalogue, prices and sales history, and does the talking to the register. Everything else is a window onto this."
+  },
+  {
+    icon: <Monitor className="h-5 w-5" />,
+    name: "The desktop app",
+    role: "Where you run the store: price book, cost comparison, sales reports, sales tax. Talks to the PC it is installed on, so it is quick and unaffected by the internet."
+  },
+  {
+    icon: <Smartphone className="h-5 w-5" />,
+    name: "The phone app",
+    role: "For the shop floor. Scan, search, check a price, look at today's takings. Connects back to your own PC over a secure link."
+  },
+  {
+    icon: <Laptop className="h-5 w-5" />,
+    name: "Your account",
+    role: "We look after licensing and who is allowed in. That is all it holds — your sales figures never leave the store."
   }
 ];
 
 export function HowItWorksClient() {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <MarketingShell title="How StoreDesk powers your store">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] p-2.5 text-white shadow-md">
-            <HardDrive className="h-6 w-6" />
-          </span>
-          <div>
-            <p className="text-sm font-bold">Your Store. Your Computer.</p>
-            <p className="text-xs text-[var(--muted)]">StoreDesk Worker + Desktop + Mobile App + Cloud Hub</p>
-          </div>
-        </div>
-        <VerifoneBadge />
-      </div>
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { icon: Server, label: "StoreDesk Worker", sub: "Local Server & Database" },
-          { icon: Laptop, label: "StoreDesk Desktop", sub: "Price Book & Vendor Hub" },
-          { icon: Smartphone, label: "StoreDesk Mobile", sub: "Barcode Floor Scanner" },
-          { icon: HardDrive, label: "Cloud Hub", sub: "License & Account Sync" }
-        ].map((card) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={card.label}
-              className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-white/90 p-4 shadow-sm"
-            >
-              <Icon className="h-8 w-8 text-[var(--sd-blue)]" />
-              <div>
-                <p className="font-bold">{card.label}</p>
-                <p className="text-xs text-[var(--muted)]">{card.sub}</p>
-              </div>
+    <MarketingShell
+      eyebrow="How it works"
+      title="An afternoon to set up, then it stays out of your way"
+      lede="Four steps, on hardware you already own. Nothing to rack, nothing to rewire at the till."
+    >
+      <ol className="relative space-y-px overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--border)]">
+        {STEPS.map((step, index) => (
+          <motion.li
+            key={step.n}
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{
+              duration: reduceMotion ? 0 : 0.4,
+              delay: reduceMotion ? 0 : index * 0.06,
+              ease: [0.22, 1, 0.36, 1]
+            }}
+            className="grid gap-5 bg-white p-7 md:grid-cols-[72px_1fr] md:p-9"
+          >
+            <span className="font-mono text-[13px] font-semibold text-[#1A63F4]">{step.n}</span>
+            <div>
+              <h2 className="text-[19px] font-semibold tracking-tight">{step.title}</h2>
+              <p className="mt-2.5 max-w-2xl text-[15px] leading-relaxed text-[var(--foreground)]">
+                {step.body}
+              </p>
+              <p className="mt-3 max-w-2xl border-l-2 border-[#00A87B]/40 pl-3.5 text-[13.5px] leading-relaxed text-[var(--muted)]">
+                {step.note}
+              </p>
             </div>
-          );
-        })}
-      </div>
-
-      <h2 className="mt-12 text-xl font-bold">1-2-3 Setup</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">
-        Get up and running in less than 15 minutes without calling IT.
-      </p>
-      <ol className="mt-12 space-y-4">
-        {steps.map((step, i) => {
-          const Icon = step.icon;
-          return (
-            <motion.li
-              key={step.title}
-              className="relative flex gap-6 pb-8 last:pb-0"
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-            >
-              {i !== steps.length - 1 && (
-                <div className="absolute left-6 top-12 bottom-0 w-px bg-gradient-to-b from-[var(--sd-blue)]/50 to-transparent" />
-              )}
-              <span className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white shadow-md">
-                <Icon className="h-5 w-5" />
-              </span>
-              <div className="rounded-2xl border border-[var(--border)] bg-white/95 p-5 shadow-sm w-full">
-                <h3 className="text-lg font-bold">{step.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">{step.detail}</p>
-              </div>
-            </motion.li>
-          );
-        })}
+          </motion.li>
+        ))}
       </ol>
+
+      <section className="mt-16">
+        <h2 className="text-[22px] font-semibold tracking-tight">The four pieces</h2>
+        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-[var(--muted)]">
+          You will meet all of these during setup. Only the first one has to be running for
+          the store to work.
+        </p>
+        <div className="mt-7 grid gap-px overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--border)] sm:grid-cols-2">
+          {PIECES.map((piece) => (
+            <div key={piece.name} className="bg-white p-7">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#00A87B]/10 text-[#00875F]">
+                {piece.icon}
+              </span>
+              <h3 className="mt-4 text-[16px] font-semibold tracking-tight">{piece.name}</h3>
+              <p className="mt-2 text-[14px] leading-relaxed text-[var(--muted)]">{piece.role}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-16 rounded-2xl border border-[var(--border)] bg-[#FBFCFD] p-8 md:p-10">
+        <h2 className="text-[20px] font-semibold tracking-tight">
+          What happens if the internet goes out
+        </h2>
+        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-[var(--muted)]">
+          The desktop app and the register are both on your store network, so they carry on
+          exactly as before. Anyone already signed in stays signed in for{" "}
+          {PLANS.offlineSessionHours} hours. What you lose until the line comes back is the
+          phone app from outside the store, and the overnight write to your Google Sheet —
+          both of which catch up on their own.
+        </p>
+      </section>
     </MarketingShell>
   );
 }

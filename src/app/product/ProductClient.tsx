@@ -1,124 +1,161 @@
 "use client";
 
-import Image from "next/image";
-import { MarketingShell } from "@/components/MarketingShell";
-import { VendorCostChart } from "@/components/VendorCostChart";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import type { ReactNode } from "react";
 import {
   BarChart3,
-  CloudSync,
-  FileSearch,
-  HardDrive,
-  RefreshCw,
-  ScanBarcode,
-  Server,
-  Smartphone
+  BookOpen,
+  FileSpreadsheet,
+  Receipt,
+  ScanLine,
+  Tags,
+  WifiOff
 } from "lucide-react";
+import { MarketingShell } from "@/components/MarketingShell";
+import { PLANS } from "@/lib/site";
 
-const features = [
+/**
+ * What StoreDesk does.
+ *
+ * Every claim on this page maps to shipped code. Where a number appears it
+ * comes from `@/lib/site`, which is checked against the control plane.
+ */
+
+const FEATURES: Array<{
+  icon: ReactNode;
+  title: string;
+  body: string;
+  detail: string;
+}> = [
   {
-    title: "Price Book Management",
-    body: "Your entire store catalog, instantly searchable. Update prices from anywhere without standing at the register.",
-    icon: RefreshCw,
-    accent: "from-[#0E43D8] to-[#1A63F4]"
+    icon: <BookOpen className="h-5 w-5" />,
+    title: "Price book",
+    body: "Every PLU on your register, searchable in one list — by barcode, name or department.",
+    detail:
+      "StoreDesk pulls the full PLU list from the Commander and only writes back the items that actually changed, so a refresh on a ten-thousand-item catalogue is quick and quiet."
   },
   {
-    title: "Vendor Cost Comparison",
-    body: "Compare all your local suppliers side-by-side. Always know who has the cheapest wholesale price before you buy.",
-    icon: BarChart3,
-    accent: "from-[#1A63F4] to-[#4f8cff]"
+    icon: <Tags className="h-5 w-5" />,
+    title: "Vendor costs side by side",
+    body: "What each supplier charges for the same item, cheapest first, with the margin worked out.",
+    detail:
+      "Costs are entered per case or per pack and normalised to a price per unit, so a 24-pack from one supplier and a 12-pack from another are actually comparable."
   },
   {
-    title: "Google Sheets Sync",
-    body: "Configure Google Sheets to get your daily, monthly, and department sale reports to get a better idea of how the store is performing.",
-    icon: CloudSync,
-    accent: "from-[#00A87B] to-[#28C88B]"
+    icon: <ScanLine className="h-5 w-5" />,
+    title: "Scan on the floor",
+    body: "Point your phone at a barcode and see the shelf price, what you paid, and the margin.",
+    detail:
+      "Leading zeros and EAN/UPC variants are normalised before lookup, so a code scanned from a shelf tag matches the same item a code typed at the desk does."
   },
   {
-    title: "Stop Margin Bleed",
-    body: "Compare your retail shelf prices against what you actually paid so you never sell at a loss again.",
-    icon: FileSearch,
-    accent: "from-[#00A87B] to-[#28C88B]"
+    icon: <BarChart3 className="h-5 w-5" />,
+    title: "Sales from the register",
+    body: "Daily, shift and monthly totals read straight from the Commander — no rekeying.",
+    detail:
+      "Department splits, fuel, lottery, card and cash come across as the register recorded them, alongside individual transactions."
   },
   {
-    title: "Local First Architecture",
-    body: "Runs directly on your store PC. No cloud dependency for core operations. Secure Cloudflare Tunnel for authenticated mobile access.",
-    icon: Server,
-    accent: "from-[#1A63F4] to-[#00A87B]"
+    icon: <Receipt className="h-5 w-5" />,
+    title: "Georgia ST-3 sales tax",
+    body: "Your monthly return generated as a filing-ready XML file for the Georgia Tax Center.",
+    detail:
+      "Taxable and exempt sales, jurisdiction distributions and vendor's compensation are computed from the register data you already have. Review it on screen before you file."
   },
   {
-    title: "Sales Tax & Excel Export",
-    body: "Automatic sales tax calculations that give you a ready-to-file Excel sheet. Just upload it and it does the job.",
-    icon: HardDrive,
-    accent: "from-[#0E43D8] to-[#1A63F4]"
-  },
-  {
-    title: "StoreDesk Mobile Scanner",
-    body: "Turn any phone into a price checker with StoreDesk Mobile. Scan shelf barcodes to instantly see what you pay, what you sell it for, and your exact profit.",
-    icon: Smartphone,
-    accent: "from-[#00A87B] to-[#1A63F4]"
-  },
-  {
-    title: "Scan-First Barcode Engine",
-    body: "Normalized UPC lookup strips leading zeros and handles EAN/UPC variants to immediately display wholesale cost per item and pack breakdown.",
-    icon: ScanBarcode,
-    accent: "from-[#28C88B] to-[#00A87B]"
+    icon: <FileSpreadsheet className="h-5 w-5" />,
+    title: "Your own Google Sheet",
+    body: "Daily sales written to a spreadsheet you own, on a schedule or on demand.",
+    detail:
+      "Map the columns once. If your accountant already has a sheet they like, StoreDesk writes into that one rather than making you adopt a new format."
   }
 ];
 
 export function ProductClient() {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <MarketingShell title="Everything at the counter built for real store operations">
-      <div className="mt-8 grid items-center gap-6 rounded-2xl border border-[var(--border)] bg-gradient-to-r from-slate-900 via-[#0B1F3A] to-slate-900 p-6 text-white md:grid-cols-[180px_1fr]">
-        <div className="flex justify-center">
-          <div className="relative h-24 w-36 overflow-hidden rounded-xl border border-white/20 bg-white/10 p-2 shadow-xl backdrop-blur-md">
-            <Image
-              src="/Verifone image.png"
-              alt="Verifone Commander POS Integration with StoreDesk"
-              width={160}
-              height={100}
-              className="h-full w-full object-contain"
-            />
+    <MarketingShell
+      eyebrow="What it does"
+      title="Everything the back office needs, on the PC that is already there"
+      lede="StoreDesk reads your register, keeps your price book straight, and tells you what you are actually making on each item. No new hardware, no monthly outage when the internet drops."
+    >
+      <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 lg:grid-cols-3">
+        {FEATURES.map((feature, index) => (
+          <motion.article
+            key={feature.title}
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{
+              duration: reduceMotion ? 0 : 0.4,
+              delay: reduceMotion ? 0 : Math.min(index, 3) * 0.05,
+              ease: [0.22, 1, 0.36, 1]
+            }}
+            className="group flex flex-col bg-white p-7 transition-colors hover:bg-[#FBFCFD]"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1A63F4]/8 text-[#1A63F4]">
+              {feature.icon}
+            </span>
+            <h2 className="mt-4 text-[17px] font-semibold tracking-tight">{feature.title}</h2>
+            <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--foreground)]">
+              {feature.body}
+            </p>
+            <p className="mt-3 border-t border-[var(--border)] pt-3 text-[13.5px] leading-relaxed text-[var(--muted)]">
+              {feature.detail}
+            </p>
+          </motion.article>
+        ))}
+      </div>
+
+      {/* The one thing that genuinely separates this from a cloud back office. */}
+      <section className="mt-16 overflow-hidden rounded-2xl border border-[var(--border)] bg-[#17202A] text-white">
+        <div className="grid gap-10 p-8 md:grid-cols-[1.3fr_1fr] md:p-12">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[12px] font-medium">
+              <WifiOff className="h-3.5 w-3.5" />
+              When the line goes down
+            </span>
+            <h2 className="mt-5 text-[26px] font-semibold leading-tight tracking-tight md:text-[30px]">
+              The register does not stop, so neither does StoreDesk
+            </h2>
+            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-white/70">
+              The catalogue, the prices and the sales history live on your PC, not in
+              somebody&apos;s data centre. Once a member of staff has signed in, the desktop
+              keeps working with no internet at all for {PLANS.offlineSessionHours} hours —
+              a full shift — because their sign-in is verified on your own machine rather
+              than checked against a server each time.
+            </p>
           </div>
+          <dl className="grid grid-cols-2 gap-6 self-center md:grid-cols-1">
+            <div>
+              <dt className="text-[12px] uppercase tracking-[0.1em] text-white/50">
+                Works offline for
+              </dt>
+              <dd className="mt-1 text-[28px] font-semibold tabular-nums">
+                {PLANS.offlineSessionHours} hrs
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[12px] uppercase tracking-[0.1em] text-white/50">
+                Sales data in the cloud
+              </dt>
+              <dd className="mt-1 text-[28px] font-semibold">None</dd>
+            </div>
+          </dl>
         </div>
-        <div>
-          <span className="inline-flex rounded-full bg-[#1A63F4]/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#4f8cff]">
-            Hardware Integration
-          </span>
-          <h2 className="mt-1 text-xl font-bold md:text-2xl">Read-Only Verifone® Commander Sync</h2>
-          <p className="mt-1 text-xs leading-relaxed text-slate-300">
-            Safely streams live vPLUs, ruby reports, and register transaction sets without modifying POS register configurations or risking register uptime.
-          </p>
-        </div>
-      </div>
+      </section>
 
-      <div className="mt-10">
-        <VendorCostChart />
-      </div>
-
-      <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        {features.map((f, i) => {
-          const Icon = f.icon;
-          return (
-            <motion.article
-              key={f.title}
-              className="group rounded-2xl border border-[var(--border)] bg-white/95 p-6 shadow-md shadow-blue-500/5 transition hover:-translate-y-0.5 hover:shadow-lg"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.04 }}
-            >
-              <div
-                className={`mb-4 inline-flex rounded-xl bg-gradient-to-br ${f.accent} p-2.5 text-white shadow-sm`}
-              >
-                <Icon className="h-5 w-5" strokeWidth={2.2} />
-              </div>
-              <h2 className="text-lg font-bold">{f.title}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{f.body}</p>
-            </motion.article>
-          );
-        })}
-      </div>
+      <section className="mt-16">
+        <h2 className="text-[22px] font-semibold tracking-tight">Works with your Commander</h2>
+        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-[var(--muted)]">
+          StoreDesk talks to a Verifone Commander over your store network and{" "}
+          <strong className="font-semibold text-[var(--foreground)]">only ever reads from it</strong>.
+          It does not change prices on the register, so there is nothing it can break at the
+          till. The account it connects with needs view access to the PLU list and nothing
+          more.
+        </p>
+      </section>
     </MarketingShell>
   );
 }

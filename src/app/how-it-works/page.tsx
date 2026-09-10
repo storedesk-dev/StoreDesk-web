@@ -1,34 +1,13 @@
-import type { Metadata } from "next";
 import { HowItWorksClient } from "./HowItWorksClient";
+import { pageMetadata } from "@/lib/metadata";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-desk-prod.vercel.app";
-
-export const metadata: Metadata = {
-  title: "How StoreDesk powers your store",
+export const metadata = pageMetadata({
+  title: "How StoreDesk works",
   description:
-    "Discover how StoreDesk powers your convenience store: StoreDesk Worker on store computer, Desktop admin dashboard, and StoreDesk Mobile scanner on store Wi-Fi.",
-  keywords: [
-    "How StoreDesk works",
-    "StoreDesk architecture",
-    "StoreDesk Worker",
-    "StoreDesk Desktop",
-    "StoreDesk Mobile",
-    "local-first c-store software",
-    "c-store POS network setup"
-  ],
-  alternates: {
-    canonical: `${siteUrl}/how-it-works`
-  },
-  openGraph: {
-    title: "How StoreDesk powers your store",
-    description:
-      "Store Engine on store PC, Desktop management, and Mobile floor scanning over store Wi-Fi. Local, fast, and private.",
-    url: `${siteUrl}/how-it-works`,
-    images: [{ url: `${siteUrl}/brand/logo-lockup-horizontal.png`, width: 1200, height: 400, alt: "StoreDesk System Map & Architecture" }]
-  }
-};
+    "Four steps on hardware you already own: install on the back-office PC, connect your Verifone Commander, add what your suppliers charge, and scan on the shop floor.",
+  path: "/how-it-works"
+});
 
 export default function HowItWorksPage() {
   return <HowItWorksClient />;
 }
-

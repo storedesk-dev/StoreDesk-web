@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL as siteUrl } from "@/lib/metadata";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://store-desk-prod.vercel.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
