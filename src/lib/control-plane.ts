@@ -21,25 +21,19 @@ import {
   ControlPlaneError,
   enforceRateLimit,
   hashSecret,
+  issueRelayKey,
   issueSetupKey,
+  issueWorkerCredential,
   parseSetupKey,
   publicId,
   randomSecret,
   safeJson,
-  signRelaySession,
+  signClientSession,
   verifySecret
 } from "@/lib/control-plane-security";
+import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
 import { getEmailProvider } from "@/lib/email-provider";
 import type { InternalAdminActor } from "@/lib/admin-auth";
-
-const CURRENT_EULA = {
-  eulaVersion: process.env.EULA_VERSION || "2026-07",
-  documentSha256:
-    process.env.EULA_DOCUMENT_SHA256 ||
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  privacyVersion: process.env.PRIVACY_VERSION || "2026-07",
-  systemAcknowledgementVersion: process.env.SYSTEM_ACK_VERSION || "setup-v1"
-};
 
 export function jsonError(error: unknown, correlationId = publicId("corr")) {
   if (error instanceof ControlPlaneError) {
@@ -260,11 +254,12 @@ export async function createStore(
     contactEmail: body.contactEmail?.trim().toLowerCase(),
     cloudflareToken,
     tunnelUrl,
+    // No posPassword: register credentials are entered on the store PC and
+    // never travel through the control plane.
     configJson: JSON.stringify({
       posIntegration: "verifone_commander",
       posIpAddress: "",
       posUsername: "",
-      posPassword: "",
       featureFlags: {
         enableBetaScanner: false
       }
@@ -517,88 +512,163 @@ export async function redeemSetupKey(body: {
     throw new ControlPlaneError(409, "INSTALLATION_ALREADY_BOUND", "Installation already bound");
   }
 
-  const consume = await SetupKeyModel.findOneAndUpdate(
-    { keyId: key.keyId, status: { $in: ["queued", "sent", "delivery_failed"] } },
-    { status: "consumed", consumedAt: new Date(), $inc: { attempts: 1 } },
-    { new: true }
-  );
-  if (!consume) {
-    throw new ControlPlaneError(409, "SETUP_KEY_CONSUMED", "Setup key has been consumed");
+  // ── Atomic activation ────────────────────────────────────────────────────
+  // Everything from here commits together or not at all. Previously the key was
+  // consumed first and a later failure left the installation permanently
+  // unactivatable: key burned, no credential issued, no way back without a
+  // manual database edit.
+  const session = await startTransaction();
+
+  const credential = issueWorkerCredential();
+  const relayKey = issueRelayKey();
+  const secretHash = await hashSecret(credential.secret);
+  const eulaAcceptanceId = publicId("eula");
+
+  try {
+    const consume = await SetupKeyModel.findOneAndUpdate(
+      { keyId: key.keyId, status: { $in: ["queued", "sent", "delivery_failed"] } },
+      { status: "consumed", consumedAt: new Date(), $inc: { attempts: 1 } },
+      { new: true, ...withSession(session) }
+    );
+    if (!consume) {
+      throw new ControlPlaneError(409, "SETUP_KEY_CONSUMED", "Setup key has been consumed");
+    }
+
+    await EulaAcceptanceModel.create(
+      [
+        {
+          eulaAcceptanceId,
+          organizationId: key.organizationId,
+          storeId: key.storeId,
+          workerInstallationId: key.workerInstallationId,
+          contactEmail: key.contactEmail,
+          eulaVersion: ack.eulaVersion,
+          documentSha256: ack.eulaDocumentSha256,
+          privacyVersion: ack.privacyVersion,
+          systemAcknowledgementVersion: ack.systemAcknowledgementVersion,
+          osAcknowledged: Boolean(ack.osAcknowledged),
+          privacyAcknowledged: Boolean(ack.privacyAcknowledged),
+          localDataAcknowledged: Boolean(ack.localDataAcknowledged),
+          acceptedAt: new Date(ack.acceptedAt),
+          redeemedAt: new Date(),
+          correlationId,
+          source: "setup_key_redeem"
+        }
+      ],
+      withSession(session)
+    );
+
+    // Any previously active credential for this installation is superseded.
+    await WorkerCredentialModel.updateMany(
+      { workerInstallationId: key.workerInstallationId, status: "active" },
+      { status: "revoked", revokedAt: new Date() },
+      withSession(session)
+    );
+
+    await WorkerCredentialModel.create(
+      [
+        {
+          credentialId: credential.credentialId,
+          secretHash,
+          relayKey,
+          keyId: key.keyId,
+          organizationId: key.organizationId,
+          storeId: key.storeId,
+          workerInstallationId: key.workerInstallationId,
+          status: "active",
+          issuedAt: new Date()
+        }
+      ],
+      withSession(session)
+    );
+
+    await WorkerInstallationModel.updateOne(
+      { workerInstallationId: key.workerInstallationId },
+      {
+        workerCredentialId: credential.credentialId,
+        eulaAcceptanceId,
+        status: "active",
+        activatedAt: new Date(),
+        platform: body.installation.platform,
+        workerVersion: body.installation.workerVersion,
+        electronVersion: body.installation.electronVersion
+      },
+      withSession(session)
+    );
+
+    await commitTransaction(session);
+  } catch (error) {
+    await abortTransaction(session);
+    throw error;
   }
 
-  const eulaAcceptanceId = publicId("eula");
-  await EulaAcceptanceModel.create({
-    eulaAcceptanceId,
+  // Audit is deliberately outside the transaction: a failed audit write must
+  // never undo a successful activation.
+  await writeAudit({
     organizationId: key.organizationId,
     storeId: key.storeId,
     workerInstallationId: key.workerInstallationId,
-    contactEmail: key.contactEmail,
-    eulaVersion: ack.eulaVersion,
-    documentSha256: ack.eulaDocumentSha256,
-    privacyVersion: ack.privacyVersion,
-    systemAcknowledgementVersion: ack.systemAcknowledgementVersion,
-    osAcknowledged: Boolean(ack.osAcknowledged),
-    privacyAcknowledged: Boolean(ack.privacyAcknowledged),
-    localDataAcknowledged: Boolean(ack.localDataAcknowledged),
-    acceptedAt: new Date(ack.acceptedAt),
-    redeemedAt: new Date(),
-    correlationId,
-    source: "setup_key_redeem"
-  });
-
-  const workerCredentialId = publicId("wkrc");
-  const credentialSecret = randomSecret(32);
-  const secretHash = await hashSecret(credentialSecret);
-
-  installation.workerCredentialId = workerCredentialId;
-  installation.status = "active";
-  installation.firstBootstrapCompletedAt = new Date();
-  installation.platform = body.installation.platform;
-  installation.workerVersion = body.installation.workerVersion;
-  installation.electronVersion = body.installation.electronVersion;
-  await installation.save();
-
-  await WorkerCredentialModel.create({
-    workerCredentialId,
-    secretHash,
-    organizationId: key.organizationId,
-    storeId: key.storeId,
-    workerInstallationId: key.workerInstallationId,
-    status: "active",
-    issuedAt: new Date()
-  });
-
-  await AuditEventModel.create({
-    eventId: publicId("aud"),
-    organizationId: key.organizationId,
-    storeId: key.storeId,
     actorType: "system",
     actorId: "setup_flow",
     action: "setup_key.redeem",
-    targetType: "WorkerInstallation",
+    targetType: "worker_installation",
     targetId: key.workerInstallationId,
     correlationId,
-    details: {
+    metadata: {
       setupKeyId: key.keyId,
-      workerCredentialId,
+      workerCredentialId: credential.credentialId,
       contactEmail: key.contactEmail
     }
   });
 
+  // The tunnel token and URL live on the Store, not the Installation. Reading
+  // them off the installation is what previously made every activation hand
+  // back `undefined` and leave the tunnel unprovisioned.
   return {
     contractVersion: CONTRACT_VERSION,
-    workerCredential: `${workerCredentialId}.${credentialSecret}`,
-    workerCredentialId,
+    workerCredential: credential.plaintext,
+    workerCredentialId: credential.credentialId,
+    relayKey,
     organizationId: key.organizationId,
     storeId: key.storeId,
     workerInstallationId: key.workerInstallationId,
-    cloudflareToken: (installation as Record<string, unknown>).cloudflareToken,
+    cloudflareToken: store?.cloudflareToken ? String(store.cloudflareToken) : undefined,
+    tunnelUrl: store?.tunnelUrl ? String(store.tunnelUrl) : undefined,
+    configJson: await buildEdgeConfigJson(key.organizationId, store),
     store: {
       organizationId: key.organizationId,
       storeId: key.storeId,
       workerInstallationId: key.workerInstallationId
     }
   };
+}
+
+/**
+ * The store config the edge needs: whatever the operator set on the store, plus
+ * the organization's role definitions so the Worker can enforce page access
+ * without a round trip.
+ */
+export async function buildEdgeConfigJson(
+  organizationId: string,
+  store: { configJson?: unknown } | null
+): Promise<string> {
+  let parsed: Record<string, unknown> = {};
+  const raw = store?.configJson;
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      /* an unparseable stored config is treated as empty */
+    }
+  }
+  const organization = await OrganizationModel.findOne({ organizationId }).lean();
+  const roles = Array.isArray(organization?.roles) && organization.roles.length > 0
+    ? organization.roles
+    : DEFAULT_ORG_ROLES;
+  // The POS password is a store secret; it reaches the edge through the
+  // dedicated credential channel, never inside a broadcast config blob.
+  delete parsed.posPassword;
+  return JSON.stringify({ ...parsed, orgRoles: roles });
 }
 
 export async function getBootstrap(
@@ -957,15 +1027,33 @@ export async function issueClientSession(body: {
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   });
 
-  const relay = signRelaySession({
+  // Sign with the installation's own relay key so the Worker can verify this
+  // token offline. No key means the Worker was never activated (or its
+  // credential was revoked) — a session would be unverifiable, so refuse now.
+  const credential = await WorkerCredentialModel.findOne({
+    workerInstallationId: assignment.workerInstallationId,
+    status: "active"
+  })
+    .select("+relayKey")
+    .lean();
+  if (!credential?.relayKey) {
+    throw new ControlPlaneError(
+      409,
+      "WORKER_BOOTSTRAP_INCOMPLETE",
+      "Assigned Worker has no active credential; re-activate it",
+      true
+    );
+  }
+
+  const relay = signClientSession(String(credential.relayKey), {
     sub: body.appUserId,
-    storeId: String(assignment.storeId),
-    installationId: String(assignment.workerInstallationId),
-    role: "client",
-    scopes: (assignment.scopes as string[]) || ["relay:request"],
     organizationId: String(assignment.organizationId),
+    storeId: String(assignment.storeId),
+    workerInstallationId: String(assignment.workerInstallationId),
     assignmentId: String(assignment.assignmentId),
-    audience: body.audience
+    audience: body.audience,
+    role: String(assignment.role),
+    scopes: (assignment.scopes as string[]) || ["relay:request"]
   });
 
   const clientSessionId = publicId("cses");

@@ -75,7 +75,10 @@ const TenantStoreSchema = new Schema(
     status: { type: String, enum: ["pending", "active", "suspended", "closed"], default: "active" },
     tunnelUrl: { type: String, trim: true },
     configJson: { type: String },
-    cloudflareToken: { type: String, trim: true }
+    // Bearer credential for the store hostname. Never selected by default —
+    // read it explicitly (`.select("+cloudflareToken")`) at the two places
+    // that are allowed to: the audited admin reveal, and edge config sync.
+    cloudflareToken: { type: String, trim: true, select: false }
   },
   timestamps
 );
@@ -177,6 +180,12 @@ const WorkerCredentialSchema = new Schema(
     ...tenant,
     credentialId: { ...id, unique: true },
     secretHash: { type: String, required: true, select: false },
+    /**
+     * Per-installation HMAC key. Web signs client session tokens with it; the
+     * Worker verifies them offline. Rotating the credential rotates this key,
+     * which invalidates every outstanding session for the store.
+     */
+    relayKey: { type: String, required: true, select: false },
     keyId: { type: String, required: true },
     storeId: id,
     workerInstallationId: id,

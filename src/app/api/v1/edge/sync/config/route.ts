@@ -1,62 +1,79 @@
 import { NextResponse } from "next/server";
 import { authenticateWorker } from "@/lib/admin-auth";
+import { buildEdgeConfigJson, jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
 import { TenantStoreModel } from "@/models/ControlPlane";
-import { safeJson } from "@/lib/control-plane-security";
+import { ControlPlaneError, safeJson } from "@/lib/control-plane-security";
 import { z } from "zod";
 
-const ConfigSchema = z.object({
-  posIntegration: z.literal("verifone_commander"),
-  posIpAddress: z.string().optional(),
-  posUsername: z.string().optional(),
-  posPassword: z.string().optional(),
-  featureFlags: z.record(z.string(), z.boolean()).optional()
-}).strict();
+/**
+ * Store configuration the edge may push up.
+ *
+ * `posPassword` is deliberately absent and is rejected by `.strict()`. The
+ * register password is a purely local secret: the Worker is the only thing that
+ * ever dials the register, and it does so over the store LAN. Sending it to the
+ * control plane put a plaintext POS credential in Atlas, in this request body,
+ * in `configJson`, and — because `configJson` is handed to every client of the
+ * store — in front of every signed-in user. None of that bought anything.
+ *
+ * The password is entered once in the desktop app's Settings page and stays on
+ * the store PC. Host and username are ordinary configuration and may sync.
+ */
+const EdgeConfigSchema = z
+  .object({
+    posIntegration: z.literal("verifone_commander"),
+    posIpAddress: z.string().optional(),
+    posUsername: z.string().optional(),
+    featureFlags: z.record(z.string(), z.boolean()).optional()
+  })
+  .strict();
 
 export async function PUT(req: Request) {
   try {
     const worker = await authenticateWorker(req);
-    const body = await req.json();
+    const raw = (await req.json()) as Record<string, unknown>;
 
-    // Validate incoming config from edge
-    ConfigSchema.parse(body);
+    if ("posPassword" in raw) {
+      throw new ControlPlaneError(
+        400,
+        "REQUEST_INVALID",
+        "posPassword is not accepted: register credentials stay on the store PC"
+      );
+    }
+
+    const body = EdgeConfigSchema.parse(raw);
 
     await connectDb();
-    
-    // Find the store the worker belongs to
-    const store = await TenantStoreModel.findOne({ 
-      organizationId: worker.organizationId, 
-      storeId: worker.storeId 
+    const store = await TenantStoreModel.findOne({
+      organizationId: worker.organizationId,
+      storeId: worker.storeId
     });
-    
-    if (!store) {
-      return NextResponse.json({ error: "Store not found" }, { status: 404 });
-    }
+    if (!store) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Store not found");
 
-    // Merge the edge payload into the configJson
-    let currentConfig = {};
-    if (store.configJson && store.configJson.trim()) {
+    let current: Record<string, unknown> = {};
+    if (store.configJson?.trim()) {
       try {
-        currentConfig = JSON.parse(store.configJson);
+        current = JSON.parse(store.configJson);
       } catch {
-        // If unparseable, start fresh
+        /* an unparseable stored config is replaced wholesale */
       }
     }
+    const merged: Record<string, unknown> = { ...current, ...body };
+    // Scrub any password left in the store document by an older build.
+    delete merged.posPassword;
 
-    const updatedConfig = {
-      ...currentConfig,
-      ...body
-    };
-
-    store.configJson = JSON.stringify(updatedConfig, null, 2);
+    store.configJson = JSON.stringify(merged, null, 2);
     await store.save();
 
-    return NextResponse.json({ store: safeJson(store) });
-  } catch (error: unknown) {
+    return NextResponse.json({ store: safeJson(store.toObject()) });
+  } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "Invalid configuration schema" }, { status: 400 });
+      return NextResponse.json(
+        { error: { code: "REQUEST_INVALID", message: "Invalid configuration schema" } },
+        { status: 400 }
+      );
     }
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Internal Server Error" }, { status: 500 });
+    return jsonError(error);
   }
 }
 
@@ -64,48 +81,27 @@ export async function GET(req: Request) {
   try {
     const worker = await authenticateWorker(req);
     await connectDb();
-    
-    const store = await TenantStoreModel.findOne({ 
-      organizationId: worker.organizationId, 
-      storeId: worker.storeId 
-    }).lean();
 
-    if (!store) {
-      return NextResponse.json({ error: "Store not found" }, { status: 404 });
-    }
-
-    const { WorkerInstallationModel, OrganizationModel } = await import("@/models/ControlPlane");
-    const installation = await WorkerInstallationModel.findOne({
+    // Tunnel fields live on the Store, not the WorkerInstallation. Reading them
+    // off the installation is what previously made this endpoint always return
+    // `undefined` and leave the tunnel unprovisioned.
+    const store = await TenantStoreModel.findOne({
       organizationId: worker.organizationId,
-      storeId: worker.storeId,
-      workerInstallationId: worker.workerInstallationId
-    }).lean();
+      storeId: worker.storeId
+    })
+      .select("+cloudflareToken")
+      .lean();
+    if (!store) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Store not found");
 
-    const organization = await OrganizationModel.findOne({
-      organizationId: worker.organizationId
-    }).lean();
-
-    let parsedConfig = {};
-    if (store.configJson && store.configJson.trim()) {
-      try {
-        parsedConfig = JSON.parse(store.configJson);
-      } catch {
-        // Ignore unparseable
-      }
-    }
-    
-    // Inject orgRoles into the config JSON
-    const fullConfigJson = JSON.stringify({
-      ...parsedConfig,
-      orgRoles: organization?.roles || []
-    });
-
-    return NextResponse.json({ 
-      configJson: fullConfigJson,
-      cloudflareToken: installation?.cloudflareToken,
-      tunnelUrl: installation?.tunnelUrl
-    });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      {
+        configJson: await buildEdgeConfigJson(worker.organizationId, store),
+        cloudflareToken: store.cloudflareToken ? String(store.cloudflareToken) : null,
+        tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null
+      },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
+  } catch (error) {
+    return jsonError(error);
   }
 }

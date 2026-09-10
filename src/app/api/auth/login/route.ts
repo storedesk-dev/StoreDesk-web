@@ -1,110 +1,77 @@
 import { NextResponse } from "next/server";
-import { connectDb } from "@/lib/db";
-import {
-  AppUserModel,
-  UserAssignmentModel,
-  TenantStoreModel,
-  OrganizationModel,
-  WorkerInstallationModel
-} from "@/models/ControlPlane";
-import { verifySecret, signRelaySession } from "@/lib/control-plane-security";
-import bcrypt from "bcryptjs";
+import { issueClientSession, jsonError, loginAppUser } from "@/lib/control-plane";
+import { ControlPlaneError } from "@/lib/control-plane-security";
 
+/**
+ * Convenience endpoint: AppUser login and client-session issuance in one call,
+ * for clients that always use their first (or a named) assignment.
+ *
+ * It is a thin wrapper over the canonical `/api/v1/app-auth/login` +
+ * `/api/v1/app-auth/sessions` pair — deliberately not a second implementation.
+ * The previous version duplicated password verification (with its own
+ * bcrypt/argon2 fork) and minted tokens with a different signing key, so the
+ * two paths could disagree about who was allowed in.
+ */
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as {
       email?: string;
       password?: string;
       assignmentId?: string;
+      deviceId?: string;
+      deviceName?: string;
       audience?: "desktop" | "mobile";
     };
 
     if (!body.email || !body.password) {
-      return NextResponse.json({ error: "email and password are required" }, { status: 400 });
+      throw new ControlPlaneError(400, "REQUEST_INVALID", "email and password are required");
     }
 
-    await connectDb();
+    const audience = body.audience === "mobile" ? "mobile" : "desktop";
 
-    // Find the app user and select passwordHash
-    const user = await AppUserModel.findOne({
-      email: body.email.trim().toLowerCase()
-    }).select("+passwordHash");
+    const login = await loginAppUser({
+      email: body.email,
+      password: body.password,
+      audience,
+      deviceId: body.deviceId,
+      deviceName: body.deviceName
+    });
 
-    if (!user || !user.passwordHash) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    if (login.assignments.length === 0) {
+      throw new ControlPlaneError(
+        403,
+        "AUTHORIZATION_DENIED",
+        "No Worker assignments for this AppUser"
+      );
     }
 
-    // Verify password using bcrypt or fall back to verifySecret (argon2)
-    const hash = String(user.passwordHash);
-    let isValid = false;
+    const assignment =
+      login.assignments.find((a) => a.assignmentId === body.assignmentId) ?? login.assignments[0];
 
-    if (hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$")) {
-      // bcrypt hash
-      isValid = await bcrypt.compare(body.password, hash);
-    } else {
-      // argon2 hash (existing/legacy users)
-      isValid = await verifySecret(hash, body.password);
-    }
-
-    if (!isValid) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
-    }
-
-    if (user.status !== "active") {
-      return NextResponse.json({ error: "App user is not active" }, { status: 403 });
-    }
-
-    // Find active assignments
-    const assignments = await UserAssignmentModel.find({
-      appUserId: user.appUserId,
-      status: "active"
-    }).lean();
-
-    if (assignments.length === 0) {
-      return NextResponse.json({ error: "No assignments found for this app user" }, { status: 403 });
-    }
-
-    // Find the selected assignment, or default to the first one
-    let assignment = assignments[0];
-    if (body.assignmentId) {
-      const matched = assignments.find((a) => a.assignmentId === body.assignmentId);
-      if (matched) {
-        assignment = matched;
-      }
-    }
-
-    // Load organization, store and installation details
-    const [org, store, installation] = await Promise.all([
-      OrganizationModel.findOne({ organizationId: assignment.organizationId }).lean(),
-      TenantStoreModel.findOne({ storeId: assignment.storeId }).lean(),
-      WorkerInstallationModel.findOne({ workerInstallationId: assignment.workerInstallationId }).lean()
-    ]);
-
-    // Sign JWT session token
-    const relay = signRelaySession({
-      sub: user.appUserId,
-      storeId: String(assignment.storeId),
-      installationId: String(assignment.workerInstallationId),
-      role: "client",
-      scopes: (assignment.scopes as string[]) || ["relay:request"],
-      organizationId: String(assignment.organizationId),
+    const session = await issueClientSession({
+      appUserId: String(login.appUserId),
+      deviceId: String(login.deviceId),
       assignmentId: String(assignment.assignmentId),
-      audience: body.audience || "desktop"
+      audience
     });
 
     return NextResponse.json({
-      token: relay.token,
-      expiresAt: relay.expiresAt.toISOString(),
+      token: session.sessionToken,
+      expiresAt: session.expiresAt,
+      appUserId: login.appUserId,
+      deviceId: login.deviceId,
+      assignmentId: session.assignmentId,
+      assignments: login.assignments,
       organization: {
-        organizationId: assignment.organizationId,
-        name: org?.name || "Store Owner"
+        organizationId: session.organizationId,
+        name: assignment.organizationName || "Store Owner"
       },
-      tunnelUrl: (store as Record<string, unknown> | null)?.tunnelUrl ? String((store as Record<string, unknown>).tunnelUrl) : null,
-      lanUrl: (installation as Record<string, unknown> | null)?.lanUrl ? String((installation as Record<string, unknown>).lanUrl) : null,
-      assignmentId: assignment.assignmentId
+      role: session.role,
+      roleAccess: session.roleAccess,
+      tunnelUrl: session.tunnelUrl,
+      lanUrl: session.lanUrl
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "An unexpected error occurred";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (error) {
+    return jsonError(error);
   }
 }

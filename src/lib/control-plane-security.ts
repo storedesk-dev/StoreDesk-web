@@ -2,6 +2,14 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 import argon2 from "argon2";
 
 export const CONTRACT_VERSION = "setup-v1";
+export const CONTROL_PLANE_ISSUER = process.env.CONTROL_PLANE_ISSUER || "storedesk-web";
+/** 12 h: long enough for a full retail shift without a round trip to the cloud. */
+export const CLIENT_SESSION_TTL_SECONDS = 12 * 60 * 60;
+
+/** Mint the per-installation key that signs and verifies client sessions. */
+export function issueRelayKey(): string {
+  return randomSecret(32);
+}
 const SECRET_FIELD = /(secret|password|credential|setupkey|agentkey|authorization|token)$/i;
 
 export class ControlPlaneError extends Error {
@@ -50,6 +58,12 @@ export function constantTimeEqual(left: string, right: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+export function issueWorkerCredential(): { credentialId: string; secret: string; plaintext: string } {
+  const credentialId = publicId("wcred");
+  const secret = randomSecret(32);
+  return { credentialId, secret, plaintext: `${credentialId}.${secret}` };
+}
+
 export function issueSetupKey(): { keyId: string; secret: string; plaintext: string } {
   const keyId = publicId("set");
   const secret = randomSecret(24);
@@ -70,9 +84,14 @@ export function safeJson<T>(value: T): T {
   if (!value || typeof value !== "object") return value;
   const result: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (key === "cloudflareToken") {
-      // Explicitly allow tunnel tokens so the admin UI can display them
-    } else if (key === "__v" || key === "passwordHash" || key === "secretHash" || SECRET_FIELD.test(key)) {
+    if (
+      key === "__v" ||
+      key === "passwordHash" ||
+      key === "secretHash" ||
+      key === "relayKey" ||
+      key === "cloudflareToken" ||
+      SECRET_FIELD.test(key)
+    ) {
       continue;
     }
     result[key] = safeJson(child);
@@ -118,43 +137,57 @@ export function resetRateLimitsForTests(): void {
   rateLimits.clear();
 }
 
-export function signRelaySession(claims: {
-  sub: string;
-  storeId: string;
-  installationId: string;
-  workerInstallationId?: string;
-  organizationId?: string;
-  assignmentId?: string;
-  audience?: "desktop" | "mobile" | "worker";
-  role: "agent" | "client" | "app_user";
-  scopes: string[];
-}): { token: string; expiresAt: Date } {
-  const secret = process.env.RELAY_SESSION_SECRET?.trim();
-  if (!secret || secret.length < 32) {
-    throw new ControlPlaneError(503, "RELAY_UNAVAILABLE", "Relay session signing is unavailable", true);
+/**
+ * Mint a client session token for one assignment.
+ *
+ * Signed with the installation's own `relayKey` so the Worker can verify it
+ * offline, with no shared global secret and no call back to the control plane.
+ * A compromise is contained to a single store.
+ */
+export function signClientSession(
+  relayKey: string,
+  claims: {
+    sub: string;
+    storeId: string;
+    organizationId: string;
+    workerInstallationId: string;
+    assignmentId: string;
+    audience: "desktop" | "mobile";
+    role: string;
+    scopes: string[];
+  },
+  ttlSeconds = CLIENT_SESSION_TTL_SECONDS
+): { token: string; expiresAt: Date } {
+  if (!relayKey || relayKey.length < 32) {
+    throw new ControlPlaneError(
+      503,
+      "RELAY_UNAVAILABLE",
+      "Worker has no relay key; re-activate the installation",
+      true
+    );
   }
   const now = Math.floor(Date.now() / 1000);
-  const expiresAt = new Date((now + 300) * 1000);
+  const expiresAt = new Date((now + ttlSeconds) * 1000);
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  const header = encode({ alg: "HS256", typ: "JWT", kid: process.env.RELAY_KEY_ID || "relay-v1" });
-  const workerInstallationId = claims.workerInstallationId || claims.installationId;
+  const header = encode({ alg: "HS256", typ: "JWT" });
   const payload = encode({
-    iss: process.env.CONTROL_PLANE_ISSUER || "storedesk-web",
-    aud: "storedesk-cloud-hub",
+    iss: CONTROL_PLANE_ISSUER,
+    aud: "storedesk-worker",
     sub: claims.sub,
-    storeId: claims.storeId,
-    installationId: claims.installationId,
-    workerInstallationId,
     organizationId: claims.organizationId,
+    storeId: claims.storeId,
+    workerInstallationId: claims.workerInstallationId,
     assignmentId: claims.assignmentId,
     audience: claims.audience,
-    role: claims.role === "client" ? "app_user" : claims.role,
+    role: claims.role,
     scopes: claims.scopes,
     iat: now,
-    exp: now + 300,
-    jti: publicId("rly")
+    exp: now + ttlSeconds,
+    jti: publicId("cses")
   });
-  const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url");
+  const signature = createHmac("sha256", relayKey)
+    .update(`${header}.${payload}`)
+    .digest("base64url");
   return { token: `${header}.${payload}.${signature}`, expiresAt };
 }
 

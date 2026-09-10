@@ -33,6 +33,28 @@ export default function AdminStoreDetailPage() {
   const [keyExpiresAt, setKeyExpiresAt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // The tunnel token is a bearer credential for the store's public hostname, so
+  // it is not part of the page payload. An operator asks for it explicitly and
+  // the request is audited.
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
+  const [isRevealingToken, setIsRevealingToken] = useState(false);
+
+  async function revealTunnelToken() {
+    setIsRevealingToken(true);
+    try {
+      const res = await fetch(
+        `/api/v1/admin/organizations/${orgId}/stores/${storeId}/tunnel/token`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || "Could not reveal the tunnel token");
+      setRevealedToken(String(data.cloudflareToken));
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not reveal the tunnel token", "error");
+    } finally {
+      setIsRevealingToken(false);
+    }
+  }
+
   useEffect(() => {
     if (orgId && storeId) {
       loadData();
@@ -371,28 +393,41 @@ export default function AdminStoreDetailPage() {
               />
             </div>
             
-            {store?.cloudflareToken && (
+            {store?.tunnelUrl && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tunnel Token</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    readOnly
-                    value={store.cloudflareToken}
-                    className="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-500 font-mono text-xs overflow-hidden text-ellipsis"
-                  />
+                {revealedToken ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={revealedToken}
+                      className="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-500 font-mono text-xs overflow-hidden text-ellipsis"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(revealedToken);
+                        toast("Token copied to clipboard", "success");
+                      }}
+                      className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
+                      title="Copy token"
+                    >
+                      <Copy className="h-4 w-4 text-gray-600" />
+                    </button>
+                  </div>
+                ) : (
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(store.cloudflareToken);
-                      toast("Token copied to clipboard", "success");
-                    }}
-                    className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
-                    title="Copy Token"
+                    onClick={() => void revealTunnelToken()}
+                    disabled={isRevealingToken}
+                    className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium text-gray-700 disabled:opacity-50"
                   >
-                    <Copy className="h-4 w-4 text-gray-600" />
+                    {isRevealingToken ? "Revealing…" : "Reveal tunnel token"}
                   </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Use this token to manually run cloudflared on the Edge server if needed.</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Activation delivers this token to the Worker automatically. Reveal it only to run
+                  <code className="mx-1">cloudflared</code> by hand — the request is recorded in the audit log.
+                </p>
               </div>
             )}
             
