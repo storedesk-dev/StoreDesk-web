@@ -1,20 +1,35 @@
 import type { Metadata } from "next";
-import { Source_Sans_3, Source_Code_Pro } from "next/font/google";
+import { Bricolage_Grotesque, Figtree, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastContext";
-import { SITE } from "@/lib/site";
+import { CAPABILITIES, SITE } from "@/lib/site";
 import { SITE_URL } from "@/lib/metadata";
 
-const sans = Source_Sans_3({
+/*
+ * Type system.
+ *
+ * Figtree for reading: open apertures and a tall x-height keep 16–18px body
+ * copy easy on a back-office monitor. Bricolage Grotesque for headings: a
+ * grotesque with some ink-trap character, so a page title reads as a brand
+ * rather than a form label. JetBrains Mono for PLUs, prices and margins, where
+ * digits have to line up.
+ */
+const sans = Figtree({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"]
+  display: "swap"
 });
 
-const mono = Source_Code_Pro({
+const display = Bricolage_Grotesque({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap"
+});
+
+const mono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  weight: ["400", "600"]
+  display: "swap"
 });
 
 const siteUrl = SITE_URL;
@@ -40,20 +55,11 @@ export const metadata: Metadata = {
     siteName: "StoreDesk",
     title: "StoreDesk — back-office software for convenience stores",
     description: SITE.summary,
-    images: [
-      {
-        url: `${siteUrl}/brand/logo-lockup-horizontal.png`,
-        width: 1200,
-        height: 400,
-        alt: "StoreDesk"
-      }
-    ]
   },
   twitter: {
     card: "summary_large_image",
     title: "StoreDesk — back-office software for convenience stores",
-    description: SITE.summary,
-    images: [`${siteUrl}/brand/logo-lockup-horizontal.png`]
+    description: SITE.summary
   },
   verification: {
     google: "ELm9u6dJOxQAaNx5-2-a8-u1wsPVVsjgEBJD9TDN3Jw"
@@ -73,7 +79,11 @@ const jsonLd = {
       "@id": `${siteUrl}/#software`,
       "name": "StoreDesk",
       "applicationCategory": "BusinessApplication",
-      "operatingSystem": "Windows, macOS, Android",
+      "operatingSystem": "Windows 10 or later, Android 5.0 or later",
+      "downloadUrl": `${siteUrl}/download`,
+      "url": siteUrl,
+      "image": `${siteUrl}/brand/logo-mark.png`,
+      "featureList": Object.values(CAPABILITIES),
       "description": SITE.summary,
       "creator": { "@type": "Organization", "name": "StoreDesk" }
     },
@@ -83,7 +93,13 @@ const jsonLd = {
       "name": "StoreDesk",
       "url": siteUrl,
       "logo": `${siteUrl}/brand/logo-mark.png`,
-      "sameAs": []
+      "email": SITE.email,
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "email": SITE.supportEmail,
+        "availableLanguage": "English"
+      }
     },
     {
       "@type": "WebSite",
@@ -107,7 +123,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${sans.variable} ${mono.variable} antialiased`}>
+      <body className={`${sans.variable} ${display.variable} ${mono.variable} antialiased`}>
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

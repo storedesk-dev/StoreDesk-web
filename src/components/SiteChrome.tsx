@@ -67,8 +67,9 @@ export function SiteHeader() {
             priority
             className="h-7 w-7 object-contain drop-shadow-[0_2px_6px_rgba(26,99,244,0.25)]"
           />
-          <span className="text-[17px] font-semibold tracking-tight text-[#17202A]">
-            Store<span className="text-[#00A87B]">Desk</span>
+          {/* The lockup's wordmark, set as live text so it stays crisp on glass. */}
+          <span className="sd-wordmark whitespace-nowrap font-[family-name:var(--font-display)] text-[17px] font-extrabold uppercase tracking-[0.03em]">
+            Store Desk
           </span>
         </Link>
 
@@ -206,7 +207,7 @@ export function SiteFooter() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-md shadow-black/10">
               <Image src="/brand/logo-mark.png" alt="" width={64} height={64} className="h-6 w-6 object-contain" />
             </span>
-            <span className="text-[18px] font-semibold tracking-tight">StoreDesk</span>
+            <span className="font-[family-name:var(--font-display)] text-[18px] font-extrabold uppercase tracking-[0.03em]">Store Desk</span>
           </div>
           <p className="mt-4 max-w-sm text-[14.5px] leading-relaxed text-white/85">
             {SITE.tagline}. Runs on the PC in your back office and keeps working when the
