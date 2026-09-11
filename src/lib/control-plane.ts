@@ -851,8 +851,12 @@ export async function createAssignment(
   return safeJson(doc.toObject());
 }
 
-async function assignmentSummaries(appUserId: string) {
-  const assignments = await UserAssignmentModel.find({ appUserId, status: "active" }).lean();
+async function assignmentSummaries(appUserId: string, organizationId?: string) {
+  const assignments = await UserAssignmentModel.find({
+    appUserId,
+    status: "active",
+    ...(organizationId ? { organizationId } : {})
+  }).lean();
   const summaries = [];
   for (const a of assignments) {
     const [org, store, installation] = await Promise.all([
@@ -956,12 +960,46 @@ export async function enrollAppUser(body: {
   };
 }
 
+/** Slugs are stored lowercase; the fallback slug is an organization id, hence `_`. */
+const ORGANIZATION_SLUG = /^[a-z0-9][a-z0-9._-]{0,99}$/;
+
+export function normalizeOrganizationSlug(raw: string): string | null {
+  const slug = raw.trim().toLowerCase();
+  return ORGANIZATION_SLUG.test(slug) ? slug : null;
+}
+
+async function activeOrganizationBySlug(rawSlug: string) {
+  const slug = normalizeOrganizationSlug(rawSlug);
+  if (!slug) throw new ControlPlaneError(400, "REQUEST_INVALID", "Organization is invalid");
+  await connectDb();
+  const org = await OrganizationModel.findOne({ slug, status: "active" }).lean();
+  if (!org) {
+    throw new ControlPlaneError(404, "ORGANIZATION_NOT_FOUND", "No organization matches that name");
+  }
+  return org;
+}
+
+/**
+ * The first sign-in screen: the user types their organization, and the app
+ * shows its name above the email and password. Public, so it answers with the
+ * name only. A slug is guessable, so no id, store or tunnel address comes back;
+ * the store's address arrives with the session, after sign-in.
+ */
+export async function lookupOrganization(rawSlug: string) {
+  const org = await activeOrganizationBySlug(rawSlug);
+  return {
+    contractVersion: CONTRACT_VERSION,
+    organization: { slug: String(org.slug), name: String(org.name) }
+  };
+}
+
 export async function loginAppUser(body: {
   email: string;
   password: string;
   deviceName?: string;
   audience: "desktop" | "mobile";
   deviceId?: string;
+  organizationSlug?: string;
 }) {
   await connectDb();
   const user = await AppUserModel.findOne({
@@ -973,6 +1011,27 @@ export async function loginAppUser(body: {
   if (user.status !== "active") {
     throw new ControlPlaneError(403, "AUTHORIZATION_DENIED", "App user is not active");
   }
+
+  // Signing in to one organization lists only its stores. Checked after the
+  // password, so only the account's owner learns which organizations it is in.
+  let organizationId: string | undefined;
+  if (body.organizationSlug !== undefined) {
+    const org = await activeOrganizationBySlug(body.organizationSlug);
+    organizationId = String(org.organizationId);
+    const member = await UserAssignmentModel.exists({
+      appUserId: user.appUserId,
+      organizationId,
+      status: "active"
+    });
+    if (!member) {
+      throw new ControlPlaneError(
+        403,
+        "ORGANIZATION_ACCESS_DENIED",
+        "This login has no access to that organization"
+      );
+    }
+  }
+
   user.lastLoginAt = new Date();
   await user.save();
 
@@ -996,7 +1055,7 @@ export async function loginAppUser(body: {
     });
   }
 
-  const assignments = await assignmentSummaries(String(user.appUserId));
+  const assignments = await assignmentSummaries(String(user.appUserId), organizationId);
   return {
     contractVersion: CONTRACT_VERSION,
     appUserId: user.appUserId,
