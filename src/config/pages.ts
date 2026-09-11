@@ -78,7 +78,9 @@ export const ALL_PAGES: PageDefinition[] = [
     app: "electron",
     filePath: "src/pages/PriceBookPage.tsx",
     defaultEnabled: true,
-    knownFeatureFlags: {}
+    knownFeatureFlags: {
+      priceGroups: { label: "Price Groups", description: "Group items by rule or by hand and mass-update their price and info through the group.", default: true }
+    }
   },
   {
     key: "costAnalysis",
@@ -86,6 +88,33 @@ export const ALL_PAGES: PageDefinition[] = [
     description: "True cost comparison across vendors — price per item, per pack, per unit.",
     app: "electron",
     filePath: "src/pages/CostAnalysisPage.tsx",
+    defaultEnabled: true,
+    knownFeatureFlags: {}
+  },
+  {
+    key: "fuelPrices",
+    label: "Fuel Prices",
+    description: "In-effect and pending fuel prices from the register, price-change history, and staged changes.",
+    app: "electron",
+    filePath: "src/pages/FuelPricesPage.tsx",
+    defaultEnabled: true,
+    knownFeatureFlags: {}
+  },
+  {
+    key: "deals",
+    label: "Deals",
+    description: "Register combos and mix & match deals with their item lists and items (read-only).",
+    app: "electron",
+    filePath: "src/pages/DealsPage.tsx",
+    defaultEnabled: true,
+    knownFeatureFlags: {}
+  },
+  {
+    key: "registerChanges",
+    label: "Register Changes",
+    description: "Price and fuel changes staged for the register — review, cancel, or revert a batch.",
+    app: "electron",
+    filePath: "src/pages/RegisterChangesPage.tsx",
     defaultEnabled: true,
     knownFeatureFlags: {}
   },
@@ -178,6 +207,26 @@ export const ALL_PAGES: PageDefinition[] = [
     description: "View the selling price book and suggested prices on mobile.",
     app: "mobile",
     filePath: "lib/features/price_book/price_book_screen.dart",
+    defaultEnabled: true,
+    knownFeatureFlags: {
+      priceGroups: { label: "Price Groups", description: "View price groups and mass-update price through a group on mobile.", default: true }
+    }
+  },
+  {
+    key: "mobileFuelPrices",
+    label: "Fuel Prices",
+    description: "In-effect and pending fuel prices on mobile, and staging a pending change.",
+    app: "mobile",
+    filePath: "lib/features/fuel/fuel_prices_screen.dart",
+    defaultEnabled: true,
+    knownFeatureFlags: {}
+  },
+  {
+    key: "mobileDeals",
+    label: "Deals",
+    description: "Register combos and mix & match deals with their items on mobile (read-only).",
+    app: "mobile",
+    filePath: "lib/features/deals/deals_screen.dart",
     defaultEnabled: true,
     knownFeatureFlags: {}
   },
