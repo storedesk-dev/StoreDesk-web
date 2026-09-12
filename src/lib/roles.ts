@@ -32,6 +32,7 @@ export const DEFAULT_ORG_ROLES = [
           { key: "transactions",   enabled: true, featureFlags: { enableExport: true, enableRefundView: true } },
           { key: "manageWorker",   enabled: true, featureFlags: {} },
           { key: "userManagement", enabled: true, featureFlags: {} },
+          { key: "reportMapping",  enabled: true, featureFlags: {} },
           { key: "settings",       enabled: true, featureFlags: {} }
         ]
       },

@@ -98,8 +98,8 @@ export const ALL_PAGES: PageDefinition[] = [
   },
   {
     key: "fuelPrices",
-    label: "Fuel Prices",
-    description: "In-effect and pending fuel prices from the register, price-change history, and staged changes.",
+    label: "Fuel Center",
+    description: "Fuel prices (in effect, pending, staged edits), pumps and their sales, and fuel sold by grade over chosen dates.",
     app: "electron",
     filePath: "src/pages/FuelPricesPage.tsx",
     defaultEnabled: true,
@@ -149,6 +149,15 @@ export const ALL_PAGES: PageDefinition[] = [
     key: "userManagement",
     label: "Users and Roles",
     description: "View the store's synced users and edit role access; changes sync to the control plane.",
+    app: "electron",
+    filePath: "src/pages/SettingsPage.tsx",
+    defaultEnabled: false,
+    knownFeatureFlags: {}
+  },
+  {
+    key: "reportMapping",
+    label: "Report Mapping",
+    description: "Map the register's report lines (tax rates, departments, payment types, cards) to StoreDesk's daily numbers, Sales Tax and Google Sheet columns.",
     app: "electron",
     filePath: "src/pages/SettingsPage.tsx",
     defaultEnabled: false,
@@ -229,8 +238,8 @@ export const ALL_PAGES: PageDefinition[] = [
   },
   {
     key: "mobileFuelPrices",
-    label: "Fuel Prices",
-    description: "In-effect and pending fuel prices on mobile, and staging a pending change.",
+    label: "Fuel Center",
+    description: "Fuel prices with pending flags and staged edits, pumps and their sales, and fuel sold by grade on mobile.",
     app: "mobile",
     filePath: "lib/features/fuel/fuel_prices_screen.dart",
     defaultEnabled: true,

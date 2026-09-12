@@ -43,6 +43,7 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       "deals",
       "registerChanges",
       "transactions",
+      "reportMapping",
       "settings"
     ],
     mobile: [

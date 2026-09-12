@@ -94,6 +94,7 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       "deals",
       "registerChanges",
       "transactions",
+      "reportMapping",
       "settings"
     ],
     mobile: [
