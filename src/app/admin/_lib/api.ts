@@ -77,6 +77,8 @@ export interface StoreInstallationSummary {
 
 export interface StoreTunnel {
   status: TunnelStatus;
+  /** The PC was replaced and the tunnel must be rotated (Retry) before a setup key can be issued. */
+  rotationRequired?: boolean;
   url?: string | null;
   message?: string | null;
 }
@@ -215,6 +217,10 @@ export interface AppUser {
   loginType?: LoginType;
   passwordSetBy?: "user" | "admin" | null;
   lastLoginAt?: string | null;
+  /** Other organizations this login belongs to. */
+  sharedWith?: Array<{ organizationId: string; name: string }>;
+  /** Why this organization can't change the login's password, status or invitation (409 LOGIN_SHARED); null when it can. */
+  loginChangeBlocked?: string | null;
   assignments: Assignment[];
 }
 
@@ -335,7 +341,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       method,
       credentials: "same-origin",
       cache: "no-store",
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      // Every change is sent as JSON, body or not: the server refuses admin
+      // mutations of any other type (a cross-site form cannot send JSON).
+      headers: method === "GET" ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
   } catch {

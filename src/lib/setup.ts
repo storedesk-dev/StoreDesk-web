@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import {
   SetupKeyModel,
   SubscriptionModel,
+  TenantStoreModel,
   WorkerCredentialModel,
   WorkerInstallationModel
 } from "@/models/ControlPlane";
@@ -14,15 +15,16 @@ import { PLANS, SITE } from "@/lib/site";
 import { requireOrganization } from "@/lib/organizations";
 import { installationSummary, requireStore } from "@/lib/tenant-stores";
 import { entitlementProblem, expireLapsedSubscriptions, subscriptionView } from "@/lib/subscriptions";
-import { cloudflareConfigured, tunnelView } from "@/lib/tunnel";
+import { cloudflareConfigured, rotateStoreTunnel, tunnelView } from "@/lib/tunnel";
 import { revokeInstallationsAndNotify } from "@/lib/store-notify";
 import type { InternalAdminActor } from "@/lib/admin-auth";
 
 /**
  * Store → PC & phones (owner decision 6): the org tag for phones, the setup
  * key for the PC, and the one path that issues keys (P8) — entitlement
- * checked, status `shown` or `sent`, standard errors. Replace PC (P4) resets
- * an installation so a new key can activate a new PC.
+ * checked, status `shown` or `sent`, standard errors. Replace PC (P4) cuts
+ * the old PC off — credential revoked, tunnel secret rotated — so a new key
+ * can activate a new PC.
  */
 
 type Doc = Record<string, unknown>;
@@ -54,6 +56,14 @@ function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | nul
   }
   const problem = entitlementProblem(ctx.subscription);
   if (problem) return { status: 402, code: "SUBSCRIPTION_INACTIVE", message: problem };
+  if (ctx.store.tunnelRotationRequired === true) {
+    return {
+      status: 409,
+      code: "TUNNEL_ROTATION_REQUIRED",
+      message:
+        "The replaced PC can still serve this store's tunnel. Retry the tunnel to rotate it, then issue a setup key."
+    };
+  }
   if (cloudflareConfigured() && !ctx.store.tunnelUrl) {
     return {
       status: 428,
@@ -278,10 +288,14 @@ export const ReplacePcSchema = z
   .strict();
 
 /**
- * Replace this PC (P4): revoke the installation's credential and tell the old
- * PC (its next pull gets 401 and it turns sign-in off), revoke unused keys,
- * and put the installation back to `awaiting_activation` so the next key
- * redeems on a new PC.
+ * Replace this PC (P4). The old PC holds two things that let it act for the
+ * store: its worker credential and the tunnel token. The credential is
+ * revoked (the old PC is told and turns sign-in off) and the tunnel secret is
+ * rotated, which drops the old PC's tunnel connection. If the tunnel cannot be
+ * rotated now (Cloudflare refuses, is not configured, or the tunnel predates
+ * stored ids), the store is marked `tunnelRotationRequired` and no setup key
+ * is issued until "Retry tunnel" succeeds. Then the installation goes back to
+ * `awaiting_activation` so the next key redeems on a new PC.
  */
 export async function replaceStorePc(
   admin: InternalAdminActor,
@@ -332,6 +346,18 @@ export async function replaceStorePc(
       }
     }
   );
+
+  let tunnelRotated = false;
+  let tunnelError: string | null = null;
+  if (ctx.store.tunnelUrl) {
+    const outcome = ctx.store.tunnelId ? await rotateStoreTunnel(storeId, String(ctx.store.tunnelId)) : null;
+    tunnelRotated = outcome?.status === "ok";
+    if (!tunnelRotated) {
+      tunnelError = outcome?.message ?? "The tunnel predates rotation support; Retry tunnel replaces it.";
+      await TenantStoreModel.updateOne({ storeId }, { $set: { tunnelRotationRequired: true } });
+    }
+  }
+
   await auditAdmin(admin, {
     organizationId,
     storeId,
@@ -339,8 +365,16 @@ export async function replaceStorePc(
     action: "installation.replace",
     targetType: "worker_installation",
     targetId: workerInstallationId,
-    metadata: { previousStatus: target.status, credentialsRevoked: revoked }
+    metadata: {
+      previousStatus: target.status,
+      credentialsRevoked: revoked,
+      tunnelRotated,
+      ...(tunnelError ? { tunnelRotationRequired: true, tunnelError } : {})
+    }
   });
-  const fresh = (await WorkerInstallationModel.findOne({ workerInstallationId }).lean()) as Doc | null;
-  return { installation: installationSummary(fresh) };
+  const [fresh, store] = await Promise.all([
+    WorkerInstallationModel.findOne({ workerInstallationId }).lean(),
+    requireStore(organizationId, storeId)
+  ]);
+  return { installation: installationSummary(fresh as Doc | null), tunnel: tunnelView(store) };
 }

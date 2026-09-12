@@ -122,6 +122,12 @@ const TenantStoreSchema = new Schema(
     tunnelStatus: { type: String, enum: ["provisioned", "not_configured", "failed"] },
     tunnelError: { type: String },
     tunnelUpdatedAt: Date,
+    /** Cloudflare ids saved when provisioning succeeded; delete and rotate go by these, never by name. */
+    tunnelId: { type: String },
+    tunnelDnsRecordId: { type: String },
+    /** The PC was replaced and the tunnel secret is not rotated yet: no setup key until it is. */
+    tunnelRotationRequired: { type: Boolean },
+    tunnelRotatedAt: Date,
     /**
      * Register connection only (`posIntegration`, `posIpAddress`,
      * `posUsername`), built by the server — no route accepts a client-supplied
@@ -292,6 +298,12 @@ const AppUserSchema = new Schema(
      */
     loginType: { type: String, enum: ["email", "managed"], default: "email" },
     passwordSetBy: { type: String, enum: ["user", "admin"] },
+    /**
+     * The organization whose admin created this login. Only that organization
+     * may set its password or change its status, and only while no other
+     * organization has it (lib/users.ts). Missing on older records.
+     */
+    createdInOrganizationId: { type: String, index: true },
     enrollmentSecretHash: { type: String, select: false },
     enrollmentExpiresAt: Date,
     enrollmentConsumedAt: Date,
@@ -364,6 +376,21 @@ const AuditEventSchema = new Schema(
 );
 AuditEventSchema.index({ organizationId: 1, occurredAt: -1 });
 
+/**
+ * Staff sign-in failure counters, per hashed address and per hashed e-mail,
+ * shared by every server instance. A TTL index drops a window once it ends.
+ */
+const LoginThrottleSchema = new Schema(
+  {
+    key: { type: String, required: true, unique: true },
+    count: { type: Number, required: true, default: 0 },
+    expiresAt: { type: Date, required: true }
+  },
+  { versionKey: false }
+);
+LoginThrottleSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const LoginThrottleModel = models.LoginThrottle || model("LoginThrottle", LoginThrottleSchema);
 export const InternalAdminModel =
   models.InternalAdmin || model("InternalAdmin", InternalAdminSchema);
 export const AdminSessionModel =

@@ -239,7 +239,8 @@ describe("DELETE /organizations/{org}", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ deleted: organizationId, counts: { stores: 1, installations: 1, usersDeleted: 1, usersKept: 1 } });
     expect(revokeInstallationsAndNotify).toHaveBeenCalledWith({ organizationId, reason: "organization.delete" });
-    expect(deleteCloudflareTunnel).toHaveBeenCalledWith("example-retail-store-42");
+    // No tunnel was created (Cloudflare is off); deletion is by stored id only, never by name.
+    expect(deleteCloudflareTunnel).not.toHaveBeenCalled();
 
     for (const model of [TenantStoreModel, SubscriptionModel, WorkerInstallationModel, WorkerCredentialModel, UserAssignmentModel]) {
       expect(await model.countDocuments({ organizationId })).toBe(0);

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
-import { deleteCloudflareTunnel } from "@/lib/cloudflare";
 import {
   SetupKeyModel,
   SubscriptionModel,
@@ -30,7 +29,16 @@ import {
   expireLapsedSubscriptions,
   subscriptionView
 } from "@/lib/subscriptions";
-import { provisionStoreTunnel, toDnsLabel, tunnelView, type TunnelOutcome } from "@/lib/tunnel";
+import {
+  freeTunnelLabel,
+  provisionStoreTunnel,
+  removeStoreTunnel,
+  rotateStoreTunnel,
+  toDnsLabel,
+  tunnelLabelInUse,
+  tunnelView,
+  type TunnelOutcome
+} from "@/lib/tunnel";
 import { googleServiceAccountEmail } from "@/lib/google";
 import type { InternalAdminActor } from "@/lib/admin-auth";
 
@@ -191,6 +199,10 @@ export type StorePatch = z.output<typeof StorePatchSchema>;
 
 // ── Writes ───────────────────────────────────────────────────────────────────
 
+function labelTaken(label: string): ControlPlaneError {
+  return new ControlPlaneError(409, "TUNNEL_LABEL_TAKEN", `The tunnel name "${label}" is already used by another store`);
+}
+
 export async function createStore(
   admin: InternalAdminActor,
   organizationId: string,
@@ -226,12 +238,18 @@ export async function createStore(
   }
 
   const storeId = publicId("store");
-  const settings: StoreSettings = { ...defaultStoreSettings(), timeZone: body.timeZone ?? null };
+  // A label the operator chose must be free; a derived one gets -2, -3, … .
+  const explicit = toDnsLabel(body.tunnelLabel ?? body.slug ?? "");
+  if (explicit && (await tunnelLabelInUse(explicit, storeId))) throw labelTaken(explicit);
   const label =
-    toDnsLabel(body.tunnelLabel ?? body.slug ?? "") ||
-    toDnsLabel(`${String(org.slug)}-${body.name}`) ||
-    toDnsLabel(`${String(org.slug)}-${body.storeNumber ?? ""}`) ||
-    toDnsLabel(storeId);
+    explicit ||
+    (await freeTunnelLabel(
+      toDnsLabel(`${String(org.slug)}-${body.name}`) ||
+        toDnsLabel(`${String(org.slug)}-${body.storeNumber ?? ""}`) ||
+        toDnsLabel(storeId),
+      storeId
+    ));
+  const settings: StoreSettings = { ...defaultStoreSettings(), timeZone: body.timeZone ?? null };
   await TenantStoreModel.create({
     organizationId,
     storeId,
@@ -243,7 +261,7 @@ export async function createStore(
     status: "active",
     settings,
     settingsVersion: 1,
-    tunnelLabel: label,
+    // The tunnel label is saved only once a tunnel exists under it.
     configJson: registerConfigJson({})
   });
   await auditAdmin(admin, {
@@ -311,14 +329,8 @@ export async function deleteStore(admin: InternalAdminActor, organizationId: str
   // throws and stops the delete.
   await revokeInstallationsAndNotify({ organizationId, storeId, reason: "store.delete" });
 
-  const label = tunnelLabelOf(store);
-  if (label) {
-    try {
-      await deleteCloudflareTunnel(label);
-    } catch (error) {
-      console.warn("[store.delete] tunnel:", error);
-    }
-  }
+  // By the stored Cloudflare ids only.
+  const tunnel = await removeStoreTunnel(store);
 
   await Promise.all([
     SetupKeyModel.deleteMany({ storeId }),
@@ -333,12 +345,27 @@ export async function deleteStore(admin: InternalAdminActor, organizationId: str
     action: "store.delete",
     targetType: "store",
     targetId: storeId,
-    metadata: { name: store.name, installations: installationIds.length, assignments: assignments.length }
+    metadata: {
+      name: store.name,
+      installations: installationIds.length,
+      assignments: assignments.length,
+      tunnelDeleted: tunnel.tunnelDeleted,
+      ...(tunnel.manualCleanup ? { tunnelNeedsManualCleanup: tunnel.manualCleanup } : {})
+    }
   });
-  return { deleted: storeId };
+  return { deleted: storeId, ...(tunnel.manualCleanup ? { tunnelNeedsManualCleanup: tunnel.manualCleanup } : {}) };
 }
 
-/** Retry the tunnel (P6). 409 when the store already has one. */
+/**
+ * Retry the tunnel (P6), or rotate a live one:
+ * - no tunnel: create it (a label the operator chose must be free);
+ * - a tunnel with a stored Cloudflare id: rotate its secret — after Replace PC
+ *   this is what cuts the old PC off — audited `store.tunnel.rotate`;
+ * - an older tunnel known only by its name: create a replacement under a new
+ *   name. The old one is left for manual cleanup (deleting by name is unsafe)
+ *   and named in the audit.
+ * 503 TUNNEL_NOT_CONFIGURED and 502 TUNNEL_PROVISION_FAILED carry the current `tunnel`.
+ */
 export async function retryStoreTunnel(
   admin: InternalAdminActor,
   organizationId: string,
@@ -346,32 +373,44 @@ export async function retryStoreTunnel(
   body: { label?: string }
 ) {
   const store = await requireStore(organizationId, storeId);
-  if (store.tunnelUrl) {
-    throw new ControlPlaneError(409, "TUNNEL_EXISTS", "This store already has a tunnel", false, {
-      tunnel: tunnelView(store)
-    });
-  }
   const org = await requireOrganization(organizationId);
-  const label =
-    toDnsLabel(body.label ?? "") ||
-    tunnelLabelOf(store) ||
-    toDnsLabel(`${String(org.slug)}-${String(store.name)}`) ||
-    toDnsLabel(storeId);
-  const outcome = await provisionStoreTunnel(storeId, label);
+  let outcome: TunnelOutcome;
+  let action: string;
+  const metadata: Doc = {};
+  if (store.tunnelUrl && store.tunnelId) {
+    outcome = await rotateStoreTunnel(storeId, String(store.tunnelId));
+    action = "store.tunnel.rotate";
+    metadata.tunnelId = store.tunnelId;
+    metadata.afterReplacePc = store.tunnelRotationRequired === true;
+  } else {
+    const explicit = toDnsLabel(body.label ?? "");
+    const legacy = store.tunnelUrl ? tunnelLabelOf(store) : null;
+    // An older tunnel keeps its name until removed by hand, so even this
+    // store's own label counts as taken.
+    const exceptStoreId = legacy ? "" : storeId;
+    if (explicit && (await tunnelLabelInUse(explicit, exceptStoreId))) throw labelTaken(explicit);
+    const label =
+      explicit ||
+      (await freeTunnelLabel(toDnsLabel(`${String(org.slug)}-${String(store.name)}`) || toDnsLabel(storeId), exceptStoreId));
+    outcome = await provisionStoreTunnel(storeId, label);
+    action = "store.tunnel.provision";
+    Object.assign(metadata, { label, retry: true, ...(legacy ? { replacedLegacyTunnel: legacy, tunnelNeedsManualCleanup: legacy } : {}) });
+  }
   await auditAdmin(admin, {
     organizationId,
     storeId,
-    action: "store.tunnel.provision",
+    action,
     targetType: "store",
     targetId: storeId,
-    metadata: { status: outcome.status, label, retry: true, ...(outcome.status === "failed" ? { error: outcome.message } : {}) }
+    metadata: { ...metadata, status: outcome.status, ...(outcome.status === "failed" ? { error: outcome.message } : {}) }
   });
   const tunnel = tunnelView(await requireStore(organizationId, storeId));
   if (outcome.status === "not_configured") {
-    throw new ControlPlaneError(503, "TUNNEL_NOT_CONFIGURED", tunnel.message ?? "Cloudflare is not configured", false, { tunnel });
+    throw new ControlPlaneError(503, "TUNNEL_NOT_CONFIGURED", outcome.message ?? "Cloudflare is not configured", false, { tunnel });
   }
   if (outcome.status === "failed") {
-    throw new ControlPlaneError(502, "TUNNEL_PROVISION_FAILED", `Cloudflare refused the tunnel: ${outcome.message}`, true, {
+    const what = action === "store.tunnel.rotate" ? "rotate the tunnel" : "create the tunnel";
+    throw new ControlPlaneError(502, "TUNNEL_PROVISION_FAILED", `Cloudflare refused to ${what}: ${outcome.message}`, true, {
       tunnel
     });
   }
@@ -380,6 +419,26 @@ export async function retryStoreTunnel(
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
+
+/**
+ * One Google Sheet belongs to one organization: StoreDesk's account can open
+ * every sheet shared with it, so letting a second organization attach the
+ * same sheet would hand it the first one's data. 409 SHEET_IN_USE.
+ */
+export async function assertSheetNotInOtherOrganization(organizationId: string, spreadsheetId: string): Promise<void> {
+  await connectDb();
+  const used = await TenantStoreModel.exists({
+    "settings.integrations.googleSheets.spreadsheetId": spreadsheetId,
+    organizationId: { $ne: organizationId }
+  });
+  if (used) {
+    throw new ControlPlaneError(
+      409,
+      "SHEET_IN_USE",
+      "This sheet is already connected to another organization's store. Each organization needs its own sheet."
+    );
+  }
+}
 
 export async function getStoreSettings(organizationId: string, storeId: string) {
   const store = await requireStore(organizationId, storeId);
@@ -422,6 +481,10 @@ export async function updateStoreSettings(
   const { settings, changed } = applySettingsUpdate(current, update);
   if (changed.length === 0) {
     return { settings: current, settingsVersion: version, googleClientEmail: googleServiceAccountEmail() };
+  }
+  const spreadsheetId = settings.integrations.googleSheets.spreadsheetId;
+  if (changed.includes("integrations") && spreadsheetId) {
+    await assertSheetNotInOtherOrganization(organizationId, spreadsheetId);
   }
   const versionFilter = version === 1 ? { $in: [1, null] } : version;
   const written = await TenantStoreModel.updateOne(

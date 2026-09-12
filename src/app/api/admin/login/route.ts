@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  ADMIN_COOKIE,
+  adminCookieName,
+  adminCookieOptions,
   authenticateInternalAdminLogin,
   createAdminSession,
   readAdminToken,
@@ -17,8 +18,9 @@ const LoginSchema = z.object({
 });
 
 /**
- * Staff sign-in. 10 failures per address and 5 per e-mail in 15 minutes lock
- * further attempts out (429 LOGIN_RATE_LIMITED); every attempt is audited.
+ * Staff sign-in. At most 10 attempts per address and 5 per e-mail in 15
+ * minutes, counted in MongoDB (429 LOGIN_RATE_LIMITED); every attempt is
+ * audited. The middleware refuses a sign-in not sent by the admin console.
  */
 export async function POST(req: Request) {
   try {
@@ -29,13 +31,7 @@ export async function POST(req: Request) {
       ok: true,
       admin: { adminId: String(admin.adminId), email: String(admin.email), name: String(admin.name) }
     });
-    res.cookies.set(ADMIN_COOKIE, session.token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      expires: session.expiresAt
-    });
+    res.cookies.set(adminCookieName(), session.token, adminCookieOptions(session.expiresAt));
     return res;
   } catch (error) {
     return jsonError(error);
@@ -59,6 +55,6 @@ export async function DELETE(req: Request) {
     /* signing out always clears the cookie */
   }
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(ADMIN_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  res.cookies.set(adminCookieName(), "", adminCookieOptions());
   return res;
 }

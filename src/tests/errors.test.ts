@@ -55,7 +55,14 @@ describe("jsonError", () => {
 
 describe("parseBody", () => {
   const schema = z.object({ name: z.string().min(1) }).strict();
-  const req = (text: string) => new Request("http://localhost/x", { method: "POST", body: text });
+  const req = (text: string, type = "application/json") =>
+    new Request("http://localhost/x", { method: "POST", body: text, headers: { "Content-Type": type } });
+
+  it("refuses a body that is not sent as application/json with 415", async () => {
+    await expect(parseBody(req('{"name":"a"}', "text/plain"), schema)).rejects.toMatchObject({ status: 415, code: "UNSUPPORTED_MEDIA_TYPE" });
+    await expect(parseBody(req("name=a", "application/x-www-form-urlencoded"), schema)).rejects.toMatchObject({ status: 415 });
+    await expect(parseBody(req('{"name":"a"}', "application/json; charset=utf-8"), schema)).resolves.toEqual({ name: "a" });
+  });
 
   it("reads JSON and validates it", async () => {
     await expect(parseBody(req('{"name":"a"}'), schema)).resolves.toEqual({ name: "a" });

@@ -3,6 +3,7 @@ import { connectDb } from "@/lib/db";
 import {
   AdminSessionModel,
   InternalAdminModel,
+  LoginThrottleModel,
   OrganizationModel,
   TenantStoreModel,
   WorkerCredentialModel,
@@ -10,19 +11,36 @@ import {
 } from "@/models/ControlPlane";
 import {
   ControlPlaneError,
-  clearRateLimit,
   constantTimeEqual,
   hashSecret,
   publicId,
   randomSecret,
-  rateLimitBlocked,
-  recordRateHit,
   sha256,
   verifySecret
 } from "@/lib/control-plane-security";
 import { writeAudit } from "@/lib/audit";
 
-export const ADMIN_COOKIE = "sd_session";
+/**
+ * The staff session cookie. In production it is `__Host-sd_session`: the
+ * browser only accepts it with Secure, Path=/ and no Domain, so a sibling
+ * host (a store's *.tunnels.storedesk.net) can neither set nor read it.
+ * `__Host-` requires HTTPS, so local runs on http://localhost use the plain name.
+ */
+export function adminCookieName(): string {
+  return process.env.NODE_ENV === "production" ? "__Host-sd_session" : "sd_session";
+}
+
+export function adminCookieOptions(expires?: Date) {
+  return {
+    httpOnly: true,
+    // Strict: the cookie never rides a request started on another site,
+    // including a same-site store tunnel host.
+    sameSite: "strict" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    ...(expires ? { expires } : { maxAge: 0 })
+  };
+}
 
 export type InternalAdminActor = {
   adminId: string;
@@ -39,16 +57,12 @@ function cookieFromHeader(header: string | null, name: string): string {
 
 /** Bearer header first, then the session cookie. Works outside a request scope (tests, scripts). */
 export async function readAdminToken(req: Request): Promise<string> {
-  return adminToken(req);
-}
-
-async function adminToken(req: Request): Promise<string> {
   const authorization = req.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) return authorization.slice(7);
   try {
-    return (await cookies()).get(ADMIN_COOKIE)?.value ?? "";
+    return (await cookies()).get(adminCookieName())?.value ?? "";
   } catch {
-    return cookieFromHeader(req.headers.get("cookie"), ADMIN_COOKIE);
+    return cookieFromHeader(req.headers.get("cookie"), adminCookieName());
   }
 }
 
@@ -71,7 +85,7 @@ export async function createAdminSession(
 
 export async function requireInternalAdmin(req: Request): Promise<InternalAdminActor> {
   await connectDb();
-  const token = await adminToken(req);
+  const token = await readAdminToken(req);
   const [sessionId, secret, extra] = token.split(".");
   if (!sessionId || !secret || extra) {
     throw new ControlPlaneError(401, "AUTHENTICATION_REQUIRED", "Authentication required");
@@ -164,8 +178,39 @@ export async function authenticateWorker(req: Request): Promise<{
 // ── Staff sign-in (P7) ───────────────────────────────────────────────────────
 
 const LOGIN_WINDOW_MS = 15 * 60_000;
-const LOGIN_FAILURES_PER_IP = 10;
-const LOGIN_FAILURES_PER_EMAIL = 5;
+export const LOGIN_ATTEMPTS_PER_IP = 10;
+export const LOGIN_ATTEMPTS_PER_EMAIL = 5;
+
+/**
+ * Count one attempt against `key` and answer the count in the current window.
+ * One atomic update in MongoDB, shared by every server instance: a window
+ * that has ended starts again at 1. A TTL index removes ended windows.
+ */
+async function countAttempt(key: string, now: Date): Promise<number> {
+  const expires = new Date(now.getTime() + LOGIN_WINDOW_MS);
+  const live = { $gt: ["$expiresAt", now] };
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const doc = await LoginThrottleModel.collection.findOneAndUpdate(
+        { key },
+        [
+          {
+            $set: {
+              count: { $cond: [live, { $add: ["$count", 1] }, 1] },
+              expiresAt: { $cond: [live, "$expiresAt", expires] }
+            }
+          }
+        ],
+        { upsert: true, returnDocument: "after" }
+      );
+      return Number(doc?.count ?? 1);
+    } catch (error) {
+      // Two first attempts raced to insert the same key; the retry increments.
+      if ((error as { code?: number }).code === 11000 && attempt === 0) continue;
+      throw error;
+    }
+  }
+}
 
 let dummyHash: Promise<string> | null = null;
 /** Verify against something for an unknown e-mail too, so the answer takes as long. */
@@ -175,18 +220,21 @@ function unknownAccountHash(): Promise<string> {
 }
 
 /**
- * Staff sign-in with lockout: 10 failures from one address or 5 for one
- * e-mail within 15 minutes refuse further attempts (429) until the window
- * ends. A success clears the e-mail's count. Every success and failure is
- * audited, never with the password.
+ * Staff sign-in with lockout: at most 10 attempts from one address and 5 for
+ * one e-mail in 15 minutes. Each attempt is counted atomically in MongoDB
+ * before the password is checked, so parallel attempts cannot slip past the
+ * limit and every instance sees the same counts. A success clears both
+ * counts. Every success and failure is audited, never with the password.
  */
 export async function authenticateInternalAdminLogin(email: string, password: string, ip = "unknown") {
   await connectDb();
   const normalizedEmail = email.trim().toLowerCase();
-  const ipKey = `admin-login-ip:${ip}`;
-  const emailKey = `admin-login-email:${normalizedEmail}`;
   const ipHash = sha256(ip).slice(0, 16);
-  if (rateLimitBlocked(ipKey, LOGIN_FAILURES_PER_IP) || rateLimitBlocked(emailKey, LOGIN_FAILURES_PER_EMAIL)) {
+  const ipKey = `admin-login:ip:${sha256(ip)}`;
+  const emailKey = `admin-login:email:${sha256(normalizedEmail)}`;
+  const now = new Date();
+  const [ipCount, emailCount] = await Promise.all([countAttempt(ipKey, now), countAttempt(emailKey, now)]);
+  if (ipCount > LOGIN_ATTEMPTS_PER_IP || emailCount > LOGIN_ATTEMPTS_PER_EMAIL) {
     throw new ControlPlaneError(
       429,
       "LOGIN_RATE_LIMITED",
@@ -217,8 +265,6 @@ export async function authenticateInternalAdminLogin(email: string, password: st
     ? await verifySecret(String(admin.passwordHash), password)
     : (await verifySecret(await unknownAccountHash(), password), false);
   if (!admin || !valid) {
-    recordRateHit(ipKey, LOGIN_WINDOW_MS);
-    recordRateHit(emailKey, LOGIN_WINDOW_MS);
     await writeAudit({
       actorType: "system",
       actorId: "admin_login",
@@ -232,7 +278,7 @@ export async function authenticateInternalAdminLogin(email: string, password: st
   if (admin.status !== "active") {
     throw new ControlPlaneError(403, "AUTHORIZATION_DENIED", "Internal admin is disabled");
   }
-  clearRateLimit(emailKey);
+  await LoginThrottleModel.deleteMany({ key: { $in: [ipKey, emailKey] } });
   admin.lastLoginAt = new Date();
   await admin.save();
   await writeAudit({

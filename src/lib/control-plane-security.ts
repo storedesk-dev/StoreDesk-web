@@ -167,29 +167,6 @@ export function resetRateLimitsForTests(): void {
   rateLimits.clear();
 }
 
-/**
- * Failure counters (admin sign-in): check before the work, record only when it
- * fails. Unlike enforceRateLimit, a success never spends the budget.
- * In-memory per instance, like enforceRateLimit.
- */
-export function rateLimitBlocked(key: string, limit: number, now = Date.now()): boolean {
-  const entry = rateLimits.get(key);
-  return Boolean(entry && entry.resetAt > now && entry.count >= limit);
-}
-
-export function recordRateHit(key: string, windowMs: number, now = Date.now()): void {
-  const entry = rateLimits.get(key);
-  if (!entry || entry.resetAt <= now) {
-    rateLimits.set(key, { count: 1, resetAt: now + windowMs });
-    return;
-  }
-  entry.count += 1;
-}
-
-export function clearRateLimit(key: string): void {
-  rateLimits.delete(key);
-}
-
 /** The caller's address as Vercel reports it; "unknown" outside a proxy. */
 export function callerIp(req: Request): string {
   return (

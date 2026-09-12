@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
-import { AppUserModel, TenantStoreModel, UserAssignmentModel } from "@/models/ControlPlane";
+import { AppUserModel, OrganizationModel, TenantStoreModel, UserAssignmentModel } from "@/models/ControlPlane";
 import { ControlPlaneError, hashSecret, publicId, randomSecret } from "@/lib/control-plane-security";
 import { auditAdmin } from "@/lib/audit";
 import { loginSchema, notFound, optionalText } from "@/lib/http";
@@ -21,7 +21,12 @@ import type { InternalAdminActor } from "@/lib/admin-auth";
  *
  * A login that already exists is never modified here — not its password, not
  * its name, not its status. Only the assignments are added (`existing: true`).
- * Password changes are their own audited admin action.
+ *
+ * A login is global: it can belong to several organizations. Its password,
+ * status and invitation can be changed only by the organization that created
+ * it, and only while no other organization has it — otherwise an admin working
+ * in one organization could take over a login another organization relies on
+ * (409 LOGIN_SHARED, naming the other organizations).
  */
 
 type Doc = Record<string, unknown>;
@@ -77,6 +82,62 @@ export const AssignmentPatchSchema = z
   .strict()
   .refine((body) => Object.keys(body).length > 0, { message: "Nothing to change" });
 
+// ── Who owns a login ─────────────────────────────────────────────────────────
+
+type OrgRef = { organizationId: string; name: string };
+
+/** Per user: the other organizations with an active assignment, and the creating organization if it still exists. */
+async function ownership(appUserIds: string[], users: Doc[], organizationId: string) {
+  const others = (await UserAssignmentModel.find({
+    appUserId: { $in: appUserIds },
+    status: "active",
+    organizationId: { $ne: organizationId }
+  })
+    .select("appUserId organizationId")
+    .lean()) as Doc[];
+  const creators = users.map((user) => user.createdInOrganizationId).filter((id): id is string => typeof id === "string");
+  const orgIds = [...new Set([...others.map((row) => String(row.organizationId)), ...creators])];
+  const orgs = (await OrganizationModel.find({ organizationId: { $in: orgIds } }).select("organizationId name").lean()) as Doc[];
+  const names = new Map(orgs.map((org) => [String(org.organizationId), String(org.name)]));
+  const result = new Map<string, { sharedWith: OrgRef[]; creator: OrgRef | null }>();
+  for (const user of users) {
+    const id = String(user.appUserId);
+    const shared = [...new Set(others.filter((row) => row.appUserId === id).map((row) => String(row.organizationId)))];
+    const created = typeof user.createdInOrganizationId === "string" ? user.createdInOrganizationId : null;
+    result.set(id, {
+      sharedWith: shared.map((orgId) => ({ organizationId: orgId, name: names.get(orgId) ?? orgId })),
+      // An organization deleted since no longer owns anything.
+      creator: created && names.has(created) ? { organizationId: created, name: names.get(created)! } : null
+    });
+  }
+  return result;
+}
+
+function blockedReason(organizationId: string, owner: { sharedWith: OrgRef[]; creator: OrgRef | null }): { message: string; organizations: OrgRef[] } | null {
+  if (owner.creator && owner.creator.organizationId !== organizationId) {
+    const organizations = [owner.creator, ...owner.sharedWith.filter((org) => org.organizationId !== owner.creator!.organizationId)];
+    return {
+      message: `This login was created by ${owner.creator.name}. Its password and status can only be changed there.`,
+      organizations
+    };
+  }
+  if (owner.sharedWith.length) {
+    return {
+      message: `This login is also used by ${owner.sharedWith.map((org) => org.name).join(", ")}. Its password and status can't be changed while another organization has it.`,
+      organizations: owner.sharedWith
+    };
+  }
+  return null;
+}
+
+async function assertLoginOwnedHere(organizationId: string, user: Doc): Promise<void> {
+  const owner = (await ownership([String(user.appUserId)], [user], organizationId)).get(String(user.appUserId))!;
+  const blocked = blockedReason(organizationId, owner);
+  if (blocked) {
+    throw new ControlPlaneError(409, "LOGIN_SHARED", blocked.message, false, { organizations: blocked.organizations });
+  }
+}
+
 // ── Views ────────────────────────────────────────────────────────────────────
 
 const iso = (value: unknown): string | null => (value ? toIsoOr(value, "") || null : null);
@@ -99,7 +160,12 @@ function assignmentView(assignment: Doc, lookup?: Lookup) {
   };
 }
 
-export function userView(user: Doc, assignments: Doc[] = [], lookup?: Lookup) {
+export function userView(
+  user: Doc,
+  assignments: Doc[] = [],
+  lookup?: Lookup,
+  owner?: { sharedWith: OrgRef[]; blocked: string | null }
+) {
   const pending = user.status === "pending_enrollment";
   const expires = user.enrollmentExpiresAt ? new Date(String(user.enrollmentExpiresAt)) : null;
   return {
@@ -114,6 +180,10 @@ export function userView(user: Doc, assignments: Doc[] = [], lookup?: Lookup) {
     invitation: pending
       ? { expiresAt: expires ? expires.toISOString() : null, expired: Boolean(expires && expires.getTime() <= Date.now()) }
       : null,
+    /** Other organizations this login belongs to. */
+    sharedWith: owner?.sharedWith ?? [],
+    /** Why this organization can't change the login's password, status or invitation; null when it can. */
+    loginChangeBlocked: owner?.blocked ?? null,
     assignments: assignments.map((assignment) => assignmentView(assignment, lookup))
   };
 }
@@ -131,6 +201,20 @@ function orgRoles(org: Doc): OrgRole[] {
   return normalizeRoles(org.roles, toIsoOr(org.createdAt, EPOCH));
 }
 
+async function viewsFor(organizationId: string, users: Doc[], assignments: Doc[], org?: Doc) {
+  const ids = users.map((user) => String(user.appUserId));
+  const [lookup, owners] = await Promise.all([lookupFor(organizationId, org), ownership(ids, users, organizationId)]);
+  return users.map((user) => {
+    const owner = owners.get(String(user.appUserId))!;
+    return userView(
+      user,
+      assignments.filter((row) => row.appUserId === user.appUserId),
+      lookup,
+      { sharedWith: owner.sharedWith, blocked: blockedReason(organizationId, owner)?.message ?? null }
+    );
+  });
+}
+
 export async function listUsers(organizationId: string) {
   const org = await requireOrganization(organizationId);
   const assignments = (await UserAssignmentModel.find({ organizationId, status: "active" })
@@ -138,14 +222,7 @@ export async function listUsers(organizationId: string) {
     .lean()) as Doc[];
   const ids = [...new Set(assignments.map((row) => String(row.appUserId)))];
   const users = (await AppUserModel.find({ appUserId: { $in: ids } }).sort({ email: 1 }).lean()) as Doc[];
-  const lookup = await lookupFor(organizationId, org);
-  return users.map((user) =>
-    userView(
-      user,
-      assignments.filter((row) => row.appUserId === user.appUserId),
-      lookup
-    )
-  );
+  return viewsFor(organizationId, users, assignments, org);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -268,12 +345,11 @@ async function requireMember(organizationId: string, appUserId: string): Promise
 }
 
 async function memberView(organizationId: string, appUserId: string) {
-  const [user, assignments, lookup] = await Promise.all([
+  const [user, assignments] = await Promise.all([
     AppUserModel.findOne({ appUserId }).lean(),
-    UserAssignmentModel.find({ appUserId, organizationId, status: "active" }).sort({ createdAt: 1 }).lean(),
-    lookupFor(organizationId)
+    UserAssignmentModel.find({ appUserId, organizationId, status: "active" }).sort({ createdAt: 1 }).lean()
   ]);
-  return userView(user as Doc, assignments as Doc[], lookup);
+  return (await viewsFor(organizationId, [user as Doc], assignments as Doc[]))[0];
 }
 
 // ── Add ──────────────────────────────────────────────────────────────────────
@@ -314,6 +390,7 @@ export async function addUser(admin: InternalAdminActor, organizationId: string,
     email: login,
     name: body.name ?? undefined,
     createdByAdminId: admin.adminId,
+    createdInOrganizationId: organizationId,
     ...(body.mode === "managed"
       ? {
           status: "active",
@@ -363,8 +440,10 @@ export async function addUser(admin: InternalAdminActor, organizationId: string,
 // ── Change ───────────────────────────────────────────────────────────────────
 
 /**
- * Name and status. A login is shared by every organization it belongs to, so
- * disabling it here disables it everywhere.
+ * Name and status. The status is the login's everywhere, so changing it is
+ * refused (409 LOGIN_SHARED) unless this organization owns the login.
+ * Disabling also withdraws a pending invitation, so a disabled user cannot
+ * come back through /enroll.
  */
 export async function updateUser(
   admin: InternalAdminActor,
@@ -373,13 +452,19 @@ export async function updateUser(
   body: z.output<typeof UserPatchSchema>
 ) {
   const user = await requireMember(organizationId, appUserId);
+  const statusChange = body.status !== undefined && body.status !== user.status;
+  if (statusChange) await assertLoginOwnedHere(organizationId, user);
   const set: Doc = {};
   const unset: Doc = {};
   if (body.name !== undefined) {
     if (body.name) set.name = body.name;
     else unset.name = 1;
   }
-  if (body.status === "disabled") set.status = "disabled";
+  if (body.status === "disabled") {
+    set.status = "disabled";
+    unset.enrollmentSecretHash = 1;
+    unset.enrollmentExpiresAt = 1;
+  }
   if (body.status === "active" && user.status !== "active") {
     // Asks whether a hash exists without loading it.
     const hasPassword = await AppUserModel.exists({ appUserId, passwordHash: { $exists: true, $nin: [null, ""] } });
@@ -407,12 +492,14 @@ export async function updateUser(
 }
 
 /**
- * An admin sets a new password (audited). A pending user becomes active and
- * their invitation stops working; a disabled user stays disabled. The stores
- * pull the new hash and end that user's sessions.
+ * An admin sets a new password (audited), only from the organization that
+ * owns the login (409 LOGIN_SHARED otherwise). A pending user becomes active
+ * and their invitation stops working; a disabled user stays disabled. The
+ * stores pull the new hash and end that user's sessions.
  */
 export async function setUserPassword(admin: InternalAdminActor, organizationId: string, appUserId: string, password: string) {
   const user = await requireMember(organizationId, appUserId);
+  await assertLoginOwnedHere(organizationId, user);
   const now = new Date();
   await AppUserModel.updateOne(
     { appUserId },
@@ -437,12 +524,17 @@ export async function setUserPassword(admin: InternalAdminActor, organizationId:
   return { ok: true as const };
 }
 
-/** A new invitation code for a user who has not set a password yet. The old code stops working. */
+/**
+ * A new invitation code for a user who has not set a password yet, only from
+ * the organization that owns the login — whoever holds the code sets the
+ * password. The old code stops working.
+ */
 export async function reissueInvitation(admin: InternalAdminActor, organizationId: string, appUserId: string) {
   const user = await requireMember(organizationId, appUserId);
   if (user.status !== "pending_enrollment") {
     throw new ControlPlaneError(409, "USER_ALREADY_ENROLLED", "This user already has a password; set a new one instead");
   }
+  await assertLoginOwnedHere(organizationId, user);
   const org = await requireOrganization(organizationId);
   const invitation = newInvitation();
   await AppUserModel.updateOne(

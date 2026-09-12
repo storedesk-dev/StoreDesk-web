@@ -69,7 +69,10 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
     setRetrying(true);
     try {
       const res = await api.retryTunnel(orgId, storeId);
-      toast(res.tunnel?.status === "ok" ? "Tunnel ready" : "Tunnel retry started", "success");
+      toast(
+        data?.tunnel.status === "ok" ? "Tunnel rotated; a replaced PC can no longer use it" : res.tunnel?.status === "ok" ? "Tunnel ready" : "Tunnel retry started",
+        "success"
+      );
       void reload();
       refreshStore();
     } catch (e) {
@@ -184,6 +187,9 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
                   {data.tunnel.status === "failed" && data.tunnel.message ? (
                     <span className="text-[12.5px] text-red-700">{data.tunnel.message}</span>
                   ) : null}
+                  {data.tunnel.rotationRequired && data.tunnel.message ? (
+                    <span className="text-[12.5px] text-amber-700">{data.tunnel.message}</span>
+                  ) : null}
                   {data.tunnel.status === "not_configured" ? (
                     <span className="text-[12.5px] text-slate-600">
                       Phones can&apos;t reach this store until Cloudflare is configured on this deployment.
@@ -197,9 +203,10 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
                   icon={<RefreshCw className="h-3.5 w-3.5" />}
                   busy={retrying}
                   onClick={retryTunnel}
-                  disabled={data.tunnel.status === "ok" || data.tunnel.status === "not_configured"}
+                  disabled={data.tunnel.status === "not_configured"}
+                  title={data.tunnel.status === "ok" ? "Rotate the tunnel secret; a replaced PC loses access" : undefined}
                 >
-                  Retry
+                  {data.tunnel.status === "ok" ? "Rotate" : "Retry"}
                 </Button>
               )
             }

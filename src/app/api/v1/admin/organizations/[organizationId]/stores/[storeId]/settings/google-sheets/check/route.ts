@@ -5,7 +5,7 @@ import { ControlPlaneError, enforceRateLimit } from "@/lib/control-plane-securit
 import { jsonError, parseBody } from "@/lib/http";
 import { checkSpreadsheet, requireServiceAccount } from "@/lib/google";
 import { normalizeStoreSettings, parseSpreadsheetUrl } from "@/lib/store-settings";
-import { requireStore } from "@/lib/tenant-stores";
+import { assertSheetNotInOtherOrganization, requireStore } from "@/lib/tenant-stores";
 
 type Ctx = { params: Promise<{ organizationId: string; storeId: string }> };
 
@@ -34,6 +34,8 @@ export async function POST(req: Request, ctx: Ctx) {
         "spreadsheetUrl: paste the sheet's link, https://docs.google.com/spreadsheets/d/…"
       );
     }
+    // Refused before Google is asked: a sheet another organization attached is theirs.
+    await assertSheetNotInOtherOrganization(organizationId, spreadsheetId);
     return NextResponse.json({ ok: true, ...(await checkSpreadsheet(spreadsheetId)) });
   } catch (error) {
     return jsonError(error);

@@ -82,6 +82,13 @@ export const TUNNEL_NOT_CONFIGURED_LABEL = "Remote access isn't set up in this e
 
 export function TunnelChip({ tunnel }: { tunnel: StoreTunnel | null | undefined }) {
   if (!tunnel || tunnel.status === "missing") return <Chip tone="gray">No tunnel</Chip>;
+  if (tunnel.rotationRequired) {
+    return (
+      <Chip tone="amber" dot title={tunnel.message ?? undefined}>
+        Rotate tunnel
+      </Chip>
+    );
+  }
   if (tunnel.status === "failed") return <Chip tone="red" dot>Tunnel failed</Chip>;
   if (tunnel.status === "not_configured") {
     return (

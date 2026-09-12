@@ -6,6 +6,7 @@ import { TenantStoreModel } from "@/models/ControlPlane";
 import { ControlPlaneError } from "@/lib/control-plane-security";
 import { isStoreSecretConfigured, sealStoreSecret } from "@/lib/store-secrets";
 import { z } from "zod";
+import { parseBody } from "@/lib/http";
 
 type Ctx = { params: Promise<{ organizationId: string; storeId: string }> };
 
@@ -29,7 +30,8 @@ export async function PUT(req: Request, ctx: Ctx) {
   try {
     const admin = await requireInternalAdmin(req);
     const { organizationId, storeId } = await ctx.params;
-    const body = Body.parse(await req.json());
+    // parseBody: 415 for anything but application/json, 400 for a bad body.
+    const body = await parseBody(req, Body);
 
     if (body.posPassword && !isStoreSecretConfigured()) {
       throw new ControlPlaneError(

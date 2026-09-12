@@ -148,6 +148,9 @@ export function UsersTab({ orgId, org, refreshOrg }: OrgTabProps) {
                     <td className={table.td}>{u.name || <span className="text-slate-400">—</span>}</td>
                     <td className={table.td}>
                       <Chip tone={how.tone}>{how.label}</Chip>
+                      {u.loginChangeBlocked ? (
+                        <div className="mt-1 max-w-xs text-[11.5px] text-slate-500">{u.loginChangeBlocked}</div>
+                      ) : null}
                     </td>
                     <td className={table.td}>
                       {active.length === 0 ? (
@@ -184,10 +187,12 @@ export function UsersTab({ orgId, org, refreshOrg }: OrgTabProps) {
                         items={[
                           { label: "Change role or store", onSelect: () => setAction({ kind: "assignments", user: u }), hidden: active.length === 0 },
                           { label: "Add a store", onSelect: () => setAction({ kind: "add-store", user: u }) },
-                          { label: "Set new password", onSelect: () => setAction({ kind: "password", user: u }), hidden: !managed },
-                          { label: "Re-send invite", onSelect: () => void resendInvite(u), hidden: u.status !== "pending_enrollment" },
-                          { label: "Enable", onSelect: () => void enable(u), hidden: u.status !== "disabled" },
-                          { label: "Disable", onSelect: () => setAction({ kind: "disable", user: u }), hidden: u.status === "disabled", danger: true },
+                          // A login another organization shares or created: these change it everywhere, so
+                          // the server refuses them (LOGIN_SHARED) and the row says why instead.
+                          { label: "Set new password", onSelect: () => setAction({ kind: "password", user: u }), hidden: !managed || Boolean(u.loginChangeBlocked) },
+                          { label: "Re-send invite", onSelect: () => void resendInvite(u), hidden: u.status !== "pending_enrollment" || Boolean(u.loginChangeBlocked) },
+                          { label: "Enable", onSelect: () => void enable(u), hidden: u.status !== "disabled" || Boolean(u.loginChangeBlocked) },
+                          { label: "Disable", onSelect: () => setAction({ kind: "disable", user: u }), hidden: u.status === "disabled" || Boolean(u.loginChangeBlocked), danger: true },
                           { label: "Revoke access to this organization", onSelect: () => setAction({ kind: "revoke", user: u }), hidden: active.length === 0, danger: true }
                         ]}
                       />

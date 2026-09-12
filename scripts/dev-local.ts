@@ -17,16 +17,9 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 
-const BLANKED = [
-  "CLOUDFLARE_API_TOKEN",
-  "CLOUDFLARE_ACCOUNT_ID",
-  "CLOUDFLARE_ZONE_ID",
-  "RESEND_API_KEY",
-  "SETUP_EMAIL_FROM",
-  "SUPPORT_ADMIN_EMAIL",
-  "SUPPORT_ADMIN_PASSWORD",
-  "ADMIN_PASSWORD"
-];
+import { DEV_LOCAL_BLANKED_ENV } from "../src/lib/dev-local-env";
+
+const BLANKED: readonly string[] = DEV_LOCAL_BLANKED_ENV;
 
 async function main() {
   const keep = new Set((process.env.DEV_LOCAL_KEEP ?? "").split(",").map((key) => key.trim()).filter(Boolean));

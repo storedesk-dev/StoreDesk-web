@@ -71,10 +71,18 @@ export function jsonError(error: unknown, correlationId = publicId("corr")) {
   return respond(503, "ACTIVATION_UNAVAILABLE", "Control plane temporarily unavailable", correlationId, true);
 }
 
-/** The body as JSON; an empty body reads as `{}`. Not JSON → 400. */
+/**
+ * The body as JSON; an empty body reads as `{}`. A body sent as anything but
+ * `application/json` is 415 (an HTML form cannot send that type, which closes
+ * the cross-site form route to every mutation); not JSON → 400.
+ */
 export async function readJson(req: Request): Promise<unknown> {
   const text = await req.text();
   if (!text.trim()) return {};
+  const type = (req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (type !== "application/json") {
+    throw new ControlPlaneError(415, "UNSUPPORTED_MEDIA_TYPE", "Send the body as application/json");
+  }
   try {
     return JSON.parse(text);
   } catch {

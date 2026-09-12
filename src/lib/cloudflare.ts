@@ -1,191 +1,138 @@
 import crypto from "crypto";
 
-export async function provisionCloudflareTunnel(storeId: string, tunnelSlug: string): Promise<{
-  cloudflareToken: string;
-  tunnelUrl: string;
-} | null> {
+/**
+ * Cloudflare tunnels, one per store: how phones reach the store server.
+ *
+ * Everything after creation is by id — the tunnel id and the DNS record id
+ * stored on the store when provisioning succeeded — never by name: labels
+ * are chosen by operators, and a name lookup can match another store's tunnel.
+ */
+
+const API = "https://api.cloudflare.com/client/v4";
+
+type CfResponse<T> = { success?: boolean; result?: T; errors?: Array<{ message?: string }> };
+
+function credentials(): { token: string; accountId: string } | null {
   const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  return token && accountId ? { token, accountId } : null;
+}
 
-  if (!token || !accountId) {
+async function cf<T>(token: string, path: string, init: { method: string; body?: unknown }): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    method: init.method,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body)
+  });
+  const data = (await res.json().catch(() => ({}))) as CfResponse<T>;
+  if (!res.ok || data.success === false) {
+    throw new Error(data.errors?.[0]?.message || `Cloudflare answered ${res.status}`);
+  }
+  return data.result as T;
+}
+
+function newTunnelSecret(): string {
+  return crypto.randomBytes(32).toString("base64");
+}
+
+function tunnelDomain(): string {
+  return process.env.CLOUDFLARE_TUNNEL_DOMAIN?.trim() || "tunnels.storedesk.net";
+}
+
+export type ProvisionedTunnel = {
+  cloudflareToken: string;
+  tunnelUrl: string;
+  tunnelId: string;
+  /** Null when no CLOUDFLARE_ZONE_ID is set (DNS managed outside StoreDesk). */
+  dnsRecordId: string | null;
+};
+
+/**
+ * Create the tunnel, its DNS record and its routing. All or nothing: if the
+ * DNS record or the routing fails, what was created is deleted again and the
+ * error is thrown. Null when Cloudflare is not configured.
+ */
+export async function provisionCloudflareTunnel(storeId: string, label: string): Promise<ProvisionedTunnel | null> {
+  const creds = credentials();
+  if (!creds) {
     console.info("[cloudflare] Missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID. Skipping tunnel creation.");
     return null;
   }
-
-  const tunnelName = tunnelSlug;
-  // Generate a cryptographically secure 32-byte secret for the tunnel
-  const tunnelSecret = crypto.randomBytes(32).toString("base64");
-
-  console.info(`[cloudflare] Provisioning tunnel "${tunnelName}"...`);
-
-  // 1. Create the Tunnel via API
-  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel`, {
+  const { token, accountId } = creds;
+  const hostname = `${label}.${tunnelDomain()}`;
+  const created = await cf<{ id?: string; token?: string }>(token, `/accounts/${accountId}/cfd_tunnel`, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      name: tunnelName,
-      config_src: "cloudflare",
-      tunnel_secret: tunnelSecret
-    })
+    body: { name: label, config_src: "cloudflare", tunnel_secret: newTunnelSecret() }
   });
-
-  const data = (await res.json()) as { success?: boolean; result?: { id?: string; token?: string }; errors?: Array<{ message?: string }> };
-  if (!res.ok || !data.success) {
-    const errMsg = data.errors?.[0]?.message || "Failed to create Cloudflare tunnel";
-    throw new Error(errMsg);
-  }
-
-  const tunnelId = data.result?.id;
-  const tunnelToken = data.result?.token;
-
-  if (!tunnelId || !tunnelToken) {
-    throw new Error("Cloudflare did not return a valid tunnel ID or token.");
-  }
-
-  console.info(`[cloudflare] Tunnel created successfully. ID: ${tunnelId}`);
-
-  const tunnelDomain = process.env.CLOUDFLARE_TUNNEL_DOMAIN?.trim() || "tunnels.storedesk.net";
-  const tunnelUrl = `https://${tunnelSlug}.${tunnelDomain}`;
-
-  // 2. Create the DNS record (CNAME) pointing to the tunnel if zone ID is provided
-  const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
-  if (zoneId) {
-    console.info(`[cloudflare] Creating DNS CNAME record for ${tunnelSlug}.${tunnelDomain}...`);
-    try {
-      const dnsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          type: "CNAME",
-          name: `${tunnelSlug}.${tunnelDomain}`,
-          content: `${tunnelId}.cfargotunnel.com`,
-          ttl: 1,
-          proxied: true
-        })
-      });
-
-      const dnsData = (await dnsRes.json()) as { success?: boolean; errors?: Array<{ message?: string }> };
-      if (!dnsRes.ok || !dnsData.success) {
-        const errMsg = dnsData.errors?.[0]?.message || "Failed to create DNS CNAME record";
-        console.warn(`[cloudflare:warn] CNAME registration warning: ${errMsg}`);
-      } else {
-        console.info("[cloudflare] DNS CNAME record registered successfully.");
-      }
-    } catch (dnsErr: unknown) {
-      const msg = dnsErr instanceof Error ? dnsErr.message : String(dnsErr);
-      console.warn(`[cloudflare:warn] Failed to create DNS record: ${msg}`);
-    }
-  }
-
-  // 3. Configure the Tunnel routing (Published Application / Public Hostname)
-  console.info(`[cloudflare] Configuring tunnel routing for ${tunnelSlug}.${tunnelDomain} -> http://localhost:4630 ...`);
+  if (!created?.id || !created.token) throw new Error("Cloudflare did not return a tunnel id and token");
+  const tunnelId = created.id;
+  let dnsRecordId: string | null = null;
   try {
-    const configRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        config: {
-          ingress: [
-            {
-              hostname: `${tunnelSlug}.${tunnelDomain}`,
-              service: "http://localhost:4630"
-            },
-            {
-              service: "http_status:404"
-            }
-          ]
-        }
-      })
-    });
-
-    const configData = (await configRes.json()) as { success?: boolean; errors?: Array<{ message?: string }> };
-    if (!configRes.ok || !configData.success) {
-      const errMsg = configData.errors?.[0]?.message || "Failed to configure tunnel routing";
-      console.warn(`[cloudflare:warn] Tunnel configuration warning: ${errMsg}`);
-    } else {
-      console.info("[cloudflare] Tunnel routing configured successfully.");
-    }
-  } catch (configErr: unknown) {
-    const msg = configErr instanceof Error ? configErr.message : String(configErr);
-    console.warn(`[cloudflare:warn] Failed to configure tunnel routing: ${msg}`);
-  }
-
-  return {
-    cloudflareToken: tunnelToken,
-    tunnelUrl
-  };
-}
-
-export async function deleteCloudflareTunnel(tunnelSlug: string): Promise<boolean> {
-  const token = process.env.CLOUDFLARE_API_TOKEN?.trim();
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
-
-  if (!token || !accountId) {
-    console.info("[cloudflare] Missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID. Skipping tunnel deletion.");
-    return false;
-  }
-
-  console.info(`[cloudflare] Deleting tunnel "${tunnelSlug}"...`);
-
-  try {
-    // 1. Fetch tunnel by name to get its ID
-    const listRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel?name=${tunnelSlug}`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    const listData = (await listRes.json()) as { success?: boolean; result?: Array<{ id: string }> };
-    
-    const tunnels = listData.result || [];
-    if (tunnels.length > 0) {
-      const tunnelId = tunnels[0].id;
-      // Delete the tunnel
-      const delRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/cfd_tunnel/${tunnelId}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (!delRes.ok) {
-        console.warn(`[cloudflare:warn] Failed to delete tunnel ${tunnelId}`);
-      } else {
-        console.info(`[cloudflare] Tunnel ${tunnelId} deleted successfully.`);
-      }
-    } else {
-      console.info(`[cloudflare] Tunnel "${tunnelSlug}" not found. Moving on.`);
-    }
-
-    // 2. Delete DNS CNAME records associated with this tunnel slug
     const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
     if (zoneId) {
-      const tunnelDomain = process.env.CLOUDFLARE_TUNNEL_DOMAIN?.trim() || "tunnels.storedesk.net";
-      const recordName = `${tunnelSlug}.${tunnelDomain}`;
-      
-      const dnsRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?name=${recordName}`, {
-        headers: { "Authorization": `Bearer ${token}` }
+      const record = await cf<{ id?: string }>(token, `/zones/${zoneId}/dns_records`, {
+        method: "POST",
+        body: { type: "CNAME", name: hostname, content: `${tunnelId}.cfargotunnel.com`, ttl: 1, proxied: true }
       });
-      const dnsData = (await dnsRes.json()) as { success?: boolean; result?: Array<{ id: string }> };
-      
-      const records = dnsData.result || [];
-      for (const record of records) {
-        const dnsDelRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${record.id}`, {
-          method: "DELETE",
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (dnsDelRes.ok) {
-          console.info(`[cloudflare] DNS record ${record.id} for ${recordName} deleted successfully.`);
-        }
-      }
+      if (!record?.id) throw new Error("Cloudflare did not return a DNS record id");
+      dnsRecordId = record.id;
     }
-
-    return true;
+    await cf(token, `/accounts/${accountId}/cfd_tunnel/${encodeURIComponent(tunnelId)}/configurations`, {
+      method: "PUT",
+      body: { config: { ingress: [{ hostname, service: "http://localhost:4630" }, { service: "http_status:404" }] } }
+    });
   } catch (error) {
-    console.error(`[cloudflare:error] Failed to delete tunnel "${tunnelSlug}":`, error);
-    return false;
+    await deleteCloudflareTunnel({ tunnelId, dnsRecordId }).catch(() => undefined);
+    throw error;
   }
+  console.info(`[cloudflare] Tunnel ${tunnelId} created for ${storeId}.`);
+  return { cloudflareToken: created.token, tunnelUrl: `https://${hostname}`, tunnelId, dnsRecordId };
+}
+
+/** Delete a tunnel and its DNS record by their ids. Never throws; says what was deleted. */
+export async function deleteCloudflareTunnel(ids: {
+  tunnelId: string;
+  dnsRecordId?: string | null;
+}): Promise<{ tunnelDeleted: boolean; dnsDeleted: boolean }> {
+  const creds = credentials();
+  if (!creds) return { tunnelDeleted: false, dnsDeleted: false };
+  const { token, accountId } = creds;
+  const tunnelPath = `/accounts/${accountId}/cfd_tunnel/${encodeURIComponent(ids.tunnelId)}`;
+  let tunnelDeleted = false;
+  let dnsDeleted = false;
+  try {
+    // A tunnel with live connections cannot be deleted; drop them first.
+    await cf(token, `${tunnelPath}/connections`, { method: "DELETE" }).catch(() => undefined);
+    await cf(token, tunnelPath, { method: "DELETE" });
+    tunnelDeleted = true;
+  } catch (error) {
+    console.warn(`[cloudflare] Could not delete tunnel ${ids.tunnelId}: ${error instanceof Error ? error.message : error}`);
+  }
+  const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
+  if (ids.dnsRecordId && zoneId) {
+    try {
+      await cf(token, `/zones/${zoneId}/dns_records/${encodeURIComponent(ids.dnsRecordId)}`, { method: "DELETE" });
+      dnsDeleted = true;
+    } catch (error) {
+      console.warn(`[cloudflare] Could not delete DNS record ${ids.dnsRecordId}: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+  return { tunnelDeleted, dnsDeleted };
+}
+
+/**
+ * Rotate a tunnel's secret so a token held by a replaced PC stops working:
+ * set a new secret, drop the live connections (the old PC's), and fetch the
+ * token for the new secret. Same tunnel, same hostname. Throws on failure.
+ */
+export async function rotateCloudflareTunnel(tunnelId: string): Promise<{ cloudflareToken: string }> {
+  const creds = credentials();
+  if (!creds) throw new Error("Cloudflare is not configured");
+  const { token, accountId } = creds;
+  const tunnelPath = `/accounts/${accountId}/cfd_tunnel/${encodeURIComponent(tunnelId)}`;
+  await cf(token, tunnelPath, { method: "PATCH", body: { tunnel_secret: newTunnelSecret() } });
+  await cf(token, `${tunnelPath}/connections`, { method: "DELETE" });
+  const cloudflareToken = await cf<string>(token, `${tunnelPath}/token`, { method: "GET" });
+  if (typeof cloudflareToken !== "string" || !cloudflareToken) throw new Error("Cloudflare did not return the new tunnel token");
+  return { cloudflareToken };
 }

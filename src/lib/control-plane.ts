@@ -374,6 +374,11 @@ export async function enrollAppUser(body: {
   if (user.enrollmentConsumedAt || user.status === "active") {
     throw new ControlPlaneError(409, "ENROLLMENT_CONSUMED", "Enrollment already consumed");
   }
+  // Only an invited user who has not set a password yet: a disabled login
+  // must never come back to life through an old invitation code.
+  if (user.status !== "pending_enrollment") {
+    throw new ControlPlaneError(401, "ENROLLMENT_INVALID", "Enrollment credential is invalid");
+  }
   if (user.enrollmentExpiresAt && user.enrollmentExpiresAt.getTime() <= Date.now()) {
     throw new ControlPlaneError(410, "ENROLLMENT_EXPIRED", "Enrollment expired");
   }

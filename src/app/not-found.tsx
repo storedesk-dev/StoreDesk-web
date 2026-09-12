@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { ADMIN_COOKIE } from "@/lib/admin-auth";
+import { adminCookieName } from "@/lib/admin-auth";
 
 export default async function NotFound() {
   const cookieStore = await cookies();
-  const hasAdminCookie = cookieStore.has(ADMIN_COOKIE);
+  const hasAdminCookie = cookieStore.has(adminCookieName());
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--surface)] text-center px-4">

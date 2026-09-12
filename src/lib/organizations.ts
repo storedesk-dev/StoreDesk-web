@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
-import { deleteCloudflareTunnel } from "@/lib/cloudflare";
+import { removeStoreTunnel } from "@/lib/tunnel";
 import {
   AppUserModel,
   ClientDeviceModel,
@@ -259,7 +259,7 @@ export async function deleteOrganization(admin: InternalAdminActor, organization
   }
 
   const [stores, installations, subscriptions, assignments] = (await Promise.all([
-    TenantStoreModel.find({ organizationId }).select("storeId tunnelUrl tunnelLabel").lean(),
+    TenantStoreModel.find({ organizationId }).select("storeId tunnelUrl tunnelLabel tunnelId tunnelDnsRecordId").lean(),
     WorkerInstallationModel.find({ organizationId }).select("workerInstallationId").lean(),
     SubscriptionModel.find({ organizationId }).select("subscriptionId").lean(),
     UserAssignmentModel.find({ organizationId }).select("assignmentId appUserId").lean()
@@ -283,15 +283,11 @@ export async function deleteOrganization(admin: InternalAdminActor, organization
   // revoke throws and stops the delete.
   await revokeInstallationsAndNotify({ organizationId, reason: "organization.delete" });
 
+  // By the stored Cloudflare ids only; older name-only tunnels are listed for manual cleanup.
+  const tunnelsNeedManualCleanup: string[] = [];
   for (const store of stores) {
-    const label = tunnelLabelOf(store);
-    if (label) {
-      try {
-        await deleteCloudflareTunnel(label);
-      } catch (error) {
-        console.error(`[organization.delete] tunnel for ${String(store.storeId)}:`, error);
-      }
-    }
+    const outcome = await removeStoreTunnel(store);
+    if (outcome.manualCleanup) tunnelsNeedManualCleanup.push(outcome.manualCleanup);
   }
 
   const byIds = <T>(ids: T[]) => ({ $in: ids });
@@ -314,7 +310,8 @@ export async function deleteOrganization(admin: InternalAdminActor, organization
     subscriptions: subscriptionIds.length,
     assignments: assignmentIds.length,
     usersDeleted: Number(results[6].deletedCount ?? 0),
-    usersKept: memberIds.length - orphanUserIds.length
+    usersKept: memberIds.length - orphanUserIds.length,
+    tunnelsNeedManualCleanup
   };
   await auditAdmin(admin, {
     organizationId,

@@ -11,7 +11,7 @@ import { createOrganization, updateOrganization } from "@/lib/organizations";
 import { createSubscription } from "@/lib/subscriptions";
 import { updateStoreSettings } from "@/lib/tenant-stores";
 import { addUser } from "@/lib/users";
-import { deleteCloudflareTunnel, provisionCloudflareTunnel } from "@/lib/cloudflare";
+import { deleteCloudflareTunnel, provisionCloudflareTunnel, rotateCloudflareTunnel } from "@/lib/cloudflare";
 import { revokeInstallationsAndNotify, scheduleNotify } from "@/lib/store-notify";
 import {
   SubscriptionModel,
@@ -32,7 +32,8 @@ vi.mock("@/lib/store-notify", async (importOriginal) => {
 });
 vi.mock("@/lib/cloudflare", () => ({
   provisionCloudflareTunnel: vi.fn(async () => null),
-  deleteCloudflareTunnel: vi.fn(async () => true)
+  deleteCloudflareTunnel: vi.fn(async () => ({ tunnelDeleted: true, dnsDeleted: true })),
+  rotateCloudflareTunnel: vi.fn(async () => ({ cloudflareToken: "rotated" }))
 }));
 
 /** Stores: create against a subscription's limit, the tunnel outcome (P6), details, delete, access preview. */
@@ -99,7 +100,9 @@ describe("POST …/stores", () => {
     useCloudflare();
     vi.mocked(provisionCloudflareTunnel).mockResolvedValueOnce({
       cloudflareToken: "CF_TOKEN_MUST_NOT_LEAK",
-      tunnelUrl: "https://example-retail-store-42.tunnels.example"
+      tunnelUrl: "https://example-retail-store-42.tunnels.example",
+      tunnelId: "cf-tunnel-1",
+      dnsRecordId: "dns-1"
     });
     const { organizationId } = await orgWithSubscription();
     const res = await createStoreCall(organizationId, { name: "Store 42" });
@@ -112,7 +115,7 @@ describe("POST …/stores", () => {
     expect(JSON.stringify(got.body)).not.toContain("CF_TOKEN_MUST_NOT_LEAK");
   });
 
-  it("records a failed tunnel, retries it, then refuses a second tunnel", async () => {
+  it("records a failed tunnel, retries it, then rotates the live one", async () => {
     useCloudflare();
     vi.mocked(provisionCloudflareTunnel).mockRejectedValueOnce(new Error("tunnel name already taken"));
     const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -124,7 +127,12 @@ describe("POST …/stores", () => {
     const storeId = res.body.store.storeId;
     expect(res.body.store.tunnel.status).toBe("failed");
 
-    vi.mocked(provisionCloudflareTunnel).mockResolvedValueOnce({ cloudflareToken: "t", tunnelUrl: "https://s42.tunnels.example" });
+    vi.mocked(provisionCloudflareTunnel).mockResolvedValueOnce({
+      cloudflareToken: "t",
+      tunnelUrl: "https://s42.tunnels.example",
+      tunnelId: "cf-tunnel-9",
+      dnsRecordId: null
+    });
     const retried = await call(retryTunnel, request("POST", "/", { token: admin.token }), { organizationId, storeId });
     expect(retried.status).toBe(200);
     expect(retried.body.tunnel).toMatchObject({ status: "ok", url: "https://s42.tunnels.example" });
@@ -132,8 +140,9 @@ describe("POST …/stores", () => {
     expect((await lastAudit("store.tunnel.provision"))?.metadata).toMatchObject({ status: "ok", retry: true });
 
     const again = await call(retryTunnel, request("POST", "/", { token: admin.token }), { organizationId, storeId });
-    expect(again.status).toBe(409);
-    expect(again.body.error.code).toBe("TUNNEL_EXISTS");
+    expect(again.status).toBe(200);
+    expect(rotateCloudflareTunnel).toHaveBeenCalledWith("cf-tunnel-9");
+    expect(await lastAudit("store.tunnel.rotate")).toBeTruthy();
   });
 
   it("answers a tunnel retry with 503 when Cloudflare is off and 502 when it refuses", async () => {
@@ -246,7 +255,8 @@ describe("GET, PATCH, PUT and DELETE …/stores/{store}", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ deleted: store.storeId });
     expect(revokeInstallationsAndNotify).toHaveBeenCalledWith({ organizationId, storeId: store.storeId, reason: "store.delete" });
-    expect(deleteCloudflareTunnel).toHaveBeenCalledWith("example-retail-store-42");
+    // No tunnel was ever created here (Cloudflare is off), so there is nothing to delete.
+    expect(deleteCloudflareTunnel).not.toHaveBeenCalled();
     expect(await TenantStoreModel.countDocuments({ storeId: store.storeId })).toBe(0);
     expect(await WorkerInstallationModel.countDocuments({ workerInstallationId: pc.workerInstallationId })).toBe(0);
     expect(await WorkerCredentialModel.countDocuments({ workerInstallationId: pc.workerInstallationId })).toBe(0);
