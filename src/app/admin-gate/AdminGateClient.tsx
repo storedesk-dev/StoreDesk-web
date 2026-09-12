@@ -2,9 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { api, errorMessage } from "../admin/_lib/api";
+import { BrandLockup } from "../admin/_components/BrandLockup";
 
 const inputClass =
   "block h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-[#111827] placeholder:text-slate-400 focus:border-[#1A63F4] focus:outline-none focus:ring-2 focus:ring-[#1A63F4]/25";
@@ -36,7 +36,7 @@ export default function AdminGateClient() {
     <main className="flex min-h-screen items-center justify-center bg-[#F6F8FB] px-4">
       <div className="w-full max-w-sm">
         <form onSubmit={onSubmit} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" aria-describedby="gate-note">
-          <Image src="/brand/logo-lockup-horizontal.svg" alt="StoreDesk" width={160} height={34} className="h-8 w-auto object-contain" priority />
+          <BrandLockup size={32} />
           <h1 className="mt-5 text-lg font-extrabold tracking-tight text-[#111827]">StoreDesk admin</h1>
           <p id="gate-note" className="mt-1 text-sm text-slate-600">
             For StoreDesk staff. Store owners and their staff sign in on the desktop app or phone, not here.

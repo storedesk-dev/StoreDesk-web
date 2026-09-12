@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { BrandLockup } from "./BrandLockup";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Building2, LayoutDashboard, LogOut, Search } from "lucide-react";
@@ -40,7 +40,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       </a>
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
         <Link href="/admin" className="flex h-14 items-center gap-2 border-b border-slate-100 px-4">
-          <Image src="/brand/logo-lockup-horizontal.svg" alt="StoreDesk" width={140} height={30} className="h-7 w-auto" priority />
+          <BrandLockup size={28} />
         </Link>
         <div className="px-4 pb-1 pt-4 text-[10.5px] font-bold uppercase tracking-[0.14em] text-slate-400">Control plane</div>
         <nav aria-label="Admin" className="flex-1 space-y-0.5 px-2">
