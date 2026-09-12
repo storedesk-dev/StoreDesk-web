@@ -1,123 +1,69 @@
 # store-desk-web/ — Agent map
 
-Parent: root `AGENTS.md`. Remote: `https://github.com/storedesk-dev/StoreDesk-web.git`
+Parent: root `AGENTS.md` and `CLAUDE.md`. Remote: `https://github.com/storedesk-dev/StoreDesk-web.git`
 
 ## Purpose
 
-StoreDesk Web — Next.js marketing site, SEO search engine portal, and Atlas-backed store license control plane.
-
-## Owners
-
-`docs-scribe` + web implementer; later Hub work stays out of this repo until WO opens.
-
-## Key Features & SEO Architecture
-
-- **SEO System**: Next.js 15 App Router dynamic sitemap (`src/app/sitemap.ts`), `robots.txt` (`src/app/robots.ts`), and route-level server component metadata.
-- **Structured Data**: Schema.org JSON-LD graph (`SoftwareApplication`, `Organization`, `WebSite`) in `src/app/layout.tsx`.
-- **Target Keywords**: `StoreDesk`, `StoreDesk Worker`, `StoreDesk Mobile`, `StoreDesk Desktop`, `StoreDesk Web`, `c-store price book`, `Verifone Commander backoffice`, `vendor cost comparison`.
-- **Pages & Routes**: `/` (Home), `/product` (Features & Verifone Sync), `/how-it-works` (Architecture), `/about` (Mission), `/contact` (Support), `/privacy`, `/terms`.
+StoreDesk Web — the Next.js marketing site and the **control plane**: organizations, subscriptions,
+stores (features, integrations, register, PC and phones), roles, users and audit, plus the API store servers
+use to activate and to pull access. Contract: `docs/design/control-plane-admin.md` and
+`docs/design/store-sign-in-and-sync.md` in the parent repo.
 
 ## Rules
 
-- Atlas holds licenses / registry only — not catalog or Commander data.
-- Prefer StoreDesk Mobile naming (not Buddy).
-- Brand tokens from parent `brand-kit/`.
+- **No store data.** MongoDB holds the control plane only — never catalog, price book or register history.
+- **Every admin mutation writes an audit event** (`lib/audit.ts`, actions like `store.settings.update`).
+- **Every change that reaches a store notifies it** (`scheduleNotify` / `scheduleAppUserNotify` in
+  `lib/store-notify.ts`); the store then pulls `GET /api/v1/edge/sync/access`.
+- **Validate every body with zod** (`parseBody` in `lib/http.ts`) and answer errors through `jsonError`:
+  `{error:{code,message,…}}`; a duplicate is 409, a bad value 400 — never 503 for a client mistake.
+- **No secret in a response.** `safeJson()` scrubs secret-named fields; `passwordHash` is selected
+  (`+passwordHash`) only in `lib/access-sync.ts`, `lib/control-plane.ts` and `lib/admin-auth.ts`
+  (a test enforces this). The register password is write-only.
+- **configJson is server-built** (register connection only). Roles reach stores only through the access sync.
+- **An existing login is never modified by "add user"** — password changes are their own audited route.
+- `src/config/pages.ts` is generated from `shared/pages-registry.ts`; never hand-edit it.
+- Prefer StoreDesk Mobile naming (not Buddy). Brand tokens from the parent `brand-kit/`.
 
 ## Agent Directives
 
-**Stack:** Next.js + React + TypeScript
+**Stack:** Next.js 15 App Router + React + TypeScript + Mongoose + zod.
+
+**Verify:** `npm run lint && npx tsc --noEmit && npm test`, then `npx next build`.
+Run locally with `npm run dev:local` (in-memory MongoDB, sample data, logins printed).
+
+**Tests:** route and library tests call the route handlers directly against an in-memory MongoDB replica
+set — `setupMemoryMongo()` from `src/tests/helpers/mongo.ts`, request helpers in `src/tests/helpers/api.ts`.
+Mock `@/lib/store-notify` (to assert notifies) and `@/lib/cloudflare`.
 
 **Release rule:** Update `LATEST_RELEASE_TAG` in `src/app/download/DownloadClient.tsx` before every release tag.
 
-**Verify:** `npm run build` (type check + build)
+**Task discipline:** read `docs/` and this file before grepping; reuse existing helpers; plan → approve →
+implement → verify → commit.
 
-**Task discipline:**
-- Token bloat: reuse existing components and hooks before adding new ones.
-- Read `docs/` + `AGENTS.md` before grepping.
-- Plan → approve → implement → verify → commit. TDD applies.
-- No code without human approval. No WO close without `qa-verifier` green.
+**Out of scope:** stock qty, inventory, reorder, warehouse.
 
-**Out of scope:** stock qty, inventory, reorder, warehouse, cloud backend.
-
-## Directory Structure
+## Layout
 
 ```txt
-store-desk-web/src
+src
 ├── app
-│   ├── about
-│   │   ├── AboutClient.tsx
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   ├── admin
-│   │   ├── agents
-│   │   ├── audit
-│   │   ├── layout.tsx
-│   │   ├── organizations
-│   │   ├── page.tsx
-│   │   ├── setup-keys
-│   │   └── users
-│   ├── admin-gate
-│   │   ├── AdminGateClient.tsx
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   ├── api
-│   │   ├── admin
-│   │   ├── auth
-│   │   ├── stores
-│   │   └── v1
-│   ├── apple-icon.jpg
-│   ├── contact
-│   │   ├── ContactClient.tsx
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   ├── download
-│   │   ├── DownloadClient.tsx
-│   │   └── page.tsx
-│   ├── favicon.ico
-│   ├── globals.css
-│   ├── how-it-works
-│   │   ├── HowItWorksClient.tsx
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   ├── icon.jpg
-│   ├── layout.tsx
-│   ├── page.tsx
-│   ├── privacy
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   ├── product
-│   │   ├── ProductClient.tsx
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   ├── robots.ts
-│   ├── sitemap.ts
-│   └── terms
-│       ├── layout.tsx
-│       └── page.tsx
-├── components
-│   ├── DeviceStage.tsx
-│   ├── LandingPage.tsx
-│   ├── MarketingShell.tsx
-│   ├── MermaidDiagram.tsx
-│   ├── SiteChrome.tsx
-│   ├── VendorCostChart.tsx
-│   └── VerifoneBadge.tsx
-├── lib
-│   ├── admin-auth.ts
-│   ├── cloudflare.ts
-│   ├── control-plane-security.ts
-│   ├── control-plane.ts
-│   ├── db.ts
-│   ├── email-provider.ts
-│   ├── mongodb.js
-│   ├── site.ts
-│   └── stores.ts
-├── middleware.ts
-├── models
-│   ├── ControlPlane.ts
-│   └── Store.ts
-└── tests
-    └── control-plane-security.test.ts
-
-25 directories, 51 files
+│   ├── (marketing pages)        about, contact, download, how-it-works, product, privacy, terms, enroll
+│   ├── admin/                   admin console (organizations, stores, roles, users, activity)
+│   ├── admin-gate/              staff sign-in
+│   └── api
+│       ├── admin/login          staff sign-in API (rate-limited, audited)
+│       └── v1
+│           ├── admin/           admin API (staff session)
+│           ├── edge/            store-server API (worker credential): sync/access, sync/config,
+│           │                    roles/{roleId}, google/access-token
+│           ├── setup-keys/redeem   activation (setup key)
+│           ├── organizations/…/worker-installations/…/bootstrap   store-server bootstrap
+│           └── app-auth/        org-tag lookup and enrollment (public, rate-limited)
+├── config/pages.ts              GENERATED page registry
+├── lib/                         one module per area (see README "What is where")
+├── models/ControlPlane.ts       every Mongoose model
+├── middleware.ts                cookie presence check for /admin and /api/v1/admin
+└── tests/                       vitest; helpers/ for the in-memory MongoDB
+scripts/dev-local.ts             npm run dev:local
 ```
