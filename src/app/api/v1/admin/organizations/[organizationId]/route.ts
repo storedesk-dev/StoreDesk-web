@@ -12,6 +12,7 @@ import {
   AppUserModel 
 } from "@/models/ControlPlane";
 import { safeJson } from "@/lib/control-plane-security";
+import { revokeInstallationsAndNotify } from "@/lib/store-notify";
 
 type Ctx = { params: Promise<{ organizationId: string }> };
 
@@ -40,6 +41,12 @@ export async function DELETE(req: Request, ctx: Ctx) {
     if (!doc) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    // Revoke first. Every worker credential of the organization is revoked and
+    // each store server is told (it pulls, gets 401, and treats itself as
+    // revoked) before anything is deleted — and before the tunnels the notify
+    // travels through are removed. A failed revoke stops the delete.
+    await revokeInstallationsAndNotify({ organizationId, reason: "organization.delete" });
 
     // Cascade delete related records
     const stores = await TenantStoreModel.find({ organizationId });

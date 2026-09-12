@@ -139,7 +139,7 @@ rateGlobal.__sdRateLimits = rateLimits;
 
 export function enforceRateLimit(
   key: string,
-  options: { limit: number; windowMs: number },
+  options: { limit: number; windowMs: number; code?: string },
   now = Date.now()
 ): void {
   const current = rateLimits.get(key);
@@ -149,7 +149,12 @@ export function enforceRateLimit(
   }
   current.count += 1;
   if (current.count > options.limit) {
-    throw new ControlPlaneError(429, "ACTIVATION_RATE_LIMITED", "Too many attempts", true);
+    throw new ControlPlaneError(
+      429,
+      options.code ?? "ACTIVATION_RATE_LIMITED",
+      "Too many attempts",
+      true
+    );
   }
 }
 

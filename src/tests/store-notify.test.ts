@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   NOTIFY_PATH,
   notifyInstallations,
+  revokeInstallationsAndNotify,
   runAfterResponse,
   signNotify,
   type NotifyTarget
@@ -123,6 +124,69 @@ describe("notifyInstallations", () => {
       { ...fixed, timeoutMs: 20, fetch: hang as unknown as typeof fetch, loadTargets: async () => [target] }
     );
     expect(outcomes).toEqual([{ workerInstallationId: target.workerInstallationId, ok: false, error: "TIMEOUT" }]);
+  });
+});
+
+describe("revokeInstallationsAndNotify", () => {
+  it("loads targets, then revokes, then notifies with the keys loaded before the revoke", async () => {
+    const order: string[] = [];
+    const fetchMock = vi.fn(async () => {
+      order.push("notify");
+      return new Response(null, { status: 202 });
+    });
+    const result = await revokeInstallationsAndNotify(
+      { organizationId: "org_1", reason: "organization.delete" },
+      {
+        ...fixed,
+        fetch: fetchMock as unknown as typeof fetch,
+        loadTargets: async () => {
+          order.push("load");
+          return [target];
+        },
+        revoke: async (scope) => {
+          order.push(`revoke:${scope.organizationId}`);
+          return 2;
+        }
+      }
+    );
+    expect(order).toEqual(["load", "revoke:org_1", "notify"]);
+    expect(result.revoked).toBe(2);
+    expect(result.outcomes).toEqual([{ workerInstallationId: target.workerInstallationId, ok: true, status: 202 }]);
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(JSON.parse(String(init.body)).reason).toBe("organization.delete");
+  });
+
+  it("still revokes when the targets cannot be loaded", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const revoke = vi.fn(async () => 1);
+    const result = await revokeInstallationsAndNotify(
+      { organizationId: "org_1", storeId: "store_1", reason: "store.delete" },
+      {
+        loadTargets: async () => {
+          throw new Error("database down");
+        },
+        revoke
+      }
+    );
+    expect(revoke).toHaveBeenCalledWith({ organizationId: "org_1", storeId: "store_1", workerInstallationIds: undefined });
+    expect(result.outcomes).toEqual([]);
+  });
+
+  it("throws, and notifies no one, when the revoke fails", async () => {
+    const fetchMock = vi.fn();
+    await expect(
+      revokeInstallationsAndNotify(
+        { organizationId: "org_1", reason: "organization.delete" },
+        {
+          fetch: fetchMock as unknown as typeof fetch,
+          loadTargets: async () => [target],
+          revoke: async () => {
+            throw new Error("database down");
+          }
+        }
+      )
+    ).rejects.toThrow("database down");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

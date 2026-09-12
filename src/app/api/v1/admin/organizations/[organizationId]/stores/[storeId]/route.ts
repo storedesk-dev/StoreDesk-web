@@ -4,7 +4,7 @@ import { jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
 import { TenantStoreModel } from "@/models/ControlPlane";
 import { safeJson } from "@/lib/control-plane-security";
-import { scheduleNotify } from "@/lib/store-notify";
+import { revokeInstallationsAndNotify, scheduleNotify } from "@/lib/store-notify";
 
 type Ctx = { params: Promise<{ organizationId: string; storeId: string }> };
 
@@ -91,6 +91,11 @@ export async function DELETE(req: Request, ctx: Ctx) {
     if (!store) {
       return NextResponse.json({ error: "Store not found" }, { status: 404 });
     }
+
+    // Revoke first: the store's worker credentials are revoked and its server
+    // told, before the tunnel the notify travels through is deleted. A failed
+    // revoke stops the delete.
+    await revokeInstallationsAndNotify({ organizationId, storeId, reason: "store.delete" });
 
     if (store.tunnelUrl) {
       try {

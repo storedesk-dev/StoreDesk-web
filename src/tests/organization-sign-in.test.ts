@@ -52,20 +52,11 @@ describe("GET /api/v1/app-auth/organizations/{slug}", () => {
   });
 });
 
-describe("POST /api/v1/app-auth/login with an organization", () => {
-  it("refuses an organizationSlug that is not a string", async () => {
-    const res = await login(
-      new Request("http://localhost/api/v1/app-auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: "owner@example.invalid",
-          password: "a-long-password",
-          audience: "mobile",
-          organizationSlug: { $ne: "" }
-        })
-      })
-    );
-    expect(res.status).toBe(400);
+describe("POST /api/v1/app-auth/login", () => {
+  it("is turned off: the phone signs in at the store after the lookup", async () => {
+    // Even the operator-injection body that used to earn a 400 now gets 410.
+    const res = await login();
+    expect(res.status).toBe(410);
+    expect((await res.json()).error.code).toBe("GONE");
   });
 });

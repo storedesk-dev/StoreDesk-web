@@ -34,6 +34,9 @@ export type NotifyReason =
   | "subscription.create"
   | "subscription.change"
   | "store.update"
+  | "store.delete"
+  | "organization.delete"
+  | "installation.revoke"
   | "device.revoke";
 
 export type NotifyInput = {
@@ -256,6 +259,69 @@ export async function notifyAppUserInstallations(
     );
     return [];
   }
+}
+
+export type RevokeScope = {
+  organizationId: string;
+  storeId?: string;
+  workerInstallationIds?: string[];
+};
+
+/** Every active (or overlapping) worker credential in scope becomes revoked. */
+export async function revokeWorkerCredentials(scope: RevokeScope): Promise<number> {
+  await connectDb();
+  const filter: Record<string, unknown> = {
+    organizationId: scope.organizationId,
+    status: { $in: ["active", "overlap"] }
+  };
+  if (scope.storeId) filter.storeId = scope.storeId;
+  if (scope.workerInstallationIds?.length) {
+    filter.workerInstallationId = { $in: scope.workerInstallationIds };
+  }
+  const result = await WorkerCredentialModel.updateMany(filter, {
+    status: "revoked",
+    revokedAt: new Date()
+  });
+  return Number(result.modifiedCount ?? 0);
+}
+
+/**
+ * Take installations out of service: the one path for deleting an
+ * organization or a store, and for any future change that moves an
+ * installation out of active/degraded. The order matters:
+ *
+ * 1. Load the notify targets while the credentials are still active — the
+ *    relay key that signs the notify lives on the credential.
+ * 2. Revoke the credentials. A failure here throws, so the caller stops before
+ *    deleting anything.
+ * 3. Notify, and wait (at most the 3 s notify timeout): the store pulls, gets
+ *    401 from the access sync, and treats itself as revoked. Awaited rather
+ *    than run after the response, because callers delete the tunnel next and
+ *    the notify travels through it.
+ */
+export async function revokeInstallationsAndNotify(
+  input: RevokeScope & { reason: NotifyReason },
+  deps: NotifyDeps & { revoke?: (scope: RevokeScope) => Promise<number> } = {}
+): Promise<{ revoked: number; outcomes: NotifyOutcome[] }> {
+  const scope: RevokeScope = {
+    organizationId: input.organizationId,
+    storeId: input.storeId,
+    workerInstallationIds: input.workerInstallationIds
+  };
+  const notifyInput: NotifyInput = { ...scope, reason: input.reason };
+  let targets: NotifyTarget[] = [];
+  try {
+    targets = await (deps.loadTargets ?? loadNotifyTargets)(notifyInput);
+  } catch (error) {
+    console.warn(
+      `[store-notify] ${input.reason}: could not load installations to notify: ${
+        error instanceof Error ? error.name : "Error"
+      }`
+    );
+  }
+  const revoked = await (deps.revoke ?? revokeWorkerCredentials)(scope);
+  const outcomes = await notifyInstallations(notifyInput, { ...deps, loadTargets: async () => targets });
+  return { revoked, outcomes };
 }
 
 /**

@@ -5,8 +5,6 @@ import {
   AppUserModel,
   AuditEventModel,
   ClientDeviceModel,
-  ClientRefreshCredentialModel,
-  ClientSessionModel,
   EulaAcceptanceModel,
   OrganizationModel,
   SetupKeyModel,
@@ -28,7 +26,6 @@ import {
   publicId,
   randomSecret,
   safeJson,
-  signClientSession,
   verifySecret
 } from "@/lib/control-plane-security";
 import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
@@ -959,9 +956,13 @@ async function activeOrganizationBySlug(rawSlug: string) {
  * slug, e.g. `hopin4630`) and the app saves the answer, so it knows where each
  * store's server is before anyone signs in. Public and rate-limited, so it
  * carries only public facts: the organization's name and, per active store,
- * its name, id and tunnel URL. A tunnel URL is a public hostname; the store
- * server behind it answers nothing but `/api/health` without a session, which
- * still needs the email and password. The LAN address comes with the session.
+ * its name, id and tunnel URL. Tunnel URLs are public hostnames, so listing
+ * them reveals nothing a DNS lookup would not. Without a session the store
+ * server behind one answers only `/api/health`, its sign-in and refresh
+ * (rate-limited, with a per-caller budget and an account lockout), and the
+ * notify endpoint (which needs the installation's relay-key signature and can
+ * only make the store pull). Signing in still needs the email and password.
+ * The LAN address comes with the session.
  */
 export async function lookupOrganization(rawSlug: string) {
   const org = await activeOrganizationBySlug(rawSlug);
@@ -980,230 +981,5 @@ export async function lookupOrganization(rawSlug: string) {
       storeNumber: store.storeNumber ? String(store.storeNumber) : null,
       tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null
     }))
-  };
-}
-
-/**
- * LEGACY — no client calls this any more. The desktop and the phone sign in at
- * the store server (`POST /api/auth/v1/login`), which checks the password
- * against the hashes it pulls from `GET /api/v1/edge/sync/access`
- * (docs/design/store-sign-in-and-sync.md). Kept working until it is removed.
- */
-export async function loginAppUser(body: {
-  email: string;
-  password: string;
-  deviceName?: string;
-  audience: "desktop" | "mobile";
-  deviceId?: string;
-  organizationSlug?: string;
-}) {
-  await connectDb();
-  const user = await AppUserModel.findOne({
-    email: body.email.trim().toLowerCase()
-  }).select("+passwordHash");
-  if (!user || !user.passwordHash || !(await verifySecret(String(user.passwordHash), body.password))) {
-    throw new ControlPlaneError(401, "LOGIN_INVALID", "Email or password is invalid");
-  }
-  if (user.status !== "active") {
-    throw new ControlPlaneError(403, "AUTHORIZATION_DENIED", "App user is not active");
-  }
-
-  // Signing in to one organization lists only its stores. Checked after the
-  // password, so only the account's owner learns which organizations it is in.
-  let organizationId: string | undefined;
-  if (body.organizationSlug !== undefined) {
-    const org = await activeOrganizationBySlug(body.organizationSlug);
-    organizationId = String(org.organizationId);
-    const member = await UserAssignmentModel.exists({
-      appUserId: user.appUserId,
-      organizationId,
-      status: "active"
-    });
-    if (!member) {
-      throw new ControlPlaneError(
-        403,
-        "ORGANIZATION_ACCESS_DENIED",
-        "This login has no access to that organization"
-      );
-    }
-  }
-
-  user.lastLoginAt = new Date();
-  await user.save();
-
-  let deviceId = body.deviceId;
-  if (deviceId) {
-    const device = await ClientDeviceModel.findOne({
-      deviceId,
-      appUserId: user.appUserId,
-      status: "active"
-    }).lean();
-    if (!device) throw new ControlPlaneError(403, "DEVICE_REVOKED", "Device is not active");
-  } else {
-    deviceId = publicId("dev");
-    await ClientDeviceModel.create({
-      deviceId,
-      appUserId: user.appUserId,
-      audience: body.audience,
-      deviceName: body.deviceName?.trim() || `${body.audience}-device`,
-      status: "active",
-      lastSeenAt: new Date()
-    });
-  }
-
-  const assignments = await assignmentSummaries(String(user.appUserId), organizationId);
-  return {
-    contractVersion: CONTRACT_VERSION,
-    appUserId: user.appUserId,
-    deviceId,
-    assignments
-  };
-}
-
-/** LEGACY — see loginAppUser. Store servers now issue sessions themselves. */
-export async function issueClientSession(body: {
-  appUserId: string;
-  deviceId: string;
-  assignmentId: string;
-  audience: "desktop" | "mobile";
-}) {
-  await connectDb();
-  const assignment = await UserAssignmentModel.findOne({
-    assignmentId: body.assignmentId,
-    appUserId: body.appUserId,
-    status: "active"
-  }).lean();
-  if (!assignment) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Assignment not found");
-
-  const installation = await WorkerInstallationModel.findOne({
-    workerInstallationId: assignment.workerInstallationId,
-    organizationId: assignment.organizationId,
-    storeId: assignment.storeId
-  }).lean();
-  if (!installation?.firstBootstrapCompletedAt || installation.status !== "active") {
-    throw new ControlPlaneError(
-      409,
-      "WORKER_BOOTSTRAP_INCOMPLETE",
-      "Assigned Worker is not ready"
-    );
-  }
-
-  const sub = await SubscriptionModel.findOne({
-    organizationId: assignment.organizationId,
-    subscriptionId: installation.subscriptionId,
-    status: { $in: ["trialing", "active"] },
-    entitlementExpiresAt: { $gt: new Date() }
-  }).lean();
-  if (!sub) throw new ControlPlaneError(402, "SUBSCRIPTION_INACTIVE", "Subscription inactive");
-
-  const device = await ClientDeviceModel.findOne({
-    deviceId: body.deviceId,
-    appUserId: body.appUserId,
-    status: "active"
-  }).lean();
-  if (!device) throw new ControlPlaneError(403, "DEVICE_REVOKED", "Device is not active");
-
-  const refreshId = publicId("ref");
-  const refreshSecret = randomSecret(32);
-  await ClientRefreshCredentialModel.create({
-    refreshId,
-    secretHash: await hashSecret(refreshSecret),
-    appUserId: body.appUserId,
-    assignmentId: body.assignmentId,
-    deviceId: body.deviceId,
-    status: "active",
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-  });
-
-  // Sign with the installation's own relay key so the Worker can verify this
-  // token offline. No key means the Worker was never activated (or its
-  // credential was revoked) — a session would be unverifiable, so refuse now.
-  const credential = await WorkerCredentialModel.findOne({
-    workerInstallationId: assignment.workerInstallationId,
-    status: "active"
-  })
-    .select("+relayKey")
-    .lean();
-  if (!credential?.relayKey) {
-    throw new ControlPlaneError(
-      409,
-      "WORKER_BOOTSTRAP_INCOMPLETE",
-      "Assigned Worker has no active credential; re-activate it",
-      true
-    );
-  }
-
-  const relay = signClientSession(String(credential.relayKey), {
-    sub: body.appUserId,
-    organizationId: String(assignment.organizationId),
-    storeId: String(assignment.storeId),
-    workerInstallationId: String(assignment.workerInstallationId),
-    assignmentId: String(assignment.assignmentId),
-    audience: body.audience,
-    role: String(assignment.role),
-    scopes: (assignment.scopes as string[]) || ["relay:request"]
-  });
-
-  const clientSessionId = publicId("cses");
-  await ClientSessionModel.create({
-    clientSessionId,
-    appUserId: body.appUserId,
-    assignmentId: body.assignmentId,
-    deviceId: body.deviceId,
-    organizationId: assignment.organizationId,
-    storeId: assignment.storeId,
-    workerInstallationId: assignment.workerInstallationId,
-    audience: body.audience,
-    scopes: assignment.scopes,
-    status: "active",
-    expiresAt: relay.expiresAt
-  });
-
-  const [store, org] = await Promise.all([
-    TenantStoreModel.findOne({ storeId: assignment.storeId }).lean(),
-    OrganizationModel.findOne({ organizationId: assignment.organizationId }).lean()
-  ]);
-
-  // Parse pageAccess and roleAccess from Organization.roles or store's configJson
-  let pageAccess: Record<string, { enabled: boolean }> = {};
-  let roleAccess: Record<string, unknown> | null = null;
-
-  const orgRoles = Array.isArray((org as Record<string, unknown> | null)?.roles)
-    ? ((org as Record<string, unknown>).roles as Record<string, unknown>[])
-    : [];
-  if (orgRoles.length > 0) {
-    roleAccess = orgRoles.find(r => r.roleId === assignment.role) || null;
-  }
-
-  try {
-    const raw = (store as Record<string, unknown> | null)?.configJson;
-    if (raw && typeof raw === "string") {
-      const parsed = JSON.parse(raw);
-      pageAccess = parsed.pageAccess || {};
-      if (!roleAccess && Array.isArray(parsed.roles)) {
-        roleAccess = parsed.roles.find((r: Record<string, unknown>) => r.roleId === assignment.role) || null;
-      }
-    }
-  } catch { }
-
-  if (!roleAccess) {
-    roleAccess = DEFAULT_ORG_ROLES.find(r => r.roleId === assignment.role) || DEFAULT_ORG_ROLES[0];
-  }
-
-  return {
-    contractVersion: CONTRACT_VERSION,
-    sessionToken: relay.token,
-    expiresAt: relay.expiresAt.toISOString(),
-    organizationId: assignment.organizationId,
-    storeId: assignment.storeId,
-    workerInstallationId: assignment.workerInstallationId,
-    assignmentId: assignment.assignmentId,
-    role: assignment.role,
-    scopes: assignment.scopes,
-    pageAccess,
-    roleAccess,
-    refreshCredential: `${refreshId}.${refreshSecret}`,
-    tunnelUrl: (store as Record<string, unknown>)?.tunnelUrl as string | null,
-    lanUrl: (installation as Record<string, unknown>)?.lanUrl as string | null
   };
 }
