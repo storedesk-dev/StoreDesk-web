@@ -19,6 +19,7 @@ import { requireOrganization } from "@/lib/organizations";
 import { requireStore } from "@/lib/tenant-stores";
 import { ENTITLED_STATUSES, coverageIndex, expireLapsedLicenses } from "@/lib/licenses";
 import { tunnelView } from "@/lib/tunnel";
+import { remoteStatuses } from "@/lib/remote-status";
 
 type Doc = Record<string, unknown>;
 const EPOCH = "1970-01-01T00:00:00.000Z";
@@ -192,9 +193,11 @@ const LIVE_INSTALL = ["active", "degraded", "updating", "rollback"];
 const ONLINE_WINDOW_MS = 10 * 60_000;
 const OFFLINE_AFTER_MS = 24 * 60 * 60_000;
 const ENDING_WINDOW_MS = 30 * DAY_MS;
+/** A tunnel down longer than this needs attention. */
+const TUNNEL_DOWN_AFTER_MS = 15 * 60_000;
 
 export type AttentionItem = {
-  kind: "pc_not_activated" | "license_ending" | "store_unlicensed" | "tunnel_failed" | "store_offline";
+  kind: "pc_not_activated" | "license_ending" | "store_unlicensed" | "tunnel_failed" | "tunnel_down" | "store_offline";
   organizationId: string;
   organizationName: string;
   storeId: string | null;
@@ -337,6 +340,25 @@ export async function dashboard() {
         })
       );
     }
+  }
+
+  // Phones can't reach the store: its tunnel has been down for 15 minutes or more.
+  const reachable = stores.filter((store) => store.status === "active" && activeOrg(String(store.organizationId)));
+  const remote = await remoteStatuses(reachable);
+  for (const store of reachable) {
+    const status = remote.get(String(store.storeId));
+    if (status?.status !== "offline" || !status.since) continue;
+    if (now - new Date(status.since).getTime() < TUNNEL_DOWN_AFTER_MS) continue;
+    attention.push(
+      item({
+        kind: "tunnel_down",
+        organizationId: String(store.organizationId),
+        storeId: String(store.storeId),
+        storeName: String(store.name),
+        at: status.since,
+        message: "Tunnel down — phones can't reach this store"
+      })
+    );
   }
 
   for (const installation of live) {

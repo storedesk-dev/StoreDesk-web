@@ -17,7 +17,7 @@ import {
   Spinner,
   useLoad
 } from "../../../../../_components/ui";
-import { PcChip, TunnelChip } from "../../../../../_components/status";
+import { PcChip, RemoteChip, TunnelChip } from "../../../../../_components/status";
 import type { StoreTabProps } from "./shared";
 
 const KEY_STATUS: Record<SetupKeyStatus, string> = {
@@ -183,7 +183,8 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
               value: (
                 <span className="flex flex-wrap items-center gap-2">
                   <TunnelChip tunnel={data.tunnel} />
-                  {data.tunnel.url ? <span className="font-mono text-[12px] text-slate-600">{data.tunnel.url}</span> : null}
+                  <RemoteChip remote={data.remote} />
+                  {data.tunnel.url ?<span className="font-mono text-[12px] text-slate-600">{data.tunnel.url}</span> : null}
                   {data.tunnel.status === "failed" && data.tunnel.message ? (
                     <span className="text-[12.5px] text-red-700">{data.tunnel.message}</span>
                   ) : null}

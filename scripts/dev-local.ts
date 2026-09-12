@@ -40,6 +40,18 @@ async function main() {
   });
   await mongoose.disconnect();
 
+  // No Cloudflare here, so stub the remote-status source (lib/remote-status.ts,
+  // STOREDESK_REMOTE_STATUS_STUB; ignored in production) for some variety:
+  // Store 17 offline for the last 30 minutes, every other store online.
+  const offlineStore = seed.stores.find((store) => store.name.startsWith("Store 17"));
+  const offlineSince = new Date(Date.now() - 30 * 60_000);
+  if (!process.env.STOREDESK_REMOTE_STATUS_STUB) {
+    process.env.STOREDESK_REMOTE_STATUS_STUB = JSON.stringify({
+      "*": { status: "online" },
+      ...(offlineStore ? { [offlineStore.storeId]: { status: "offline", since: offlineSince.toISOString() } } : {})
+    });
+  }
+
   const port = process.env.PORT || "3000";
   const lines = [
     "",
@@ -66,6 +78,7 @@ async function main() {
     "",
     `  MongoDB         ${uri}  (in memory; gone on exit)`,
     "  Cloudflare and e-mail are off: stores show the tunnel as not configured.",
+    `  Remote status is stubbed: ${offlineStore ? `${offlineStore.name} offline since ${offlineSince.toTimeString().slice(0, 5)}, ` : ""}every other store online.`,
     "──────────────────────────────────────────────────────────────────────────────────",
     ""
   ];

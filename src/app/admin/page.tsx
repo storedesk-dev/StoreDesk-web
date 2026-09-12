@@ -8,6 +8,7 @@ import { api, errorMessage, type AttentionItem } from "./_lib/api";
 import { daysUntil, formatDate, formatShortDateTime, relativeTime } from "./_lib/format";
 import { Button, Card, EmptyState, ErrorBanner, PageHeader, Spinner, table, useLoad } from "./_components/ui";
 import { ActivityActor, ActivityTarget, actionLabel } from "./_components/activity";
+import { sinceTime } from "./_components/status";
 
 const orgHref = (orgId: string, tab?: string) =>
   `/admin/organizations/${encodeURIComponent(orgId)}${tab ? `?tab=${tab}` : ""}`;
@@ -15,6 +16,8 @@ const storeHref = (orgId: string, storeId: string, tab?: string) =>
   `/admin/organizations/${encodeURIComponent(orgId)}/stores/${encodeURIComponent(storeId)}${tab ? `?tab=${tab}` : ""}`;
 
 function attentionText(item: AttentionItem): string {
+  // Shown in the viewer's own time.
+  if (item.kind === "tunnel_down") return `Tunnel down since ${sinceTime(item.at)} — phones can't reach this store`;
   if (item.message) return item.message;
   switch (item.kind) {
     case "pc_not_activated":
@@ -102,7 +105,7 @@ export default function DashboardPage() {
                   {data.attention.map((item, i) => (
                     <li key={`${item.kind}-${item.storeId ?? item.licenseId ?? item.organizationId}-${i}`} className="flex items-center gap-3 px-4 py-2.5">
                       <AlertTriangle
-                        className={`h-4 w-4 shrink-0 ${item.kind === "tunnel_failed" || item.kind === "store_offline" || item.kind === "store_unlicensed" ? "text-red-500" : "text-amber-500"}`}
+                        className={`h-4 w-4 shrink-0 ${item.kind === "tunnel_failed" || item.kind === "tunnel_down" || item.kind === "store_offline" || item.kind === "store_unlicensed" ? "text-red-500" : "text-amber-500"}`}
                         aria-hidden
                       />
                       <div className="min-w-0 flex-1">

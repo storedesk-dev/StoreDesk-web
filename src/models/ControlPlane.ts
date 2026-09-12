@@ -183,6 +183,12 @@ const TenantStoreSchema = new Schema(
     tunnelRotationRequired: { type: Boolean },
     tunnelRotatedAt: Date,
     /**
+     * Last observed remote reachability (lib/remote-status.ts) and since when,
+     * for a `since` when Cloudflare gives no timestamp. Unknown is not stored.
+     */
+    remoteStatus: { type: String, enum: ["online", "offline"] },
+    remoteStatusSince: Date,
+    /**
      * Register connection only (`posIntegration`, `posIpAddress`,
      * `posUsername`), built by the server — no route accepts a client-supplied
      * configJson, and it never carries roles or the register password.

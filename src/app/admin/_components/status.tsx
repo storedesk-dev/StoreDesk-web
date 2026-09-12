@@ -4,6 +4,7 @@ import type {
   InstallationStatus,
   LicenseStatus,
   OrgStatus,
+  RemoteStatus,
   StoreInstallationSummary,
   StoreLicenseSummary,
   StoreStatus,
@@ -101,6 +102,34 @@ export function PcChip({ installation }: { installation: StoreInstallationSummar
   return (
     <Chip tone={p.tone} dot title={installation?.lastSeenAt ? `Last seen ${relativeTime(installation.lastSeenAt)}` : undefined}>
       {p.label}
+    </Chip>
+  );
+}
+
+/** "20:14" today, "Sep 11 20:14" before today. */
+export function sinceTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  return date.toDateString() === new Date().toDateString()
+    ? time
+    : `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+}
+
+/** Whether phones can reach the store now: "Tunnel healthy" / "Tunnel down since 20:14"; nothing when unknown. */
+export function RemoteChip({ remote }: { remote: RemoteStatus | null | undefined }) {
+  if (!remote || remote.status === "unknown") return null;
+  if (remote.status === "online") {
+    return (
+      <Chip tone="green" dot title={remote.since ? `Since ${sinceTime(remote.since)}` : undefined}>
+        Tunnel healthy
+      </Chip>
+    );
+  }
+  return (
+    <Chip tone="red" dot title="Phones can't reach this store">
+      {remote.since ? `Tunnel down since ${sinceTime(remote.since)}` : "Tunnel down"}
     </Chip>
   );
 }

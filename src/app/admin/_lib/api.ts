@@ -168,6 +168,12 @@ export interface StoreInstallationSummary {
   activatedAt?: string | null;
 }
 
+/** Can phones reach the store now (the tunnel's health), and since when (minute-rounded). */
+export interface RemoteStatus {
+  status: "online" | "offline" | "unknown";
+  since: string | null;
+}
+
 export interface StoreTunnel {
   status: TunnelStatus;
   /** The PC was replaced and the tunnel must be rotated (Retry) before a setup key can be issued. */
@@ -238,6 +244,7 @@ export interface StoreSetup {
   organizationSlug: string;
   contactEmail?: string | null;
   tunnel: StoreTunnel;
+  remote?: RemoteStatus;
   license?: StoreLicenseSummary | null;
   licensingMode?: LicensingMode;
   /** Why a key cannot be issued right now (unlicensed, license ended, no tunnel, …), or null. */
@@ -367,6 +374,7 @@ export type AttentionKind =
   | "license_ending"
   | "store_unlicensed"
   | "tunnel_failed"
+  | "tunnel_down"
   | "store_offline";
 
 export interface AttentionItem {

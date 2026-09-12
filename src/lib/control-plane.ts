@@ -30,6 +30,7 @@ import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
 import { coverageFor, coveringLicense, licenseProblem } from "@/lib/licenses";
 import { SITE } from "@/lib/site";
+import { remoteStatuses } from "@/lib/remote-status";
 
 /**
  * The store-facing half of the control plane: activation (setup-key redeem),
@@ -513,17 +514,20 @@ async function activeOrganizationBySlug(rawSlug: string) {
  * The phone's first screen: the user types the org tag and the app saves the
  * answer, so it knows where each store's server is before anyone signs in.
  * Public and rate-limited, so it carries only public facts: the organization's
- * name and, per active store, its name, id and tunnel URL (a public hostname).
- * Suspended organizations and stores are left out.
+ * name and, per active store, its name, id, tunnel URL (a public hostname) and
+ * `remote: {status: "online" | "offline" | "unknown", since}` — whether phones
+ * can reach it now, and since when (rounded to the minute). An offline store
+ * is still listed. Suspended organizations and stores are left out.
  */
 export async function lookupOrganization(rawSlug: string) {
   const org = await activeOrganizationBySlug(rawSlug);
-  const stores = await TenantStoreModel.find({
+  const stores = (await TenantStoreModel.find({
     organizationId: org.organizationId,
     status: "active"
   })
     .sort({ name: 1 })
-    .lean();
+    .lean()) as Doc[];
+  const remote = await remoteStatuses(stores);
   return {
     contractVersion: CONTRACT_VERSION,
     organization: { slug: String(org.slug), name: String(org.name) },
@@ -531,7 +535,8 @@ export async function lookupOrganization(rawSlug: string) {
       storeId: String(store.storeId),
       name: String(store.name),
       storeNumber: store.storeNumber ? String(store.storeNumber) : null,
-      tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null
+      tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null,
+      remote: remote.get(String(store.storeId)) ?? { status: "unknown" as const, since: null }
     }))
   };
 }

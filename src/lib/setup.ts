@@ -15,6 +15,7 @@ import { requireOrganization } from "@/lib/organizations";
 import { installationSummary, requireStore } from "@/lib/tenant-stores";
 import { coverageFor, expireLapsedLicenses, licenseProblem, licenseSummary } from "@/lib/licenses";
 import { cloudflareConfigured, rotateStoreTunnel, tunnelView } from "@/lib/tunnel";
+import { remoteStatusOf } from "@/lib/remote-status";
 import { revokeInstallationsAndNotify } from "@/lib/store-notify";
 import type { InternalAdminActor } from "@/lib/admin-auth";
 
@@ -108,6 +109,8 @@ export async function getStoreSetup(organizationId: string, storeId: string) {
   ]);
   const blocked = whyBlocked(ctx);
   const tunnel = tunnelView(ctx.store);
+  // Can phones reach the store now: "Tunnel healthy" / "Tunnel down since …".
+  const remote = await remoteStatusOf(ctx.store);
   return {
     organizationSlug: String(ctx.org.slug),
     organization: {
@@ -122,6 +125,7 @@ export async function getStoreSetup(organizationId: string, storeId: string) {
     installations: ctx.installations.map((row) => installationSummary(row)!),
     setupKey: keyView(latestKey as Doc | null),
     tunnel,
+    remote,
     license: licenseSummary(ctx.license),
     licensingMode: ctx.licensingMode,
     keyBlockedReason: blocked?.message ?? null,

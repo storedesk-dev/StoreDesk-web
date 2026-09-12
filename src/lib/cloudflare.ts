@@ -18,11 +18,12 @@ function credentials(): { token: string; accountId: string } | null {
   return token && accountId ? { token, accountId } : null;
 }
 
-async function cf<T>(token: string, path: string, init: { method: string; body?: unknown }): Promise<T> {
+async function cf<T>(token: string, path: string, init: { method: string; body?: unknown; signal?: AbortSignal }): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     method: init.method,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: init.body === undefined ? undefined : JSON.stringify(init.body)
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    signal: init.signal
   });
   const data = (await res.json().catch(() => ({}))) as CfResponse<T>;
   if (!res.ok || data.success === false) {
@@ -37,6 +38,37 @@ function newTunnelSecret(): string {
 
 function tunnelDomain(): string {
   return process.env.CLOUDFLARE_TUNNEL_DOMAIN?.trim() || "tunnels.storedesk.net";
+}
+
+export type CloudflareTunnelHealth = {
+  /** `healthy` | `degraded` | `down` | `inactive` (Cloudflare's words). */
+  status: string | null;
+  connsActiveAt: string | null;
+  connsInactiveAt: string | null;
+  /** The oldest open connection, when Cloudflare lists them. */
+  openedAt: string | null;
+};
+
+/** A tunnel's health, by its Cloudflare id. Null when Cloudflare is not configured. */
+export async function getCloudflareTunnelHealth(tunnelId: string, signal?: AbortSignal): Promise<CloudflareTunnelHealth | null> {
+  const creds = credentials();
+  if (!creds) return null;
+  const tunnel = await cf<{
+    status?: string;
+    conns_active_at?: string | null;
+    conns_inactive_at?: string | null;
+    connections?: Array<{ opened_at?: string }>;
+  }>(creds.token, `/accounts/${creds.accountId}/cfd_tunnel/${encodeURIComponent(tunnelId)}`, { method: "GET", signal });
+  const opened = (tunnel?.connections ?? [])
+    .map((connection) => connection.opened_at)
+    .filter((value): value is string => typeof value === "string" && Boolean(value))
+    .sort()[0];
+  return {
+    status: tunnel?.status ?? null,
+    connsActiveAt: tunnel?.conns_active_at ?? null,
+    connsInactiveAt: tunnel?.conns_inactive_at ?? null,
+    openedAt: opened ?? null
+  };
 }
 
 export type ProvisionedTunnel = {
