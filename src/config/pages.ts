@@ -138,8 +138,8 @@ export const ALL_PAGES: PageDefinition[] = [
   },
   {
     key: "manageWorker",
-    label: "Manage Worker",
-    description: "Edge server status, service controls, logs, and Cloudflare Tunnel status.",
+    label: "StoreDesk Service",
+    description: "StoreDesk service status, service controls, logs, and remote access (tunnel) status.",
     app: "electron",
     filePath: "src/pages/ManageWorkerPage.tsx",
     defaultEnabled: true,
