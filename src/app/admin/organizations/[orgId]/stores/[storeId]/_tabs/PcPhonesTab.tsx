@@ -163,7 +163,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
           steps={[
             "Install StoreDesk.",
             <>Open it and choose <b>Set up this PC with a setup key</b>.</>,
-            <>Paste the key and the store contact e-mail{contact ? <> (<code className="font-mono text-[12px]">{contact}</code>)</> : null}.</>,
+            "Paste the setup key.",
             "Accept and activate.",
             "Sign in with a StoreDesk login assigned to this store."
           ]}

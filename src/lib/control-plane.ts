@@ -29,7 +29,6 @@ import { scheduleAppUserNotify } from "@/lib/store-notify";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
 import { coverageFor, coveringLicense, licenseProblem } from "@/lib/licenses";
-import { SITE } from "@/lib/site";
 import { remoteStatuses } from "@/lib/remote-status";
 
 /**
@@ -52,9 +51,10 @@ const REDEEMABLE = ["queued", "shown", "sent", "delivery_failed"];
  * `POST /api/v1/setup-keys/redeem` (P13). The desktop setup wizard only lets
  * the operator activate with all three boxes ticked, so each acknowledgement
  * must be literally `true`; the EULA digest must be a SHA-256 hex digest.
- * `contactEmail` is "the e-mail StoreDesk sent the key to": when the key has a
- * recorded contact it must match (case-insensitive, trimmed). Other unknown
- * fields are ignored.
+ * Setup asks only for the setup key: `contactEmail`, if a desktop build still
+ * sends it, is accepted and ignored — never a reason to refuse. The desktop's
+ * single consent (license, privacy, background service) sends all three
+ * acknowledgements as `true`. Other unknown fields are ignored.
  */
 export const RedeemSchema = z.object({
   setupKey: z.string().trim().min(1).max(200),
@@ -73,7 +73,8 @@ export const RedeemSchema = z.object({
     osAcknowledged: z.literal(true, { message: "must be accepted" }),
     privacyAcknowledged: z.literal(true, { message: "must be accepted" }),
     localDataAcknowledged: z.literal(true, { message: "must be accepted" }),
-    contactEmail: z.string().trim().max(254).optional()
+    /** Ignored (older desktop builds sent it). Any value, or none. */
+    contactEmail: z.unknown().optional()
   }),
   installation: z.object({
     platform: z.enum(["windows", "macos", "linux"]),
@@ -93,16 +94,6 @@ const STORE_MESSAGES = {
 
 const invalidKey = () => new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
 
-/**
- * The e-mail the key was recorded for: the store contact, or the address it
- * was e-mailed to (lib/setup.ts). A key issued with no contact records
- * StoreDesk's own address as a placeholder, which is no recorded e-mail.
- */
-function recordedContactEmail(key: Doc): string | null {
-  const email = typeof key.contactEmail === "string" ? key.contactEmail.trim().toLowerCase() : "";
-  return email && email !== SITE.email.trim().toLowerCase() ? email : null;
-}
-
 export async function redeemSetupKey(body: RedeemBody) {
   await connectDb();
 
@@ -117,25 +108,6 @@ export async function redeemSetupKey(body: RedeemBody) {
     .select("+secretHash")
     .lean();
   if (!key || !(await verifySecret(String(key.secretHash), parsed.secret))) {
-    throw invalidKey();
-  }
-  // The contact e-mail, when the key has one, is part of the key: a mismatch
-  // answers exactly like a wrong key (no hint the key itself was right), and
-  // counts toward both redeem limits above.
-  const expectedEmail = recordedContactEmail(key as Doc);
-  if (expectedEmail && (body.acknowledgements.contactEmail ?? "").trim().toLowerCase() !== expectedEmail) {
-    await writeAudit({
-      organizationId: key.organizationId,
-      storeId: key.storeId,
-      workerInstallationId: key.workerInstallationId,
-      actorType: "system",
-      actorId: "setup_flow",
-      action: "setup_key.redeem_refused",
-      targetType: "setup_key",
-      targetId: key.keyId,
-      correlationId,
-      metadata: { reason: "contact_email_mismatch" }
-    });
     throw invalidKey();
   }
   if (key.status === "consumed") {
