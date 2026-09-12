@@ -140,6 +140,15 @@ export const ALL_PAGES: PageDefinition[] = [
     knownFeatureFlags: {}
   },
   {
+    key: "userManagement",
+    label: "Users and Roles",
+    description: "View the store's synced users and edit role access; changes sync to the control plane.",
+    app: "electron",
+    filePath: "src/pages/SettingsPage.tsx",
+    defaultEnabled: false,
+    knownFeatureFlags: {}
+  },
+  {
     key: "settings",
     label: "Settings",
     description: "Store settings — POS config, receipt template, tax rates, and preferences.",
