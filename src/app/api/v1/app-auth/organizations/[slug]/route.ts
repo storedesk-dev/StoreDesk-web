@@ -5,10 +5,11 @@ import { enforceRateLimit } from "@/lib/control-plane-security";
 type Ctx = { params: Promise<{ slug: string }> };
 
 /**
- * Public: the desktop and phone apps call this when the user types their
- * organization, before the sign-in form. It answers with the organization's
- * name only (see `lookupOrganization`), and is rate-limited per caller so the
- * slug space cannot be walked quickly.
+ * Public: the phone calls this when the user types the org tag, before the
+ * sign-in form (the desktop is set up by its setup key instead). It answers
+ * with the organization's name and its active stores' public addresses (see
+ * `lookupOrganization`), and is rate-limited per caller so the tag space
+ * cannot be walked quickly.
  */
 export async function GET(req: Request, ctx: Ctx) {
   try {
