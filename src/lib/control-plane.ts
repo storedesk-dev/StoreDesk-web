@@ -980,16 +980,31 @@ async function activeOrganizationBySlug(rawSlug: string) {
 }
 
 /**
- * The first sign-in screen: the user types their organization, and the app
- * shows its name above the email and password. Public, so it answers with the
- * name only. A slug is guessable, so no id, store or tunnel address comes back;
- * the store's address arrives with the session, after sign-in.
+ * The phone's first screen: the user types the org tag (the organization's
+ * slug, e.g. `hopin4630`) and the app saves the answer, so it knows where each
+ * store's server is before anyone signs in. Public and rate-limited, so it
+ * carries only public facts: the organization's name and, per active store,
+ * its name, id and tunnel URL. A tunnel URL is a public hostname; the store
+ * server behind it answers nothing but `/api/health` without a session, which
+ * still needs the email and password. The LAN address comes with the session.
  */
 export async function lookupOrganization(rawSlug: string) {
   const org = await activeOrganizationBySlug(rawSlug);
+  const stores = await TenantStoreModel.find({
+    organizationId: org.organizationId,
+    status: "active"
+  })
+    .sort({ name: 1 })
+    .lean();
   return {
     contractVersion: CONTRACT_VERSION,
-    organization: { slug: String(org.slug), name: String(org.name) }
+    organization: { slug: String(org.slug), name: String(org.name) },
+    stores: stores.map((store) => ({
+      storeId: String(store.storeId),
+      name: String(store.name),
+      storeNumber: store.storeNumber ? String(store.storeNumber) : null,
+      tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null
+    }))
   };
 }
 
