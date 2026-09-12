@@ -2,7 +2,6 @@ import { createVerify, generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, lastAudit, request, seedOrganization, type TestAdmin } from "./helpers/api";
-import { POST as check } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/settings/google-sheets/check/route";
 import { GET as getSettings } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/settings/route";
 import { GET as sheetMeta } from "@/app/api/v1/edge/google/sheets/meta/route";
 import { GET as sheetValues } from "@/app/api/v1/edge/google/sheets/values/route";
@@ -15,8 +14,7 @@ import {
   resetGoogleTokenCacheForTests,
   signJwtAssertion
 } from "@/lib/google";
-import { updateStoreSettings } from "@/lib/tenant-stores";
-import { AuditEventModel } from "@/models/ControlPlane";
+import { AuditEventModel, TenantStoreModel } from "@/models/ControlPlane";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/store-notify")>()),
@@ -30,9 +28,8 @@ vi.mock("@/lib/cloudflare", () => ({
 
 /**
  * StoreDesk's Google account. The key and every access token stay in the
- * control plane; the admin checks a sheet is shared with it, and a store
- * server reaches its own configured sheet — and only that one — through the
- * proxy.
+ * control plane; a store server reaches its own sheet — and only that one —
+ * through the proxy, while the admin's Google Sheets switch is on.
  */
 
 setupMemoryMongo();
@@ -105,13 +102,22 @@ afterEach(() => {
   delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 });
 
-async function enableSheet() {
-  await updateStoreSettings(
-    admin,
-    params.organizationId,
-    params.storeId,
-    { integrations: { googleSheets: { enabled: true, spreadsheetUrl: SHEET, sheetName: "Daily", headerRow: 1 } } },
-    1
+/** The admin's switch, plus the sheet the store PC reported (the edge route comes next phase). */
+async function enableSheet(sheet: Record<string, unknown> = {}) {
+  await TenantStoreModel.collection.updateOne(
+    { storeId: params.storeId },
+    {
+      $set: {
+        "settings.integrations.googleSheets": {
+          enabled: true,
+          spreadsheetUrl: SHEET,
+          spreadsheetId: SHEET_ID,
+          sheetName: "Daily",
+          headerRow: 1,
+          ...sheet
+        }
+      }
+    }
   );
 }
 
@@ -187,41 +193,7 @@ describe("parseSheetRange", () => {
   });
 });
 
-describe("POST …/settings/google-sheets/check (admin)", () => {
-  function checkSheet(body: unknown) {
-    return call(check, request("POST", "/", { token: admin.token, body }), params);
-  }
-
-  it("answers the sheet's title and tabs, with the address to share it with", async () => {
-    const res = await checkSheet({ spreadsheetUrl: SHEET });
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true, clientEmail: CLIENT_EMAIL, spreadsheetId: SHEET_ID, title: "Daily Sales Book", sheets: ["Daily", "Weekly"] });
-    expect(sheetsCalls()[0].url).toContain(`/spreadsheets/${SHEET_ID}?`);
-    expect((sheetsCalls()[0].init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`);
-    expect(JSON.stringify(res.body)).not.toContain(TOKEN);
-  });
-
-  it("uses the store's saved link when none is sent", async () => {
-    await enableSheet();
-    expect((await checkSheet({})).body.spreadsheetId).toBe(SHEET_ID);
-  });
-
-  it("answers 422 SHEET_NOT_SHARED with the service-account address", async () => {
-    sheetStatus = 403;
-    const res = await checkSheet({ spreadsheetUrl: SHEET });
-    expect(res.status).toBe(422);
-    expect(res.body).toMatchObject({ error: { code: "SHEET_NOT_SHARED" }, clientEmail: CLIENT_EMAIL });
-  });
-
-  it("answers 400 for a link that is not a sheet, 503 without the account, 401 without a session", async () => {
-    expect((await checkSheet({ spreadsheetUrl: "https://example.com/x" })).status).toBe(400);
-    delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    const off = await checkSheet({ spreadsheetUrl: SHEET });
-    expect(off.status).toBe(503);
-    expect(off.body.error.code).toBe("GOOGLE_NOT_CONFIGURED");
-    expect((await call(check, request("POST", "/", { body: {} }), params)).status).toBe(401);
-  });
-
+describe("the admin settings", () => {
   it("the settings answer carries the service-account address", async () => {
     const res = await call(getSettings, request("GET", "/", { token: admin.token }), params);
     expect(res.body.googleClientEmail).toBe(CLIENT_EMAIL);
@@ -332,6 +304,17 @@ describe("the store server's sheet proxy", () => {
     const disabled = await call(sheetMeta, edge(pc.token, "/api/v1/edge/google/sheets/meta"));
     expect(disabled.status).toBe(409);
     expect(disabled.body.error.code).toBe("GOOGLE_SHEETS_NOT_ENABLED");
+    // A sheet the store reported, with the admin's switch off.
+    await enableSheet({ enabled: false });
+    const switchedOff = await call(sheetMeta, edge(pc.token, "/api/v1/edge/google/sheets/meta"));
+    expect(switchedOff.status).toBe(409);
+    expect(switchedOff.body.error.code).toBe("GOOGLE_SHEETS_NOT_ENABLED");
+    // The switch on, no sheet connected yet on the store PC.
+    await enableSheet({ spreadsheetId: null, spreadsheetUrl: null });
+    const noSheet = await call(sheetMeta, edge(pc.token, "/api/v1/edge/google/sheets/meta"));
+    expect(noSheet.status).toBe(409);
+    expect(noSheet.body.error.code).toBe("GOOGLE_SHEETS_NOT_ENABLED");
+    expect(noSheet.body.error.message).toContain("desktop app");
     delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
     const off = await call(sheetValues, edge(pc.token, "/api/v1/edge/google/sheets/values?range=Daily"));
     expect(off.status).toBe(503);

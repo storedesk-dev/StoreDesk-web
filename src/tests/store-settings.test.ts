@@ -27,7 +27,9 @@ vi.mock("@/lib/cloudflare", () => ({
 
 setupMemoryMongo();
 
-const SHEET = "https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit#gid=0";
+const SHEET_ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";
+const SHEET = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit#gid=0`;
+const OTHER_ID = "1ZzSomeoneElsesSheet00000000000000000";
 let admin: TestAdmin;
 let params: { organizationId: string; storeId: string };
 let seeded: Awaited<ReturnType<typeof seedOrganization>>;
@@ -102,20 +104,41 @@ describe("PUT …/settings", () => {
     expect(missing.body.error.code).toBe("SETTINGS_VERSION_REQUIRED");
   });
 
-  it("accepts the GET body echoed back with a change, and derives the sheet id from the link", async () => {
+  it("accepts the GET body echoed back with a change: the switch is saved, sheet fields sent are ignored", async () => {
+    // The sheet the store PC reported (the edge route comes next phase).
+    await TenantStoreModel.collection.updateOne(
+      { storeId: params.storeId },
+      { $set: { "settings.integrations.googleSheets": { enabled: false, spreadsheetUrl: SHEET, spreadsheetId: SHEET_ID, sheetName: "Daily", headerRow: 2 } } }
+    );
     const { body } = await call(getSettings, request("GET", "/", { token: admin.token }), params);
-    body.settings.integrations.googleSheets = { ...body.settings.integrations.googleSheets, enabled: true, spreadsheetUrl: SHEET, sheetName: "Daily", headerRow: 2 };
+    body.settings.integrations.googleSheets = {
+      enabled: true,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${OTHER_ID}/edit`,
+      spreadsheetId: OTHER_ID,
+      sheetName: "Other",
+      headerRow: 9
+    };
     body.settings.timeZone = "America/New_York";
     const res = await put({ settingsVersion: body.settingsVersion, settings: body.settings });
     expect(res.status).toBe(200);
     expect(res.body.settings.integrations.googleSheets).toEqual({
       enabled: true,
       spreadsheetUrl: SHEET,
-      spreadsheetId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
+      spreadsheetId: SHEET_ID,
       sheetName: "Daily",
       headerRow: 2
     });
     expect((await lastAudit("store.settings.update"))?.metadata).toMatchObject({ changed: ["integrations", "timeZone"] });
+  });
+
+  it("turns Google Sheets on and off with the switch alone; no sheet is needed", async () => {
+    const on = await put({ settingsVersion: 1, settings: { integrations: { googleSheets: { enabled: true } } } });
+    expect(on.status).toBe(200);
+    expect(on.body.settings.integrations.googleSheets).toEqual({ enabled: true, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 });
+    const off = await put({ settingsVersion: 2, settings: { integrations: { googleSheets: { enabled: false } } } });
+    expect(off.status).toBe(200);
+    expect(off.body.settingsVersion).toBe(3);
+    expect(off.body.settings.integrations.googleSheets.enabled).toBe(false);
   });
 
   it("writes nothing for an update that changes nothing", async () => {
@@ -136,20 +159,14 @@ describe("PUT …/settings", () => {
     ["a free-form config", { settingsVersion: 1, settings: { configJson: "{}" } }],
     ["a register password", { settingsVersion: 1, settings: { posPassword: "x" } }],
     ["an extra top-level field", { settingsVersion: 1, settings: {}, name: "x" }],
-    ["a header row of 0", { settingsVersion: 1, settings: { integrations: { googleSheets: { enabled: false, spreadsheetUrl: null, sheetName: null, headerRow: 0 } } } }]
+    ["a Google Sheets switch that is not a boolean", { settingsVersion: 1, settings: { integrations: { googleSheets: { enabled: "on" } } } }],
+    ["a Google Sheets switch left out", { settingsVersion: 1, settings: { integrations: { googleSheets: { spreadsheetUrl: SHEET } } } }],
+    ["an unknown Google Sheets field", { settingsVersion: 1, settings: { integrations: { googleSheets: { enabled: true, serviceAccountKey: "x" } } } }]
   ])("answers 400 for %s", async (_label, body) => {
     const res = await put(body);
     expect(res.status).toBe(400);
   });
 
-  it("requires a real sheet link to turn Google Sheets on", async () => {
-    const noLink = await put({ settingsVersion: 1, settings: { integrations: { googleSheets: { enabled: true, spreadsheetUrl: null, sheetName: null, headerRow: 1 } } } });
-    expect(noLink.status).toBe(400);
-    expect(noLink.body.error.code).toBe("SPREADSHEET_URL_REQUIRED");
-    const badLink = await put({ settingsVersion: 1, settings: { integrations: { googleSheets: { enabled: false, spreadsheetUrl: "https://example.com/sheet", sheetName: null, headerRow: 1 } } } });
-    expect(badLink.status).toBe(400);
-    expect(badLink.body.error.code).toBe("SPREADSHEET_URL_INVALID");
-  });
 });
 
 describe("what the store receives, and suspension (P12)", () => {
@@ -168,9 +185,15 @@ describe("what the store receives, and suspension (P12)", () => {
     });
     expect(first.body.store.settings.integrations.gtc).toEqual({ status: "coming_soon" });
 
-    await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: false, coam: false } } });
+    expect(first.body.store.settings.integrations.googleSheets.enabled).toBe(false);
+
+    await put({
+      settingsVersion: 1,
+      settings: { capabilities: { fuel: true, lottery: false, coam: false }, integrations: { googleSheets: { enabled: true } } }
+    });
     const second = await pull(pc.token);
     expect(second.body.store.capabilities.fuel).toBe(true);
+    expect(second.body.store.settings.integrations.googleSheets.enabled).toBe(true);
     expect(second.body.store.settingsVersion).toBe(2);
     expect(second.body.version).not.toBe(first.body.version);
   });

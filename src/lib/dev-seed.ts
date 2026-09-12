@@ -74,14 +74,8 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
     main.storeId,
     {
       capabilities: { fuel: true, lottery: true, coam: false },
-      integrations: {
-        googleSheets: {
-          enabled: false,
-          spreadsheetUrl: "https://docs.google.com/spreadsheets/d/1ExampleSheetIdForLocalRuns000000000/edit",
-          sheetName: "Daily",
-          headerRow: 1
-        }
-      }
+      // Switched on; no sheet yet — the store connects it in the desktop app.
+      integrations: { googleSheets: { enabled: true } }
     },
     main.settingsVersion
   );

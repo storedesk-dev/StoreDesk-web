@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import type { StoreCapability } from "@/config/pages";
 import { Button, Card, Chip, ErrorBanner, Spinner, Switch } from "../../../../../_components/ui";
 import { useStoreSettings, type StoreTabProps } from "./shared";
+
+/**
+ * Store · Features: what the store has and which integrations it may use, as
+ * plain switches with one Save (on top of settingsVersion). Integrations are
+ * set up on the store PC, in the StoreDesk desktop app; here they are only
+ * allowed or not.
+ */
 
 const FEATURES: Array<{ key: StoreCapability; label: string; description: string }> = [
   { key: "fuel", label: "Has fuel", description: "Fuel prices, fuel totals, gas in daily numbers." },
@@ -17,87 +24,164 @@ const LOTTERY_MODES = [
   "Online and instant sales from the lottery terminal report"
 ];
 
+type Draft = { caps: Record<StoreCapability, boolean>; googleSheets: boolean };
+
 export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const settings = useStoreSettings(orgId, storeId);
-  const [caps, setCaps] = useState<Record<StoreCapability, boolean>>({ fuel: false, lottery: false, coam: false });
-  const lotteryLegend = useId();
+  const [draft, setDraft] = useState<Draft>({ caps: { fuel: false, lottery: false, coam: false }, googleSheets: false });
+  const lotteryNote = useId();
+
+  const saved: Draft | null = settings.data
+    ? { caps: settings.data.settings.capabilities, googleSheets: settings.data.settings.integrations.googleSheets.enabled }
+    : null;
 
   useEffect(() => {
-    if (settings.data) setCaps(settings.data.settings.capabilities);
+    if (settings.data) {
+      setDraft({
+        caps: settings.data.settings.capabilities,
+        googleSheets: settings.data.settings.integrations.googleSheets.enabled
+      });
+    }
   }, [settings.data]);
 
   if (settings.error && !settings.data) return <ErrorBanner error={settings.error} onRetry={settings.reload} />;
-  if (!settings.data) return <Spinner />;
+  if (!settings.data || !saved) return <Spinner />;
 
-  const saved = settings.data.settings.capabilities;
-  const dirty = FEATURES.some((f) => caps[f.key] !== saved[f.key]);
+  const dirty = FEATURES.some((f) => draft.caps[f.key] !== saved.caps[f.key]) || draft.googleSheets !== saved.googleSheets;
+
+  function save() {
+    void settings.save(
+      (s) => ({
+        ...s,
+        capabilities: draft.caps,
+        integrations: { ...s.integrations, googleSheets: { ...s.integrations.googleSheets, enabled: draft.googleSheets } }
+      }),
+      "Features saved"
+    );
+  }
 
   return (
     <Card
       title="Features"
-      description="What this store sells. Pages that need a feature the store doesn't have are hidden from every role here."
+      description="What this store has and which integrations it may use. Pages that need a feature the store doesn't have are hidden from every role here."
     >
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void settings.save((s) => ({ ...s, capabilities: caps }), "Features saved");
+          save();
         }}
       >
-        <ul className="divide-y divide-slate-100">
-          {FEATURES.map((f) => {
-            const descId = `feat-${f.key}-desc`;
-            return (
-              <li key={f.key} className="py-3">
-                <div className="flex items-start gap-3">
-                  <Switch
-                    id={`feat-${f.key}`}
-                    label={f.label}
-                    describedBy={descId}
-                    checked={caps[f.key]}
-                    onChange={(v) => setCaps((c) => ({ ...c, [f.key]: v }))}
-                  />
-                  <div>
-                    <label htmlFor={`feat-${f.key}`} className="text-sm font-semibold">
-                      {f.label}
-                    </label>
-                    <p id={descId} className="text-[13px] text-slate-500">
-                      {f.description}
-                    </p>
+        <SwitchGroup title="Store features">
+          {FEATURES.map((f) => (
+            <li key={f.key} className="py-3">
+              <SwitchRow
+                id={`feat-${f.key}`}
+                label={f.label}
+                description={f.description}
+                checked={draft.caps[f.key]}
+                onChange={(v) => setDraft((d) => ({ ...d, caps: { ...d.caps, [f.key]: v } }))}
+              />
+              {f.key === "lottery" && draft.caps.lottery ? (
+                <fieldset disabled aria-describedby={lotteryNote} className="ml-12 mt-3 rounded-md border border-slate-200 bg-slate-50/70 p-3">
+                  <legend className="flex items-center gap-2 px-1 text-[13px] font-semibold text-slate-700">
+                    Lottery setup <Chip tone="blue">Coming soon</Chip>
+                  </legend>
+                  <p id={lotteryNote} className="mb-2 text-xs text-slate-500">
+                    How lottery gets recorded. These choices open in a later release.
+                  </p>
+                  <div className="space-y-1.5">
+                    {LOTTERY_MODES.map((mode, i) => (
+                      <label key={mode} className="flex cursor-not-allowed items-center gap-2 text-sm text-slate-500">
+                        <input type="radio" name="lottery-mode" value={i} className="h-4 w-4" disabled />
+                        {mode}
+                      </label>
+                    ))}
                   </div>
-                </div>
+                </fieldset>
+              ) : null}
+            </li>
+          ))}
+        </SwitchGroup>
 
-                {f.key === "lottery" && caps.lottery ? (
-                  <fieldset disabled aria-describedby={`${lotteryLegend}-note`} className="ml-12 mt-3 rounded-md border border-slate-200 bg-slate-50/70 p-3">
-                    <legend className="flex items-center gap-2 px-1 text-[13px] font-semibold text-slate-700">
-                      Lottery setup <Chip tone="blue">Coming soon</Chip>
-                    </legend>
-                    <p id={`${lotteryLegend}-note`} className="mb-2 text-xs text-slate-500">
-                      How lottery gets recorded. These choices open in a later release.
-                    </p>
-                    <div className="space-y-1.5">
-                      {LOTTERY_MODES.map((mode, i) => (
-                        <label key={mode} className="flex cursor-not-allowed items-center gap-2 text-sm text-slate-500">
-                          <input type="radio" name="lottery-mode" value={i} className="h-4 w-4" disabled />
-                          {mode}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+        <SwitchGroup title="Integrations">
+          <li className="py-3">
+            <SwitchRow
+              id="int-google-sheets"
+              label="Google Sheets"
+              description="Connect the store's Google Sheet in the StoreDesk desktop app (Settings). This switch allows it."
+              checked={draft.googleSheets}
+              onChange={(v) => setDraft((d) => ({ ...d, googleSheets: v }))}
+            />
+          </li>
+          <li className="py-3">
+            <SwitchRow
+              id="int-gtc"
+              label="Georgia Tax Center"
+              badge={<Chip tone="blue">Coming soon</Chip>}
+              description="Sales tax filing with bank / ACH."
+              checked={false}
+              disabled
+              onChange={() => undefined}
+            />
+          </li>
+        </SwitchGroup>
+
         <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
           {dirty ? <span className="mr-auto text-[13px] font-semibold text-amber-700">Unsaved changes</span> : null}
-          <Button variant="ghost" disabled={!dirty || settings.saving} onClick={() => setCaps(saved)}>
+          <Button variant="ghost" disabled={!dirty || settings.saving} onClick={() => setDraft(saved)}>
             Discard
           </Button>
           <Button type="submit" variant="primary" busy={settings.saving} disabled={!dirty}>
-            Save features
+            Save
           </Button>
         </div>
       </form>
     </Card>
+  );
+}
+
+function SwitchGroup({ title, children }: { title: string; children: ReactNode }) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="mb-4">
+      <h3 id={headingId} className="text-[12.5px] font-bold uppercase tracking-wide text-slate-500">
+        {title}
+      </h3>
+      <ul className="divide-y divide-slate-100">{children}</ul>
+    </section>
+  );
+}
+
+function SwitchRow({
+  id,
+  label,
+  description,
+  badge,
+  checked,
+  disabled,
+  onChange
+}: {
+  id: string;
+  label: string;
+  description: string;
+  badge?: ReactNode;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const descId = `${id}-desc`;
+  return (
+    <div className="flex items-start gap-3">
+      <Switch id={id} label={label} describedBy={descId} checked={checked} disabled={disabled} onChange={onChange} />
+      <div>
+        <label htmlFor={id} className={`flex items-center gap-2 text-sm font-semibold ${disabled ? "text-slate-500" : ""}`}>
+          {label}
+          {badge}
+        </label>
+        <p id={descId} className="text-[13px] text-slate-500">
+          {description}
+        </p>
+      </div>
+    </div>
   );
 }

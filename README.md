@@ -51,7 +51,7 @@ See `.env.example` for the full list with notes.
 | `STORE_SECRET_KEY` | Storing the register (Commander) password, encrypted; 32+ characters |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_TUNNEL_DOMAIN` | Creating each store's tunnel (optional; stores then show *not configured*) |
 | `RESEND_API_KEY`, `SETUP_EMAIL_FROM` | E-mailing setup keys and invitations (optional; otherwise shown once to the admin) |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Google Sheets: the StoreDesk service account key, raw JSON or base64 (optional) |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Google Sheets: the StoreDesk service account key, raw JSON or base64 (optional). The admin only switches Sheets on per store; the sheet is connected in the desktop app and reached through the store-scoped proxy |
 | `NEXT_PUBLIC_SITE_URL` | Canonical URL in metadata (optional) |
 
 ## What is where

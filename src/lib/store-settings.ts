@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { StoreCapability } from "@/config/pages";
-import { ControlPlaneError, canonicalJson } from "@/lib/control-plane-security";
+import { canonicalJson } from "@/lib/control-plane-security";
 
 /**
  * Store settings (docs/design/control-plane-admin.md, "Data model changes"):
@@ -8,6 +8,12 @@ import { ControlPlaneError, canonicalJson } from "@/lib/control-plane-security";
  * the store's time zone. Replaces the free-form store config the old admin
  * page edited. Older store records have none of this; every read goes through
  * normalizeStoreSettings, so a missing value is its default.
+ *
+ * Integrations are switches in the admin; they are set up on the store PC.
+ * For Google Sheets the admin owns `enabled` only. The sheet itself
+ * (`spreadsheetId`, `spreadsheetUrl`, `sheetName`, `headerRow`) is connected
+ * in the StoreDesk desktop app and reported by the store PC (next phase: an
+ * edge route, see lib/store-sheets.ts).
  */
 
 export type StoreCapabilities = Record<StoreCapability, boolean>;
@@ -108,21 +114,18 @@ export function storeCapabilities(store: { settings?: unknown } | null | undefin
 
 // ── Update ───────────────────────────────────────────────────────────────────
 
-const nullableText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .nullable()
-    .transform((value) => (value ? value : null));
-
 /**
  * `PUT …/stores/{store}/settings`. Each section given replaces that section;
  * a section left out is kept. Unknown keys are refused. `settingsVersion` is
- * the version the caller read (or send it as `If-Match`). `spreadsheetId` and
- * `gtc` may be echoed back from a GET and are ignored — the id is derived from
- * the link, and GTC is "coming soon".
+ * the version the caller read (or send it as `If-Match`).
+ *
+ * Google Sheets: only `enabled` (the admin's switch) is saved. The sheet
+ * fields a GET returns (`spreadsheetId`, `spreadsheetUrl`, `sheetName`,
+ * `headerRow`) may be echoed back and are ignored: the store PC reports them.
+ * `gtc` may be echoed back too and is ignored ("coming soon").
  */
+const Ignored = z.unknown().optional();
+
 export const StoreSettingsUpdateSchema = z
   .object({
     settingsVersion: z.number().int().min(1).optional(),
@@ -136,10 +139,10 @@ export const StoreSettingsUpdateSchema = z
         googleSheets: z
           .object({
             enabled: z.boolean(),
-            spreadsheetUrl: nullableText(500),
-            spreadsheetId: z.string().nullable().optional(),
-            sheetName: nullableText(100),
-            headerRow: z.number().int().min(1).max(1000).default(1)
+            spreadsheetUrl: Ignored,
+            spreadsheetId: Ignored,
+            sheetName: Ignored,
+            headerRow: Ignored
           })
           .strict()
           .optional(),
@@ -167,30 +170,8 @@ export function applySettingsUpdate(
   if (update.capabilities) next.capabilities = { ...update.capabilities };
   if (update.lottery) next.lottery = { setupMode: null };
   const sheets = update.integrations?.googleSheets;
-  if (sheets) {
-    const spreadsheetId = parseSpreadsheetUrl(sheets.spreadsheetUrl);
-    if (sheets.spreadsheetUrl && !spreadsheetId) {
-      throw new ControlPlaneError(
-        400,
-        "SPREADSHEET_URL_INVALID",
-        "integrations.googleSheets.spreadsheetUrl: paste the sheet's link, https://docs.google.com/spreadsheets/d/…"
-      );
-    }
-    if (sheets.enabled && !spreadsheetId) {
-      throw new ControlPlaneError(
-        400,
-        "SPREADSHEET_URL_REQUIRED",
-        "integrations.googleSheets.spreadsheetUrl: a sheet link is required to turn Google Sheets on"
-      );
-    }
-    next.integrations.googleSheets = {
-      enabled: sheets.enabled,
-      spreadsheetUrl: sheets.spreadsheetUrl,
-      spreadsheetId,
-      sheetName: sheets.sheetName,
-      headerRow: sheets.headerRow
-    };
-  }
+  // The switch only: the sheet the store PC reported is kept as it is.
+  if (sheets) next.integrations.googleSheets = { ...next.integrations.googleSheets, enabled: sheets.enabled };
   if (update.timeZone !== undefined) next.timeZone = update.timeZone;
 
   const before = normalizeStoreSettings(current);

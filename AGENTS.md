@@ -5,7 +5,7 @@ Parent: root `AGENTS.md` and `CLAUDE.md`. Remote: `https://github.com/storedesk-
 ## Purpose
 
 StoreDesk Web — the Next.js marketing site and the **control plane**: organizations, licenses
-(an organization license with seats, or a store's own license), stores (features, integrations, register,
+(an organization license with seats, or a store's own license), stores (feature and integration switches, register,
 PC and phones), roles, users and audit, plus the API store servers
 use to activate and to pull access. Contract: `docs/design/control-plane-admin.md` and
 `docs/design/store-sign-in-and-sync.md` in the parent repo.
@@ -58,7 +58,7 @@ src
 │           ├── admin/           admin API (staff session)
 │           ├── edge/            store-server API (worker credential): sync/access, sync/config,
 │           │                    roles/{roleId}, google/sheets/{meta,values,append}
-│           │                    (the store's own configured sheet only)
+│           │                    (the store's own sheet only, while its switch is on)
 │           ├── setup-keys/redeem   activation (setup key)
 │           ├── organizations/…/worker-installations/…/bootstrap   store-server bootstrap
 │           └── app-auth/        org-tag lookup and enrollment (public, rate-limited)

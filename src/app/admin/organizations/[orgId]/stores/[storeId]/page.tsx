@@ -11,14 +11,13 @@ import { PcChip, StoreLicenseChip, StoreStatusChip, pcState } from "../../../../
 import type { StoreTabProps } from "./_tabs/shared";
 import { StoreOverviewTab } from "./_tabs/StoreOverviewTab";
 import { FeaturesTab } from "./_tabs/FeaturesTab";
-import { IntegrationsTab } from "./_tabs/IntegrationsTab";
 import { RegisterTab } from "./_tabs/RegisterTab";
 import { PcPhonesTab } from "./_tabs/PcPhonesTab";
 import { AccessPreviewTab } from "./_tabs/AccessPreviewTab";
 import { LicenseTab } from "./_tabs/LicenseTab";
 
-type TabKey = "overview" | "license" | "features" | "integrations" | "register" | "pc" | "access";
-const TAB_KEYS: TabKey[] = ["overview", "license", "features", "integrations", "register", "pc", "access"];
+type TabKey = "overview" | "license" | "features" | "register" | "pc" | "access";
+const TAB_KEYS: TabKey[] = ["overview", "license", "features", "register", "pc", "access"];
 
 export default function StorePage() {
   return (
@@ -42,7 +41,9 @@ function StoreDetail() {
     return { store: store.store, org: org?.organization ?? null };
   }, [orgId, storeId]);
 
-  const requested = search.get("tab") as TabKey | null;
+  // Integrations are switches on the Features tab now; old links land there.
+  const rawTab = search.get("tab");
+  const requested = (rawTab === "integrations" ? "features" : rawTab) as TabKey | null;
   const tab: TabKey = requested && TAB_KEYS.includes(requested) ? requested : "overview";
   const setTab = (key: TabKey) => router.replace(`${pathname}?tab=${key}`, { scroll: false });
 
@@ -103,7 +104,6 @@ function StoreDetail() {
           { key: "overview", label: "Overview" },
           { key: "license", label: "License" },
           { key: "features", label: "Features" },
-          { key: "integrations", label: "Integrations" },
           { key: "register", label: "Register" },
           { key: "pc", label: "PC & phones" },
           { key: "access", label: "Access preview" }
@@ -113,7 +113,6 @@ function StoreDetail() {
         {tab === "overview" ? <StoreOverviewTab {...props} /> : null}
         {tab === "license" ? <LicenseTab {...props} /> : null}
         {tab === "features" ? <FeaturesTab {...props} /> : null}
-        {tab === "integrations" ? <IntegrationsTab {...props} /> : null}
         {tab === "register" ? <RegisterTab {...props} /> : null}
         {tab === "pc" ? <PcPhonesTab {...props} /> : null}
         {tab === "access" ? <AccessPreviewTab {...props} /> : null}

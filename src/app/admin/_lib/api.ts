@@ -170,7 +170,9 @@ export interface StoreSettings {
   lottery: { setupMode: null };
   integrations: {
     googleSheets: {
+      /** The admin's switch; the only field the admin saves. */
       enabled: boolean;
+      /** The sheet itself is connected in the desktop app and reported by the store PC; read-only here. */
       spreadsheetUrl: string | null;
       spreadsheetId: string | null;
       sheetName: string | null;
@@ -184,15 +186,6 @@ export interface StoreSettings {
 export interface StoreSettingsResponse {
   settings: StoreSettings;
   settingsVersion: number;
-  /** StoreDesk's Google account, when the deployment knows it. */
-  googleClientEmail?: string | null;
-}
-
-export interface GoogleSheetCheck {
-  clientEmail: string;
-  spreadsheetId: string;
-  title: string;
-  sheets: string[];
 }
 
 export interface PosCredentials {
@@ -541,10 +534,6 @@ export const api = {
       settingsVersion,
       settings
     }),
-  checkGoogleSheet: (orgId: string, storeId: string, spreadsheetUrl: string) =>
-    request<GoogleSheetCheck>("POST", `${store(orgId, storeId)}/settings/google-sheets/check`, {
-      spreadsheetUrl
-    }),
 
   // Register
   getPosCredentials: (orgId: string, storeId: string) =>
@@ -640,7 +629,6 @@ export const ADMIN_ROUTES = [
   "PUT    /api/v1/admin/organizations/{org}/stores/{store}/license",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/settings",
   "PUT    /api/v1/admin/organizations/{org}/stores/{store}/settings",
-  "POST   /api/v1/admin/organizations/{org}/stores/{store}/settings/google-sheets/check",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/pos-credentials",
   "PUT    /api/v1/admin/organizations/{org}/stores/{store}/pos-credentials",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/setup",

@@ -433,26 +433,6 @@ export async function retryStoreTunnel(
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 
-/**
- * One Google Sheet belongs to one organization: StoreDesk's account can open
- * every sheet shared with it, so letting a second organization attach the
- * same sheet would hand it the first one's data. 409 SHEET_IN_USE.
- */
-export async function assertSheetNotInOtherOrganization(organizationId: string, spreadsheetId: string): Promise<void> {
-  await connectDb();
-  const used = await TenantStoreModel.exists({
-    "settings.integrations.googleSheets.spreadsheetId": spreadsheetId,
-    organizationId: { $ne: organizationId }
-  });
-  if (used) {
-    throw new ControlPlaneError(
-      409,
-      "SHEET_IN_USE",
-      "This sheet is already connected to another organization's store. Each organization needs its own sheet."
-    );
-  }
-}
-
 export async function getStoreSettings(organizationId: string, storeId: string) {
   const store = await requireStore(organizationId, storeId);
   return {
@@ -495,10 +475,8 @@ export async function updateStoreSettings(
   if (changed.length === 0) {
     return { settings: current, settingsVersion: version, googleClientEmail: googleServiceAccountEmail() };
   }
-  const spreadsheetId = settings.integrations.googleSheets.spreadsheetId;
-  if (changed.includes("integrations") && spreadsheetId) {
-    await assertSheetNotInOtherOrganization(organizationId, spreadsheetId);
-  }
+  // The admin cannot attach a sheet (only the switch), so SHEET_IN_USE applies
+  // where the store PC reports one: lib/store-sheets.ts.
   const versionFilter = version === 1 ? { $in: [1, null] } : version;
   const written = await TenantStoreModel.updateOne(
     { organizationId, storeId, settingsVersion: versionFilter },
