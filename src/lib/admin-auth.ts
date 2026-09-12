@@ -166,11 +166,8 @@ export async function authenticateWorker(req: Request): Promise<{
     throw new ControlPlaneError(401, "WORKER_CREDENTIAL_INVALID", "Worker authentication failed");
   }
   if (org.status === "suspended" || store.status === "suspended" || store.status === "closed") {
-    throw new ControlPlaneError(
-      403,
-      "STORE_SUSPENDED",
-      "This organization or store is suspended. Ask your organization's administrator to reactivate it."
-    );
+    // Store-facing: every edge route answers with this.
+    throw new ControlPlaneError(403, "STORE_SUSPENDED", "This store is suspended in StoreDesk.");
   }
   return { organizationId, storeId, workerInstallationId, credentialId };
 }

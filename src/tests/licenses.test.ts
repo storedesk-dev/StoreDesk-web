@@ -177,9 +177,10 @@ describe("master mode", () => {
     const activation = await call(redeem, request("POST", "/", { body: { setupKey: key.body.setupKey, acknowledgements: VALID_ACKS, installation: VALID_INSTALLATION } }));
     expect(activation.status).toBe(402);
     expect(activation.body.error.code).toBe("STORE_UNLICENSED");
+    expect(activation.body.error.message).toBe("This store has no active StoreDesk license.");
     const refused = await pull(pc.token);
     expect(refused.status).toBe(403);
-    expect(refused.body.error.code).toBe("STORE_UNLICENSED");
+    expect(refused.body.error).toMatchObject({ code: "STORE_UNLICENSED", message: "This store has no active StoreDesk license." });
 
     const dash = await call(dashboardRoute, as("GET"));
     expect(dash.body.counts.unlicensedStores).toBe(1);

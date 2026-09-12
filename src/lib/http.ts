@@ -67,7 +67,7 @@ export function jsonError(error: unknown, correlationId = publicId("corr")) {
     return respond(400, "REQUEST_INVALID", first?.message ?? "Invalid value", correlationId);
   }
   console.error("[control-plane]", correlationId, error);
-  // The code is kept: the store server maps it on the activation route.
+  // The code is kept: on the activation route it is forwarded by the store server to the desktop wizard.
   return respond(503, "ACTIVATION_UNAVAILABLE", "Control plane temporarily unavailable", correlationId, true);
 }
 

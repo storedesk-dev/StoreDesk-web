@@ -203,7 +203,7 @@ describe("what the store receives, and suspension (P12)", () => {
     await updateStore(admin, params.organizationId, params.storeId, { status: "suspended" });
     const store = await pull(pc.token);
     expect(store.status).toBe(403);
-    expect(store.body.error.code).toBe("STORE_SUSPENDED");
+    expect(store.body.error).toMatchObject({ code: "STORE_SUSPENDED", message: "This store is suspended in StoreDesk." });
     const hidden = await call(lookup, request("GET", "/"), { slug: "example-retail" });
     expect(hidden.body.stores).toEqual([]);
 

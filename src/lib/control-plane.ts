@@ -29,6 +29,7 @@ import { scheduleAppUserNotify } from "@/lib/store-notify";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
 import { coverageFor, coveringLicense, licenseProblem } from "@/lib/licenses";
+import { SITE } from "@/lib/site";
 
 /**
  * The store-facing half of the control plane: activation (setup-key redeem),
@@ -50,7 +51,9 @@ const REDEEMABLE = ["queued", "shown", "sent", "delivery_failed"];
  * `POST /api/v1/setup-keys/redeem` (P13). The desktop setup wizard only lets
  * the operator activate with all three boxes ticked, so each acknowledgement
  * must be literally `true`; the EULA digest must be a SHA-256 hex digest.
- * Unknown fields (the wizard also sends `contactEmail`) are ignored.
+ * `contactEmail` is "the e-mail StoreDesk sent the key to": when the key has a
+ * recorded contact it must match (case-insensitive, trimmed). Other unknown
+ * fields are ignored.
  */
 export const RedeemSchema = z.object({
   setupKey: z.string().trim().min(1).max(200),
@@ -68,7 +71,8 @@ export const RedeemSchema = z.object({
       .refine((value) => !Number.isNaN(Date.parse(value)), "must be a date"),
     osAcknowledged: z.literal(true, { message: "must be accepted" }),
     privacyAcknowledged: z.literal(true, { message: "must be accepted" }),
-    localDataAcknowledged: z.literal(true, { message: "must be accepted" })
+    localDataAcknowledged: z.literal(true, { message: "must be accepted" }),
+    contactEmail: z.string().trim().max(254).optional()
   }),
   installation: z.object({
     platform: z.enum(["windows", "macos", "linux"]),
@@ -78,6 +82,25 @@ export const RedeemSchema = z.object({
   })
 });
 export type RedeemBody = z.output<typeof RedeemSchema>;
+
+/** Store-facing: these messages reach the store PC and its desktop wizard. */
+const STORE_MESSAGES = {
+  STORE_UNLICENSED: "This store has no active StoreDesk license.",
+  SUBSCRIPTION_INACTIVE: "This store's StoreDesk license isn't active.",
+  STORE_SUSPENDED: "This store is suspended in StoreDesk."
+} as const;
+
+const invalidKey = () => new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
+
+/**
+ * The e-mail the key was recorded for: the store contact, or the address it
+ * was e-mailed to (lib/setup.ts). A key issued with no contact records
+ * StoreDesk's own address as a placeholder, which is no recorded e-mail.
+ */
+function recordedContactEmail(key: Doc): string | null {
+  const email = typeof key.contactEmail === "string" ? key.contactEmail.trim().toLowerCase() : "";
+  return email && email !== SITE.email.trim().toLowerCase() ? email : null;
+}
 
 export async function redeemSetupKey(body: RedeemBody) {
   await connectDb();
@@ -93,7 +116,26 @@ export async function redeemSetupKey(body: RedeemBody) {
     .select("+secretHash")
     .lean();
   if (!key || !(await verifySecret(String(key.secretHash), parsed.secret))) {
-    throw new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
+    throw invalidKey();
+  }
+  // The contact e-mail, when the key has one, is part of the key: a mismatch
+  // answers exactly like a wrong key (no hint the key itself was right), and
+  // counts toward both redeem limits above.
+  const expectedEmail = recordedContactEmail(key as Doc);
+  if (expectedEmail && (body.acknowledgements.contactEmail ?? "").trim().toLowerCase() !== expectedEmail) {
+    await writeAudit({
+      organizationId: key.organizationId,
+      storeId: key.storeId,
+      workerInstallationId: key.workerInstallationId,
+      actorType: "system",
+      actorId: "setup_flow",
+      action: "setup_key.redeem_refused",
+      targetType: "setup_key",
+      targetId: key.keyId,
+      correlationId,
+      metadata: { reason: "contact_email_mismatch" }
+    });
+    throw invalidKey();
   }
   if (key.status === "consumed") {
     throw new ControlPlaneError(409, "SETUP_KEY_CONSUMED", "Setup key has been consumed");
@@ -115,17 +157,20 @@ export async function redeemSetupKey(body: RedeemBody) {
       .lean()
   ])) as [Doc | null, Doc | null];
   if (!org || !store) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Store not found");
-  // 423, the status the store server already maps on this route (P12).
+  // 423 STORE_SUSPENDED (P12), forwarded by the store server to the desktop wizard.
   if (org.status === "suspended" || store.status === "suspended" || store.status === "closed") {
-    throw new ControlPlaneError(423, "STORE_SUSPENDED", "This organization or store is suspended");
+    throw new ControlPlaneError(423, "STORE_SUSPENDED", STORE_MESSAGES.STORE_SUSPENDED);
   }
   // The store's covering license (from the organization's licensing mode)
   // decides, not the one the key was issued under.
   const coverage = await coverageFor(store, org);
   const problem = licenseProblem(coverage.license, coverage.mode);
   if (problem) {
-    // SUBSCRIPTION_INACTIVE is the code the store server already maps here.
-    throw new ControlPlaneError(402, problem.code === "STORE_UNLICENSED" ? "STORE_UNLICENSED" : "SUBSCRIPTION_INACTIVE", problem.message);
+    // 402 STORE_UNLICENSED / SUBSCRIPTION_INACTIVE, forwarded by the store
+    // server to the desktop wizard — so the message is store-facing, not the
+    // admin console's wording.
+    const code = problem.code === "STORE_UNLICENSED" ? "STORE_UNLICENSED" : "SUBSCRIPTION_INACTIVE";
+    throw new ControlPlaneError(402, code, STORE_MESSAGES[code]);
   }
 
   const installation = await WorkerInstallationModel.findOne({
@@ -135,7 +180,7 @@ export async function redeemSetupKey(body: RedeemBody) {
   });
   if (!installation) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Installation not found");
   if (installation.status === "suspended") {
-    throw new ControlPlaneError(423, "STORE_SUSPENDED", "Store cannot activate");
+    throw new ControlPlaneError(423, "STORE_SUSPENDED", STORE_MESSAGES.STORE_SUSPENDED);
   }
   if (installation.workerCredentialId && installation.status === "active") {
     throw new ControlPlaneError(409, "INSTALLATION_ALREADY_BOUND", "Installation already bound");

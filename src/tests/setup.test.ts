@@ -17,7 +17,7 @@ import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { updateOrganization } from "@/lib/organizations";
 import { updateStore } from "@/lib/tenant-stores";
 import { revokeInstallationsAndNotify } from "@/lib/store-notify";
-import { LicenseModel, SetupKeyModel, WorkerCredentialModel, WorkerInstallationModel } from "@/models/ControlPlane";
+import { AuditEventModel, LicenseModel, SetupKeyModel, TenantStoreModel, WorkerCredentialModel, WorkerInstallationModel } from "@/models/ControlPlane";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/store-notify")>();
@@ -235,7 +235,69 @@ describe("activation, Replace PC, and the PC limit", () => {
     await updateOrganization(admin, params.organizationId, { status: "suspended" });
     const res = await redeemKey(body.setupKey);
     expect(res.status).toBe(423);
-    expect(res.body.error.code).toBe("STORE_SUSPENDED");
+    expect(res.body.error).toMatchObject({ code: "STORE_SUSPENDED", message: "This store is suspended in StoreDesk." });
+  });
+
+  it("answers an inactive or missing license with store-facing messages (402)", async () => {
+    const { body } = await issue();
+    await LicenseModel.updateOne({ licenseId: seeded.license.licenseId }, { $set: { status: "suspended" } });
+    const inactive = await redeemKey(body.setupKey);
+    expect(inactive.status).toBe(402);
+    expect(inactive.body.error).toMatchObject({ code: "SUBSCRIPTION_INACTIVE", message: "This store's StoreDesk license isn't active." });
+    await LicenseModel.updateOne({ licenseId: seeded.license.licenseId }, { $set: { status: "cancelled" }, $unset: { coverageKey: 1 } });
+    const unlicensed = await redeemKey(body.setupKey, "198.51.100.4");
+    expect(unlicensed.status).toBe(402);
+    expect(unlicensed.body.error).toMatchObject({ code: "STORE_UNLICENSED", message: "This store has no active StoreDesk license." });
+  });
+});
+
+describe("redeem: the contact e-mail the key was sent to", () => {
+  const acks = (contactEmail: string | undefined) => ({ acknowledgements: { ...VALID_ACKS, contactEmail } });
+
+  it("must match the store contact, case-insensitively after trimming", async () => {
+    const { body } = await issue();
+    const res = await redeemKey(body.setupKey, "198.51.100.5", acks("  STORE42@Example.INVALID "));
+    expect(res.status).toBe(201);
+  });
+
+  it("a mismatch or a missing e-mail answers exactly like an invalid key, is audited, and burns nothing", async () => {
+    const { body } = await issue();
+    const bogus = await redeemKey(`set_${"a".repeat(32)}.${"x".repeat(32)}`, "198.51.100.6");
+    for (const email of ["someone@example.invalid", undefined]) {
+      const res = await redeemKey(body.setupKey, "198.51.100.6", acks(email));
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe("SETUP_KEY_INVALID");
+      expect(res.body.error.message).toBe(bogus.body.error.message);
+    }
+    const audits = await AuditEventModel.find({ action: "setup_key.redeem_refused" }).lean();
+    expect(audits).toHaveLength(2);
+    expect(audits[0]).toMatchObject({ actorType: "system", targetType: "setup_key", metadata: { reason: "contact_email_mismatch" } });
+    expect(JSON.stringify(audits)).not.toContain("someone@example.invalid");
+    expect(await SetupKeyModel.findOne({ status: "consumed" }).lean()).toBeNull();
+    expect(await WorkerCredentialModel.countDocuments()).toBe(0);
+    // The right e-mail still works.
+    expect((await redeemKey(body.setupKey, "198.51.100.6")).status).toBe(201);
+  });
+
+  it("checks the address the key was issued to when it overrides the store contact", async () => {
+    const { body } = await issue({ deliver: "show", contactEmail: "owner@example.invalid" });
+    expect((await redeemKey(body.setupKey, "198.51.100.7")).status).toBe(401);
+    expect((await redeemKey(body.setupKey, "198.51.100.7", acks("Owner@Example.invalid"))).status).toBe(201);
+  });
+
+  it("skips the check when the key has no recorded e-mail", async () => {
+    await TenantStoreModel.updateOne({ storeId: params.storeId }, { $unset: { contactEmail: 1 } });
+    const { body } = await issue();
+    expect((await redeemKey(body.setupKey, "198.51.100.8", acks("anyone@example.invalid"))).status).toBe(201);
+  });
+
+  it("counts mismatches toward the per-caller redeem limit", async () => {
+    const { body } = await issue();
+    for (let i = 0; i < 30; i += 1) {
+      expect((await redeemKey(`set_${i.toString(16).padStart(32, "0")}.${"x".repeat(32)}`, "203.0.113.20")).status).toBe(401);
+    }
+    const limited = await redeemKey(body.setupKey, "203.0.113.20", acks("wrong@example.invalid"));
+    expect(limited.status).toBe(429);
   });
 });
 

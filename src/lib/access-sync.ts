@@ -258,13 +258,14 @@ export async function loadAccessSync(worker: {
   }
 
   // The store's covering license. An unlicensed store is refused like a
-  // revoked one (403): the store server turns sign-in off at once, instead of
-  // treating the answer as a transient error and running on offline grace.
-  // A license that has lapsed or is suspended still answers 200 with its
-  // status, so the store applies the offline grace.
+  // revoked one (403): the store server turns sign-in off at once. A license
+  // that has expired or is suspended answers 200 with that status in the
+  // `subscription` block, and the store server turns sign-in off at once for
+  // it too. Offline grace covers only a failed sync (no answer, or a transient
+  // error), never an inactive license.
   const subscription = await coveringLicense(store, organization);
   if (!subscription) {
-    throw new ControlPlaneError(403, "STORE_UNLICENSED", "This store has no license. Ask StoreDesk to license it.");
+    throw new ControlPlaneError(403, "STORE_UNLICENSED", "This store has no active StoreDesk license.");
   }
 
   const unset = { $in: [null, ""] };
