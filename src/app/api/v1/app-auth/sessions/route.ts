@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { issueClientSession, jsonError } from "@/lib/control-plane";
 
+/**
+ * LEGACY — no client calls this any more; store servers issue sessions
+ * themselves (docs/design/store-sign-in-and-sync.md). Left working until it is
+ * removed; do not build on it.
+ */
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as {

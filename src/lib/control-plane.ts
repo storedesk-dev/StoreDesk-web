@@ -34,6 +34,10 @@ import {
 import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
 import { getEmailProvider } from "@/lib/email-provider";
 import type { InternalAdminActor } from "@/lib/admin-auth";
+import { DEFAULT_ORG_ROLES, normalizeRoles } from "@/lib/roles";
+import { scheduleAppUserNotify, scheduleNotify } from "@/lib/store-notify";
+
+export { DEFAULT_ORG_ROLES };
 
 export function jsonError(error: unknown, correlationId = publicId("corr")) {
   if (error instanceof ControlPlaneError) {
@@ -94,48 +98,6 @@ export async function writeAudit(input: {
 }
 
 
-export const DEFAULT_ORG_ROLES = [
-  {
-    roleName: "Organization Admin",
-    roleId: "org_admin",
-    accessKeys: {
-      electron: {
-        pages: [
-          { key: "pos",            enabled: true, featureFlags: { enableRefunds: true, enableDiscounts: true, enableVoidTransaction: true, enableCashDrawer: true } },
-          { key: "dashboard",      enabled: true, featureFlags: {} },
-          { key: "products",       enabled: true, featureFlags: { enableBulkImport: true, enableBarcodeGeneration: true } },
-          { key: "vendors",        enabled: true, featureFlags: {} },
-          { key: "priceBook",      enabled: true, featureFlags: { priceGroups: true } },
-          { key: "costAnalysis",   enabled: true, featureFlags: {} },
-          { key: "fuelPrices",     enabled: true, featureFlags: {} },
-          { key: "deals",          enabled: true, featureFlags: {} },
-          { key: "registerChanges", enabled: true, featureFlags: {} },
-          { key: "transactions",   enabled: true, featureFlags: { enableExport: true, enableRefundView: true } },
-          { key: "manageWorker",   enabled: true, featureFlags: {} },
-          { key: "userManagement", enabled: true, featureFlags: {} },
-          { key: "settings",       enabled: true, featureFlags: {} }
-        ]
-      },
-      mobile: {
-        pages: [
-          { key: "mobilePos",           enabled: true, featureFlags: { enableManualEntry: true, enableQuickSale: true } },
-          { key: "mobileDashboard",      enabled: true, featureFlags: {} },
-          { key: "mobileScanner",        enabled: true, featureFlags: { enableCameraFlash: true, enableManualEntry: true } },
-          { key: "mobileProductSearch",  enabled: true, featureFlags: {} },
-          { key: "mobileVendorPrices",   enabled: true, featureFlags: {} },
-          { key: "mobilePriceBook",      enabled: true, featureFlags: { priceGroups: true } },
-          { key: "mobileFuelPrices",     enabled: true, featureFlags: {} },
-          { key: "mobileDeals",          enabled: true, featureFlags: {} },
-          { key: "mobileTransactions",   enabled: true, featureFlags: { enableExport: true } },
-          { key: "mobileReports",        enabled: true, featureFlags: {} },
-          { key: "mobileAnalytics",      enabled: true, featureFlags: {} },
-          { key: "mobileSalesTax",       enabled: true, featureFlags: {} }
-        ]
-      }
-    }
-  }
-];
-
 export async function createOrganization(
   admin: InternalAdminActor,
   body: { name: string; slug?: string; billingEmail?: string }
@@ -156,7 +118,8 @@ export async function createOrganization(
     slug,
     billingEmail: body.billingEmail?.trim().toLowerCase(),
     status: "active",
-    roles: DEFAULT_ORG_ROLES
+    // Stored with version 1 and updatedAt, like every later role write.
+    roles: normalizeRoles(DEFAULT_ORG_ROLES, new Date().toISOString())
   });
   await writeAudit({
     organizationId,
@@ -205,6 +168,7 @@ export async function createSubscription(
     targetType: "subscription",
     targetId: subscriptionId
   });
+  scheduleNotify({ organizationId, reason: "subscription.create" });
   return safeJson(doc.toObject());
 }
 
@@ -798,6 +762,9 @@ export async function provisionAppUser(
     targetType: "app_user",
     targetId: appUserId
   });
+  // A brand-new user has no assignment yet, so this reaches no store today;
+  // kept so provisioning stays on the notify path if that changes.
+  scheduleAppUserNotify(appUserId, "app_user.create");
   // Enrollment secret returned once to admin for out-of-band delivery (email provider optional).
   return {
     ...safeJson(doc.toObject()),
@@ -847,6 +814,11 @@ export async function createAssignment(
     action: "assignment.create",
     targetType: "user_assignment",
     targetId: assignmentId
+  });
+  scheduleNotify({
+    organizationId: body.organizationId,
+    workerInstallationIds: [body.workerInstallationId],
+    reason: "assignment.create"
   });
   return safeJson(doc.toObject());
 }
@@ -939,7 +911,10 @@ export async function enrollAppUser(body: {
   user.status = "active";
   user.enrollmentConsumedAt = new Date();
   user.enrollmentSecretHash = undefined;
+  user.passwordChangedAt = new Date();
   await user.save();
+  // The new password reaches the user's stores with their next access pull.
+  scheduleAppUserNotify(appUserId, "app_user.enroll");
 
   const deviceId = publicId("dev");
   await ClientDeviceModel.create({
@@ -1008,6 +983,12 @@ export async function lookupOrganization(rawSlug: string) {
   };
 }
 
+/**
+ * LEGACY — no client calls this any more. The desktop and the phone sign in at
+ * the store server (`POST /api/auth/v1/login`), which checks the password
+ * against the hashes it pulls from `GET /api/v1/edge/sync/access`
+ * (docs/design/store-sign-in-and-sync.md). Kept working until it is removed.
+ */
 export async function loginAppUser(body: {
   email: string;
   password: string;
@@ -1079,6 +1060,7 @@ export async function loginAppUser(body: {
   };
 }
 
+/** LEGACY — see loginAppUser. Store servers now issue sessions themselves. */
 export async function issueClientSession(body: {
   appUserId: string;
   deviceId: string;

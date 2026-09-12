@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { jsonError, loginAppUser } from "@/lib/control-plane";
 
+/**
+ * LEGACY — no client calls this any more. Both apps sign in at the store
+ * server (`POST /api/auth/v1/login`, docs/design/store-sign-in-and-sync.md);
+ * the phone uses the control plane only for the org-tag lookup. Left working
+ * until it is removed; do not build on it.
+ */
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as {

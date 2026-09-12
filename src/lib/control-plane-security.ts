@@ -35,6 +35,26 @@ export function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/**
+ * Deterministic JSON: object keys sorted at every level, array order kept,
+ * `undefined` dropped, Dates as ISO strings. Used for content hashes that
+ * must not change when the same data is assembled in a different key order.
+ */
+export function canonicalJson(value: unknown): string {
+  const sortKeys = (input: unknown): unknown => {
+    if (input instanceof Date) return input.toISOString();
+    if (Array.isArray(input)) return input.map(sortKeys);
+    if (!input || typeof input !== "object") return input;
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(input as Record<string, unknown>).sort()) {
+      const child = (input as Record<string, unknown>)[key];
+      if (child !== undefined) sorted[key] = sortKeys(child);
+    }
+    return sorted;
+  };
+  return JSON.stringify(sortKeys(value));
+}
+
 export async function hashSecret(value: string): Promise<string> {
   return argon2.hash(value, {
     type: argon2.argon2id,

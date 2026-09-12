@@ -4,6 +4,7 @@ import { jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
 import { AppUserModel, UserAssignmentModel } from "@/models/ControlPlane";
 import { safeJson, hashSecret, publicId } from "@/lib/control-plane-security";
+import { scheduleAppUserNotify } from "@/lib/store-notify";
 import { z } from "zod";
 
 type Ctx = { params: Promise<{ organizationId: string }> };
@@ -68,6 +69,7 @@ export async function POST(req: Request, ctx: Ctx) {
         email: parsed.email.toLowerCase(),
         name: parsed.name,
         passwordHash,
+        passwordChangedAt: parsed.password ? new Date() : undefined,
         status: parsed.password ? "active" : "pending_enrollment",
         createdByAdminId: admin.adminId
       });
@@ -78,6 +80,7 @@ export async function POST(req: Request, ctx: Ctx) {
       }
       if (parsed.password) {
         appUser.passwordHash = await hashSecret(parsed.password);
+        appUser.passwordChangedAt = new Date();
         appUser.status = "active";
       }
       await appUser.save();
@@ -97,7 +100,11 @@ export async function POST(req: Request, ctx: Ctx) {
       createdByAdminId: admin.adminId
     });
 
-    return NextResponse.json({ 
+    // Every store this user can now sign in at — the new assignment's and,
+    // when the password changed, the stores of their earlier assignments too.
+    scheduleAppUserNotify(String(appUser.appUserId), "assignment.create");
+
+    return NextResponse.json({
       appUser: safeJson(appUser), 
       assignment: safeJson(assignment)
     });

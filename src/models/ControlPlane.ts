@@ -232,7 +232,13 @@ const AppUserSchema = new Schema(
     appUserId: { ...id, unique: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, trim: true },
+    /**
+     * argon2id. `select: false` and scrubbed by safeJson(); it leaves the
+     * control plane only in GET /api/v1/edge/sync/access, to the store
+     * servers the user is assigned to.
+     */
     passwordHash: { type: String, select: false },
+    passwordChangedAt: Date,
     status: { type: String, enum: ["pending_enrollment", "active", "disabled"], default: "pending_enrollment" },
     enrollmentSecretHash: { type: String, select: false },
     enrollmentExpiresAt: Date,

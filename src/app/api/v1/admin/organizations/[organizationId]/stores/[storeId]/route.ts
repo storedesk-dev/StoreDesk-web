@@ -4,6 +4,7 @@ import { jsonError } from "@/lib/control-plane";
 import { connectDb } from "@/lib/db";
 import { TenantStoreModel } from "@/models/ControlPlane";
 import { safeJson } from "@/lib/control-plane-security";
+import { scheduleNotify } from "@/lib/store-notify";
 
 type Ctx = { params: Promise<{ organizationId: string; storeId: string }> };
 
@@ -67,6 +68,8 @@ export async function PUT(req: Request, ctx: Ctx) {
     }
 
     await store.save();
+    // Name, number, status and tunnel URL are part of the store's access sync.
+    scheduleNotify({ organizationId, storeId, reason: "store.update" });
 
     return NextResponse.json({ store: safeJson(store) });
   } catch (error) {
