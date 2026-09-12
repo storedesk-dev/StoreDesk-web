@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_ORG_ROLES,
-  EdgeRoleUpdateSchema,
-  RoleListSchema,
-  applyRoleVersions,
-  normalizeRoles,
-  roleChangeReason
-} from "@/lib/roles";
+import { DEFAULT_ORG_ROLES, EdgeRoleUpdateSchema, normalizeRoles } from "@/lib/roles";
 import { canonicalJson } from "@/lib/control-plane-security";
 
 const CREATED = "2030-01-01T00:00:00.000Z";
@@ -70,47 +63,6 @@ describe("normalizeRoles", () => {
   });
 });
 
-describe("applyRoleVersions", () => {
-  const previous = normalizeRoles([{ ...cashier, version: 3, updatedAt: CREATED }], CREATED);
-  const now = new Date("2030-06-01T12:00:00Z");
-
-  it("keeps an unchanged role's version and updatedAt", () => {
-    const result = applyRoleVersions(previous, [cashier], now);
-    expect(result.roles[0]).toEqual(previous[0]);
-    expect(result.changed).toBe(false);
-  });
-
-  it("bumps a changed role, starts a new one at 1, and lists a deleted one", () => {
-    const edited = { ...cashier, roleName: "Front cashier" };
-    const added = { ...cashier, roleId: "manager", roleName: "Manager" };
-    const result = applyRoleVersions(previous, [edited, added], now);
-    expect(result.roles[0]).toMatchObject({ roleId: "cashier", version: 4, updatedAt: now.toISOString() });
-    expect(result.roles[1]).toMatchObject({ roleId: "manager", version: 1 });
-    expect(result.updated).toEqual(["cashier"]);
-    expect(result.created).toEqual(["manager"]);
-
-    const removed = applyRoleVersions(previous, [], now);
-    expect(removed.deleted).toEqual(["cashier"]);
-    expect(roleChangeReason(removed)).toBe("role.delete");
-    expect(roleChangeReason({ created: ["x"], updated: [], deleted: [] })).toBe("role.create");
-    expect(roleChangeReason(result)).toBe("role.update");
-  });
-
-  it("ignores a version the client sends", () => {
-    const parsed = RoleListSchema.parse([{ ...cashier, version: 99, updatedAt: "1999-01-01" }]);
-    const result = applyRoleVersions(previous, parsed, now);
-    expect(result.roles[0].version).toBe(3);
-  });
-
-  it("treats a reorder as a change without bumping versions", () => {
-    const two = normalizeRoles([cashier, { ...cashier, roleId: "b" }], CREATED);
-    const result = applyRoleVersions(two, [{ ...cashier, roleId: "b" }, cashier], now);
-    expect(result.changed).toBe(true);
-    expect(result.updated).toEqual([]);
-    expect(result.roles.map((role) => role.version)).toEqual([1, 1]);
-  });
-});
-
 describe("EdgeRoleUpdateSchema", () => {
   const valid = { baseVersion: 3, roleName: "Cashier", accessKeys: cashier.accessKeys };
   const page = (value: Record<string, unknown>) => ({
@@ -163,13 +115,11 @@ describe("EdgeRoleUpdateSchema", () => {
   });
 });
 
-describe("RoleListSchema", () => {
-  it("refuses two roles with the same id", () => {
-    expect(RoleListSchema.safeParse([cashier, cashier]).success).toBe(false);
-  });
-
-  it("accepts the default roles as stored", () => {
-    expect(RoleListSchema.safeParse(DEFAULT_ORG_ROLES).success).toBe(true);
+describe("DEFAULT_ORG_ROLES", () => {
+  it("is a valid role as the edge route accepts it", () => {
+    for (const role of DEFAULT_ORG_ROLES) {
+      expect(EdgeRoleUpdateSchema.safeParse({ baseVersion: 1, roleName: role.roleName, accessKeys: role.accessKeys }).success).toBe(true);
+    }
   });
 });
 

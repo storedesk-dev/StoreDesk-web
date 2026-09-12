@@ -104,11 +104,6 @@ export function notFound(what = "Resource"): ControlPlaneError {
   return new ControlPlaneError(404, "RESOURCE_NOT_FOUND", `${what} not found`);
 }
 
-/** 410 for a route that was removed on purpose; the message says what to use instead. */
-export function gone(message: string) {
-  return NextResponse.json({ error: { code: "GONE", message, retryable: false } }, { status: 410 });
-}
-
 /** Optional text: trimmed, and empty reads as null. */
 export const optionalText = (max: number) =>
   z

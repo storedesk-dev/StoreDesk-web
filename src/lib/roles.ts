@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import { OrganizationModel } from "@/models/ControlPlane";
-import { ControlPlaneError, canonicalJson } from "@/lib/control-plane-security";
+import { ControlPlaneError } from "@/lib/control-plane-security";
 
 /**
  * Organization roles: one list per organization in `Organization.roles`, held
@@ -98,21 +98,6 @@ export const EdgeRoleUpdateSchema = z.object({
 });
 export type EdgeRoleUpdate = z.infer<typeof EdgeRoleUpdateSchema>;
 
-/** One role as the admin UI sends it. Any `version`/`updatedAt` it echoes is ignored. */
-export const RoleDefinitionSchema = z.object({
-  roleId: z.string().trim().min(1).max(80),
-  roleName: RoleNameSchema,
-  accessKeys: RoleAccessKeysSchema
-});
-export type RoleDefinition = z.infer<typeof RoleDefinitionSchema>;
-
-export const RoleListSchema = z
-  .array(RoleDefinitionSchema)
-  .max(MAX_ROLES)
-  .refine((roles) => new Set(roles.map((role) => role.roleId)).size === roles.length, {
-    message: "Role ids must be unique"
-  });
-
 // ── Normalization ────────────────────────────────────────────────────────────
 
 export function toIsoOr(value: unknown, fallback: string): string {
@@ -180,62 +165,6 @@ export function normalizeRoles(raw: unknown, fallbackUpdatedAt: string): OrgRole
   return roles;
 }
 
-function roleContent(role: { roleName: string; accessKeys: RoleAccessKeys }): string {
-  return canonicalJson({ roleName: role.roleName, accessKeys: role.accessKeys });
-}
-
-/**
- * The admin UI saves the whole list. Compare it with what is stored: an
- * unchanged role keeps its version and `updatedAt`, a changed one goes +1, a
- * new one starts at 1. Versions are always computed here, never taken from the
- * request.
- */
-export function applyRoleVersions(previous: OrgRole[], next: RoleDefinition[], now: Date) {
-  const before = new Map(previous.map((role) => [role.roleId, role]));
-  const stamp = now.toISOString();
-  const created: string[] = [];
-  const updated: string[] = [];
-  const roles: OrgRole[] = next.map((definition) => {
-    const candidate = {
-      roleId: definition.roleId,
-      roleName: definition.roleName,
-      accessKeys: normalizeAccessKeys(definition.accessKeys)
-    };
-    const old = before.get(definition.roleId);
-    if (!old) {
-      created.push(definition.roleId);
-      return { ...candidate, version: 1, updatedAt: stamp };
-    }
-    if (roleContent(old) === roleContent(candidate)) return old;
-    updated.push(definition.roleId);
-    return { ...candidate, version: old.version + 1, updatedAt: stamp };
-  });
-  const kept = new Set(next.map((role) => role.roleId));
-  const deleted = previous.filter((role) => !kept.has(role.roleId)).map((role) => role.roleId);
-  return {
-    roles,
-    created,
-    updated,
-    deleted,
-    // Includes a pure reorder, which changes the access-sync body.
-    changed: canonicalJson(previous) !== canonicalJson(roles)
-  };
-}
-
-export function roleChangeReason(change: {
-  created: string[];
-  updated: string[];
-  deleted: string[];
-}): "role.create" | "role.update" | "role.delete" {
-  if (change.updated.length === 0 && change.deleted.length === 0 && change.created.length > 0) {
-    return "role.create";
-  }
-  if (change.updated.length === 0 && change.created.length === 0 && change.deleted.length > 0) {
-    return "role.delete";
-  }
-  return "role.update";
-}
-
 // ── Persistence ──────────────────────────────────────────────────────────────
 // Two writers (the admin UI and store servers) edit the same array, so every
 // write is compare-and-set on the organization's `updatedAt`: re-read, re-check
@@ -274,18 +203,6 @@ function busy(): ControlPlaneError {
 export async function readOrganizationRoles(organizationId: string): Promise<OrgRole[] | null> {
   const org = await loadOrganization(organizationId);
   return org ? storedRoles(org) : null;
-}
-
-/** Admin save of the whole list. `null` when the organization does not exist. */
-export async function replaceOrganizationRoles(organizationId: string, next: RoleDefinition[]) {
-  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
-    const org = await loadOrganization(organizationId);
-    if (!org) return null;
-    const result = applyRoleVersions(storedRoles(org), next, new Date());
-    if (!result.changed) return result;
-    if (await compareAndSetRoles(organizationId, org.updatedAt, result.roles)) return result;
-  }
-  throw busy();
 }
 
 export type EdgeRoleUpdateOutcome =

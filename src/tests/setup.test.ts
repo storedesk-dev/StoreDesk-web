@@ -13,7 +13,6 @@ import {
 import { GET as getSetup } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup/route";
 import { POST as issueKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
 import { POST as replacePc } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/replace-pc/route";
-import { POST as oldIssue } from "@/app/api/v1/admin/setup-keys/route";
 import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { updateOrganization } from "@/lib/organizations";
 import { updateStore } from "@/lib/tenant-stores";
@@ -261,18 +260,5 @@ describe("POST /api/v1/setup-keys/redeem validation (P13)", () => {
     expect(limited.status).toBe(429);
     expect(limited.body.error.code).toBe("ACTIVATION_RATE_LIMITED");
     expect((await redeemKey(`set_${"f".repeat(32)}.${"x".repeat(32)}`, "203.0.113.10")).status).toBe(401);
-  });
-});
-
-describe("POST /api/v1/admin/setup-keys (the store page written before …/setup-keys)", () => {
-  it("takes the same entitlement-checked path and answers the old shape", async () => {
-    const res = await call(oldIssue, request("POST", "/", { token: admin.token, body: params }));
-    expect(res.status).toBe(200);
-    expect(Object.keys(res.body).sort()).toEqual(["expiresAt", "setupKey", "workerInstallationId"]);
-    expect((await SetupKeyModel.findOne({}).lean())?.status).toBe("shown");
-    await SubscriptionModel.updateOne({ subscriptionId: seeded.subscription.subscriptionId }, { $set: { status: "cancelled" } });
-    const refused = await call(oldIssue, request("POST", "/", { token: admin.token, body: params }));
-    expect(refused.status).toBe(402);
-    expect((await call(oldIssue, request("POST", "/", { body: params }))).status).toBe(401);
   });
 });

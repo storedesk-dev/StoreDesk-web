@@ -24,7 +24,8 @@ export type InstallationStatus =
   | "suspended"
   | "updating"
   | "rollback";
-export type TunnelStatus = "ok" | "failed" | "missing" | "provisioning";
+/** `not_configured`: this deployment has no Cloudflare credentials, so no tunnel can be made. */
+export type TunnelStatus = "ok" | "failed" | "missing" | "not_configured";
 export type UserStatus = "pending_enrollment" | "active" | "disabled";
 export type LoginType = "email" | "managed";
 export type AppKey = "electron" | "mobile";

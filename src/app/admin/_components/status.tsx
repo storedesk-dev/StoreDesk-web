@@ -78,9 +78,17 @@ export function PcChip({ installation }: { installation: StoreInstallationSummar
   );
 }
 
+export const TUNNEL_NOT_CONFIGURED_LABEL = "Remote access isn't set up in this environment";
+
 export function TunnelChip({ tunnel }: { tunnel: StoreTunnel | null | undefined }) {
   if (!tunnel || tunnel.status === "missing") return <Chip tone="gray">No tunnel</Chip>;
   if (tunnel.status === "failed") return <Chip tone="red" dot>Tunnel failed</Chip>;
-  if (tunnel.status === "provisioning") return <Chip tone="blue" dot>Creating…</Chip>;
+  if (tunnel.status === "not_configured") {
+    return (
+      <Chip tone="gray" title={tunnel.message ?? undefined}>
+        {TUNNEL_NOT_CONFIGURED_LABEL}
+      </Chip>
+    );
+  }
   return <Chip tone="green" dot>Tunnel ready</Chip>;
 }

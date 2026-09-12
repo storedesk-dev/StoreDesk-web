@@ -6,16 +6,7 @@ import { jsonError, notFound, parseBody } from "@/lib/http";
 import { ControlPlaneError } from "@/lib/control-plane-security";
 import { ALL_PAGES } from "@/config/pages";
 import { UserAssignmentModel } from "@/models/ControlPlane";
-import {
-  ROLE_ID,
-  RoleAccessKeysSchema,
-  RoleListSchema,
-  createRole,
-  readOrganizationRoles,
-  replaceOrganizationRoles,
-  roleChangeReason,
-  unknownPageKeys
-} from "@/lib/roles";
+import { ROLE_ID, RoleAccessKeysSchema, createRole, readOrganizationRoles, unknownPageKeys } from "@/lib/roles";
 import { TEMPLATE_IDS, templateAccessKeys, templateSummaries } from "@/lib/role-templates";
 import { scheduleNotify } from "@/lib/store-notify";
 
@@ -30,7 +21,11 @@ async function userCounts(organizationId: string): Promise<Map<string, number>> 
   return new Map(rows.map((row) => [row._id, row.count]));
 }
 
-/** Every role (defaults at version 1 when none are stored), with its user count, and the templates. */
+/**
+ * Every role (defaults at version 1 when none are stored), with its user
+ * count, and the templates. Roles are saved one at a time
+ * (`PUT …/roles/{roleId}` with `baseVersion`); there is no whole-list save.
+ */
 export async function GET(req: Request, ctx: Ctx) {
   try {
     await requireInternalAdmin(req);
@@ -103,36 +98,6 @@ export async function POST(req: Request, ctx: Ctx) {
       { role: { ...outcome.role, userCount: 0 }, ...(unknown.length ? { warnings: { unknownPageKeys: unknown } } : {}) },
       { status: 201 }
     );
-  } catch (error) {
-    return jsonError(error);
-  }
-}
-
-/**
- * Whole-list save, used by the store page written before the per-role
- * routes. Replace with `PUT …/roles/{roleId}` (P3): a stale list here reverts
- * edits made on store servers. Kept only until that page is gone.
- * @deprecated
- */
-export async function PUT(req: Request, ctx: Ctx) {
-  try {
-    const admin = await requireInternalAdmin(req);
-    const { organizationId } = await ctx.params;
-    const body = await parseBody(req, z.object({ roles: RoleListSchema }));
-    const result = await replaceOrganizationRoles(organizationId, body.roles);
-    if (!result) throw notFound("Organization");
-    if (result.changed) {
-      const reason = roleChangeReason(result);
-      await auditAdmin(admin, {
-        organizationId,
-        action: reason,
-        targetType: "organization_roles",
-        targetId: organizationId,
-        metadata: { created: result.created, updated: result.updated, deleted: result.deleted }
-      });
-      scheduleNotify({ organizationId, reason });
-    }
-    return NextResponse.json({ roles: result.roles });
   } catch (error) {
     return jsonError(error);
   }

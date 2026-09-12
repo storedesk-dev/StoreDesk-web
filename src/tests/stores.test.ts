@@ -2,12 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, lastAudit, request, seedOrganization, type TestAdmin } from "./helpers/api";
 import { GET as list, POST as create } from "@/app/api/v1/admin/organizations/[organizationId]/stores/route";
-import {
-  DELETE as remove,
-  GET as detail,
-  PATCH as patch,
-  PUT as oldPut
-} from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/route";
+import * as storeRoute from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/route";
+import { DELETE as remove, GET as detail, PATCH as patch } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/route";
+import * as tunnelRoute from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/tunnel/route";
 import { POST as retryTunnel } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/tunnel/route";
 import { GET as preview } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/access-preview/route";
 import { createOrganization, updateOrganization } from "@/lib/organizations";
@@ -230,11 +227,9 @@ describe("GET, PATCH, PUT and DELETE …/stores/{store}", () => {
     }
   });
 
-  it("refuses the old whole-store PUT with 410 (P2)", async () => {
-    const res = await call(oldPut, request("PUT", "/"));
-    expect(res.status).toBe(410);
-    expect(res.body.error.code).toBe("GONE");
-    expect(res.body.error.message).toContain("/settings");
+  it("has no whole-store PUT (P2) and no tunnel DELETE any more", () => {
+    expect(Object.keys(storeRoute).sort()).toEqual(["DELETE", "GET", "PATCH"]);
+    expect(Object.keys(tunnelRoute)).toEqual(["POST"]);
   });
 
   it("deletes a store after revoking its PC, with its PC, keys, credentials and assignments", async () => {

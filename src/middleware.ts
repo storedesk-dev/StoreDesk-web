@@ -12,7 +12,8 @@ export async function middleware(req: NextRequest) {
 
   if (pathname.startsWith("/api/stores") || pathname.startsWith("/api/v1/admin")) {
     if (!authed) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      // The standard error shape every route answers with.
+      return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Sign in again." } }, { status: 401 });
     }
     return NextResponse.next();
   }

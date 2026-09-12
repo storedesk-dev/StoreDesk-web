@@ -184,10 +184,21 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
                   {data.tunnel.status === "failed" && data.tunnel.message ? (
                     <span className="text-[12.5px] text-red-700">{data.tunnel.message}</span>
                   ) : null}
+                  {data.tunnel.status === "not_configured" ? (
+                    <span className="text-[12.5px] text-slate-600">
+                      Phones can&apos;t reach this store until Cloudflare is configured on this deployment.
+                    </span>
+                  ) : null}
                 </span>
               ),
               action: (
-                <Button size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />} busy={retrying} onClick={retryTunnel} disabled={data.tunnel.status === "ok"}>
+                <Button
+                  size="sm"
+                  icon={<RefreshCw className="h-3.5 w-3.5" />}
+                  busy={retrying}
+                  onClick={retryTunnel}
+                  disabled={data.tunnel.status === "ok" || data.tunnel.status === "not_configured"}
+                >
                   Retry
                 </Button>
               )

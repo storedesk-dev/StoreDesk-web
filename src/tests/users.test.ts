@@ -10,7 +10,6 @@ import {
   DELETE as revokeAssignment,
   PATCH as patchAssignment
 } from "@/app/api/v1/admin/organizations/[organizationId]/users/[appUserId]/assignments/[assignmentId]/route";
-import { GET as oldList, POST as oldAdd } from "@/app/api/v1/admin/organizations/[organizationId]/app-users/route";
 import { POST as enroll } from "@/app/api/v1/app-auth/enroll/route";
 import { createStore } from "@/lib/tenant-stores";
 import { verifySecret } from "@/lib/control-plane-security";
@@ -274,17 +273,5 @@ describe("…/users/{appUserId}/assignments", () => {
     const back = await call(addAssignment, request("POST", "/", { token: admin.token, body: { storeId: second.storeId, role: "cashier" } }), { organizationId, appUserId });
     expect(back.status).toBe(201);
     expect(back.body.assignment.assignmentId).toBe(assignmentId);
-  });
-});
-
-describe("the old …/app-users route", () => {
-  it("still lists, and refuses to add with 410 (P1)", async () => {
-    await addCall(managed());
-    const listed = await call(oldList, request("GET", "/", { token: admin.token }), { organizationId });
-    expect(listed.status).toBe(200);
-    expect(listed.body.appUsers).toHaveLength(1);
-    const refused = await call(oldAdd, request("POST", "/"));
-    expect(refused.status).toBe(410);
-    expect(refused.body.error.message).toContain("/users");
   });
 });
