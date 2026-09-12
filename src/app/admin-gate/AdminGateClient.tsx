@@ -3,6 +3,11 @@
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
+import { api, errorMessage } from "../admin/_lib/api";
+
+const inputClass =
+  "block h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-[#111827] placeholder:text-slate-400 focus:border-[#1A63F4] focus:outline-none focus:ring-2 focus:ring-[#1A63F4]/25";
 
 export default function AdminGateClient() {
   const router = useRouter();
@@ -18,66 +23,66 @@ export default function AdminGateClient() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Login failed");
+      await api.signIn(email.trim(), password);
       router.replace(next.startsWith("/admin") ? next : "/admin");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
+      setError(errorMessage(err, "Sign-in failed."));
       setBusy(false);
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--surface)] px-4">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-6 shadow-lg shadow-blue-500/5"
-      >
-        <Image
-          src="/brand/logo-lockup-horizontal.svg"
-          alt="StoreDesk"
-          width={160}
-          height={34}
-          className="h-8 w-auto object-contain"
-        />
-        <h1 className="mt-5 text-lg font-bold tracking-tight">Internal admin</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          StoreDesk support operators only. Organization contacts do not sign in here.
-        </p>
-        <input
-          type="email"
-          autoFocus
-          autoComplete="username"
-          className="mt-5 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--sd-blue)]"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          autoComplete="current-password"
-          className="mt-3 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--sd-blue)]"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-        <button
-          type="submit"
-          disabled={busy}
-          className="mt-4 w-full rounded-xl bg-[var(--sd-blue)] py-2.5 text-sm font-bold text-white disabled:opacity-60 hover:bg-[var(--sd-blue-shadow)]"
-        >
-          Sign in
-        </button>
-      </form>
+    <main className="flex min-h-screen items-center justify-center bg-[#F6F8FB] px-4">
+      <div className="w-full max-w-sm">
+        <form onSubmit={onSubmit} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" aria-describedby="gate-note">
+          <Image src="/brand/logo-lockup-horizontal.svg" alt="StoreDesk" width={160} height={34} className="h-8 w-auto object-contain" priority />
+          <h1 className="mt-5 text-lg font-extrabold tracking-tight text-[#111827]">StoreDesk admin</h1>
+          <p id="gate-note" className="mt-1 text-sm text-slate-600">
+            For StoreDesk staff. Store owners and their staff sign in on the desktop app or phone, not here.
+          </p>
+
+          <label htmlFor="gate-email" className="mt-5 block text-[13px] font-semibold text-slate-700">
+            E-mail
+          </label>
+          <input
+            id="gate-email"
+            type="email"
+            autoFocus
+            autoComplete="username"
+            className={`mt-1 ${inputClass}`}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <label htmlFor="gate-password" className="mt-3 block text-[13px] font-semibold text-slate-700">
+            Password
+          </label>
+          <input
+            id="gate-password"
+            type="password"
+            autoComplete="current-password"
+            className={`mt-1 ${inputClass}`}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {error ? (
+            <p role="alert" className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            disabled={busy}
+            className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1A63F4] text-sm font-bold text-white hover:bg-[#0E43D8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A63F4] disabled:opacity-60"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            Sign in
+          </button>
+        </form>
+        <p className="mt-3 text-center text-xs text-slate-500">Too many wrong attempts locks sign-in for a few minutes.</p>
+      </div>
     </main>
   );
 }

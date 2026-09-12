@@ -1,81 +1,204 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Building2, KeyRound, Server } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import { useToast } from "@/components/ToastContext";
+import { api, errorMessage, type AttentionItem } from "./_lib/api";
+import { daysUntil, formatDate, formatShortDateTime, relativeTime } from "./_lib/format";
+import { Button, Card, EmptyState, ErrorBanner, PageHeader, Spinner, table, useLoad } from "./_components/ui";
+import { ActivityActor, ActivityTarget, actionLabel } from "./_components/activity";
 
-export default function AdminDashboardPage() {
-  const [stats, setStats] = useState({ organizations: 0, stores: 0, activeWorkers: 0 });
-  const [loading, setLoading] = useState(true);
+const orgHref = (orgId: string, tab?: string) =>
+  `/admin/organizations/${encodeURIComponent(orgId)}${tab ? `?tab=${tab}` : ""}`;
+const storeHref = (orgId: string, storeId: string, tab?: string) =>
+  `/admin/organizations/${encodeURIComponent(orgId)}/stores/${encodeURIComponent(storeId)}${tab ? `?tab=${tab}` : ""}`;
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch("/api/v1/admin/organizations");
-        const data = await res.json();
-        // Since we don't have a dedicated stats endpoint yet, derive from orgs list
-        const orgs = data.organizations || [];
-        setStats({
-          organizations: orgs.length,
-          stores: orgs.reduce((acc: number, org: Record<string, unknown>) => acc + (Array.isArray(org.stores) ? org.stores.length : 0), 0),
-          activeWorkers: 0 // Mock for now until we build the worker query
-        });
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+function attentionText(item: AttentionItem): string {
+  if (item.message) return item.message;
+  switch (item.kind) {
+    case "pc_not_activated":
+      return item.at ? `PC not activated (key issued ${relativeTime(item.at)})` : "PC not activated";
+    case "subscription_ending": {
+      const days = daysUntil(item.at);
+      return days !== null && days < 0
+        ? `Subscription ended ${formatDate(item.at)}`
+        : `Subscription ends ${formatDate(item.at)}`;
     }
-    void load();
-  }, []);
+    case "tunnel_failed":
+      return "Tunnel failed — phones can't reach this store";
+    case "store_offline":
+      return item.at ? `Store PC offline (last seen ${relativeTime(item.at)})` : "Store PC offline";
+  }
+}
+
+export default function DashboardPage() {
+  const { toast } = useToast();
+  const { data, error, loading, reload } = useLoad(() => api.dashboard(), []);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  async function retryTunnel(item: AttentionItem) {
+    if (!item.storeId) return;
+    setRetrying(item.storeId);
+    try {
+      const res = await api.retryTunnel(item.organizationId, item.storeId);
+      toast(
+        res.tunnel?.status === "ok" ? `Tunnel ready for ${item.storeName ?? "the store"}` : "Tunnel retry started",
+        "success"
+      );
+      void reload();
+    } catch (e) {
+      toast(errorMessage(e, "Couldn't retry the tunnel."), "error");
+    } finally {
+      setRetrying(null);
+    }
+  }
+
+  const counts = data?.counts;
+  const stats = [
+    { label: "Organizations", value: counts?.organizations },
+    { label: "Stores", value: counts?.stores },
+    {
+      label: "PCs online",
+      value: counts ? (
+        <>
+          {counts.pcsOnline}
+          <span className="text-base font-semibold text-slate-400">/{counts.pcsTotal}</span>
+        </>
+      ) : undefined
+    },
+    { label: "Subscriptions ending in 30 d", value: counts?.subscriptionsEndingSoon, warn: (counts?.subscriptionsEndingSoon ?? 0) > 0 }
+  ];
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight mb-8">Control Plane Dashboard</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-[var(--border)] shadow-sm">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
-              <Building2 className="h-6 w-6" />
-            </div>
-            <h2 className="text-lg font-semibold text-[var(--muted)]">Organizations</h2>
-          </div>
-          <p className="text-4xl font-bold">{loading ? "..." : stats.organizations}</p>
-        </div>
+      <PageHeader title="Dashboard" subtitle="What needs you today across every customer." />
 
-        <div className="bg-white p-6 rounded-2xl border border-[var(--border)] shadow-sm">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
-              <Server className="h-6 w-6" />
-            </div>
-            <h2 className="text-lg font-semibold text-[var(--muted)]">Active Edges</h2>
+      {error ? (
+        <ErrorBanner error={error} onRetry={reload} />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[12.5px] font-semibold text-slate-500">{s.label}</div>
+                <div className={`mt-1 text-[26px] font-extrabold tracking-tight sd-num ${s.warn ? "text-amber-700" : "text-[#111827]"}`}>
+                  {loading && s.value === undefined ? <span className="text-slate-300">—</span> : s.value ?? 0}
+                </div>
+              </div>
+            ))}
           </div>
-          <p className="text-4xl font-bold">{loading ? "..." : stats.activeWorkers}</p>
-        </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-[var(--border)] shadow-sm">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
-              <KeyRound className="h-6 w-6" />
-            </div>
-            <h2 className="text-lg font-semibold text-[var(--muted)]">Pending Keys</h2>
+          <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_1fr]">
+            <Card title="Needs attention" description="PCs not activated, subscriptions ending within 30 days, failed tunnels and offline stores." bodyClassName="p-0">
+              {loading && !data ? (
+                <Spinner />
+              ) : !data?.attention.length ? (
+                <div className="px-4 py-8 text-center text-sm text-slate-500">Nothing needs attention. Every store is set up and online.</div>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {data.attention.map((item, i) => (
+                    <li key={`${item.kind}-${item.storeId ?? item.subscriptionId ?? item.organizationId}-${i}`} className="flex items-center gap-3 px-4 py-2.5">
+                      <AlertTriangle
+                        className={`h-4 w-4 shrink-0 ${item.kind === "tunnel_failed" || item.kind === "store_offline" ? "text-red-500" : "text-amber-500"}`}
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">
+                          <Link href={orgHref(item.organizationId)} className="hover:text-[#0E43D8] hover:underline">
+                            {item.organizationName}
+                          </Link>
+                          {item.storeName ? <span className="text-slate-500"> · {item.storeName}</span> : null}
+                        </div>
+                        <div className="truncate text-[13px] text-slate-600">{attentionText(item)}</div>
+                      </div>
+                      {item.kind === "subscription_ending" ? (
+                        <Link href={orgHref(item.organizationId, "subscription")} className="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
+                          Renew
+                        </Link>
+                      ) : item.kind === "tunnel_failed" && item.storeId ? (
+                        <Button size="sm" busy={retrying === item.storeId} onClick={() => retryTunnel(item)}>
+                          Retry
+                        </Button>
+                      ) : item.storeId ? (
+                        <Link
+                          href={storeHref(item.organizationId, item.storeId, "pc")}
+                          className="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
+                        >
+                          Open
+                        </Link>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card
+              title="Recent activity"
+              actions={
+                <Link href="/admin/organizations" className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#0E43D8] hover:underline">
+                  Organizations <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </Link>
+              }
+              bodyClassName="p-0"
+            >
+              {loading && !data ? (
+                <Spinner />
+              ) : !data?.recentActivity.length ? (
+                <div className="px-4 py-8 text-center text-sm text-slate-500">No activity yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className={table.table}>
+                    <caption className="sr-only">Recent activity</caption>
+                    <thead className={table.thead}>
+                      <tr>
+                        <th scope="col" className={table.th}>Time</th>
+                        <th scope="col" className={table.th}>Who</th>
+                        <th scope="col" className={table.th}>What</th>
+                        <th scope="col" className={table.th}>Target</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.recentActivity.map((ev) => (
+                        <tr key={ev.auditEventId} className={table.tr}>
+                          <td className={`${table.td} whitespace-nowrap text-slate-500`}>{formatShortDateTime(ev.occurredAt)}</td>
+                          <td className={`${table.td} max-w-[10rem] truncate`}><ActivityActor event={ev} /></td>
+                          <td className={`${table.td} whitespace-nowrap`}>{actionLabel(ev.action)}</td>
+                          <td className={`${table.td} max-w-[12rem] truncate`}>
+                            {ev.organizationId ? (
+                              <Link href={orgHref(ev.organizationId, "activity")} className="hover:underline">
+                                <ActivityTarget event={ev} withOrg />
+                              </Link>
+                            ) : (
+                              <ActivityTarget event={ev} withOrg />
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
           </div>
-          <p className="text-4xl font-bold">0</p>
-        </div>
-      </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-[var(--border)] shadow-sm">
-        <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-        <div className="flex gap-4">
-          <Link href="/admin/organizations" className="px-4 py-2 bg-[var(--sd-blue)] text-white rounded-lg font-medium hover:bg-blue-700">
-            Manage Organizations
-          </Link>
-          <Link href="/admin/setup-keys" className="px-4 py-2 bg-white border border-[var(--border)] text-[var(--foreground)] rounded-lg font-medium hover:bg-gray-50">
-            Issue Setup Key
-          </Link>
-        </div>
-      </div>
+          {!loading && data && data.counts.organizations === 0 ? (
+            <div className="mt-5">
+              <EmptyState
+                title="No customers yet"
+                action={
+                  <Link href="/admin/organizations?new=1" className="inline-flex h-9 items-center rounded-md bg-[#1A63F4] px-3.5 text-sm font-semibold text-white hover:bg-[#0E43D8]">
+                    New organization
+                  </Link>
+                }
+              >
+                Start with an organization: its name, the org tag phones will type, and its first subscription.
+              </EmptyState>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

@@ -1,929 +1,119 @@
 "use client";
-import { useToast } from "@/components/ToastContext";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { ArrowLeft, Loader2, Save, Server, ShieldCheck, Activity, KeyRound, Copy, Check, Settings2 } from "lucide-react";
-import { ALL_PAGES } from "@/config/pages";
+import { Suspense } from "react";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
+import { api } from "../../../../_lib/api";
+import { relativeTime } from "../../../../_lib/format";
+import { ErrorBanner, Spinner, TabPanel, Tabs, useLoad } from "../../../../_components/ui";
+import { PcChip, StoreStatusChip, pcState } from "../../../../_components/status";
+import type { StoreTabProps } from "./_tabs/shared";
+import { StoreOverviewTab } from "./_tabs/StoreOverviewTab";
+import { FeaturesTab } from "./_tabs/FeaturesTab";
+import { IntegrationsTab } from "./_tabs/IntegrationsTab";
+import { RegisterTab } from "./_tabs/RegisterTab";
+import { PcPhonesTab } from "./_tabs/PcPhonesTab";
+import { AccessPreviewTab } from "./_tabs/AccessPreviewTab";
 
-interface PageEntry {
-  key: string;
-  enabled: boolean;
-  featureFlags: Record<string, boolean>;
+type TabKey = "overview" | "features" | "integrations" | "register" | "pc" | "access";
+const TAB_KEYS: TabKey[] = ["overview", "features", "integrations", "register", "pc", "access"];
+
+export default function StorePage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <StoreDetail />
+    </Suspense>
+  );
 }
-interface RoleEntry {
-  roleName: string;
-  roleId: string;
-  accessKeys: { electron: { pages: PageEntry[] }; mobile: { pages: PageEntry[] } };
-}
 
-export default function AdminStoreDetailPage() {
-  const { toast } = useToast();
-  const { orgId, storeId } = useParams();
-    
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [store, setStore] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  
-  // Tunnel Status
-  const [tunnelStatus, setTunnelStatus] = useState<"checking" | "online" | "offline" | "unknown">("unknown");
-  const [tunnelMessage, setTunnelMessage] = useState("");
-  const [isDeletingTunnel, setIsDeletingTunnel] = useState(false);
-  const [isDeletingStore, setIsDeletingStore] = useState(false);
+function StoreDetail() {
+  const { orgId, storeId } = useParams<{ orgId: string; storeId: string }>();
+  const search = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  // Editable fields
-  const [configJson, setConfigJson] = useState("");
-
-  /**
-   * Roles live on the Organization, not in the store's configJson.
-   *
-   * This editor previously read and wrote `configJson.roles`, which nothing
-   * reads: `assignmentSummaries`, `issueClientSession` and `buildEdgeConfigJson`
-   * all resolve roles from `Organization.roles`. Every toggle an operator made
-   * here was saved somewhere with no effect.
-   */
-  const [orgRoles, setOrgRoles] = useState<RoleEntry[]>([]);
-  const [rolesSaving, setRolesSaving] = useState(false);
-
-  // Register credentials, set here and delivered to the store's Worker.
-  const [posHost, setPosHost] = useState("");
-  const [posUser, setPosUser] = useState("");
-  const [posPassword, setPosPassword] = useState("");
-  const [posPasswordOnFile, setPosPasswordOnFile] = useState(false);
-  const [posSecretStorage, setPosSecretStorage] = useState(true);
-  const [posSaving, setPosSaving] = useState(false);
-  const [licensePlan, setLicensePlan] = useState("");
-  const [tunnelUrl, setTunnelUrl] = useState("");
-
-  // Setup Key state
-  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
-  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
-  const [keyExpiresAt, setKeyExpiresAt] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  // The tunnel token is a bearer credential for the store's public hostname, so
-  // it is not part of the page payload. An operator asks for it explicitly and
-  // the request is audited.
-  const [revealedToken, setRevealedToken] = useState<string | null>(null);
-  const [isRevealingToken, setIsRevealingToken] = useState(false);
-
-  async function revealTunnelToken() {
-    setIsRevealingToken(true);
-    try {
-      const res = await fetch(
-        `/api/v1/admin/organizations/${orgId}/stores/${storeId}/tunnel/token`
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message || "Could not reveal the tunnel token");
-      setRevealedToken(String(data.cloudflareToken));
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not reveal the tunnel token", "error");
-    } finally {
-      setIsRevealingToken(false);
-    }
-  }
-
-  useEffect(() => {
-    if (orgId && storeId) {
-      loadData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const detail = useLoad(async () => {
+    const [store, org] = await Promise.all([
+      api.getStore(orgId, storeId),
+      api.getOrganization(orgId).catch(() => null)
+    ]);
+    return { store: store.store, org: org?.organization ?? null };
   }, [orgId, storeId]);
 
-  async function loadData() {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}`);
-      if (!res.ok) throw new Error("Failed to load store");
-      const data = await res.json();
-      setStore(data.store);
-      
-      const defaultJson = JSON.stringify({
-        posIntegration: "verifone_commander",
-        posIpAddress: "",
-        posUsername: "",
-        posPassword: "",
-        roles: [
-          {
-            roleName: "Organization Admin", roleId: "org_admin",
-            accessKeys: {
-              electron: { pages: [
-                { key: "pos",            enabled: true,  featureFlags: { enableRefunds: true, enableDiscounts: true, enableVoidTransaction: true } },
-                { key: "dashboard",      enabled: true,  featureFlags: {} },
-                { key: "products",       enabled: true,  featureFlags: { enableBulkImport: true } },
-                { key: "vendors",        enabled: true,  featureFlags: {} },
-                { key: "vendorPrices",   enabled: true,  featureFlags: {} },
-                { key: "priceBook",      enabled: true,  featureFlags: {} },
-                { key: "costAnalysis",   enabled: true,  featureFlags: {} },
-                { key: "transactions",   enabled: true,  featureFlags: { enableExport: true } },
-                { key: "manageWorker",   enabled: true,  featureFlags: {} },
-                { key: "settings",       enabled: true,  featureFlags: {} }
-              ]},
-              mobile: { pages: [
-                { key: "mobilePos",           enabled: true,  featureFlags: { enableManualEntry: true, enableQuickSale: true } },
-                { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
-                { key: "mobileScanner",        enabled: true,  featureFlags: { enableCameraFlash: true } },
-                { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
-                { key: "mobileVendorPrices",   enabled: true,  featureFlags: {} },
-                { key: "mobilePriceBook",      enabled: true,  featureFlags: {} },
-                { key: "mobileTransactions",   enabled: true,  featureFlags: { enableExport: true } },
-                { key: "mobileReports",        enabled: true,  featureFlags: {} },
-                { key: "mobileAnalytics",      enabled: true,  featureFlags: {} },
-                { key: "mobileSalesTax",       enabled: true,  featureFlags: {} }
-              ]}
-            }
-          },
-          {
-            roleName: "Store Manager", roleId: "store_manager",
-            accessKeys: {
-              electron: { pages: [
-                { key: "pos",            enabled: true,  featureFlags: { enableRefunds: true, enableDiscounts: false, enableVoidTransaction: false } },
-                { key: "dashboard",      enabled: true,  featureFlags: {} },
-                { key: "products",       enabled: true,  featureFlags: { enableBulkImport: false } },
-                { key: "vendors",        enabled: true,  featureFlags: {} },
-                { key: "vendorPrices",   enabled: true,  featureFlags: {} },
-                { key: "priceBook",      enabled: true,  featureFlags: {} },
-                { key: "costAnalysis",   enabled: true,  featureFlags: {} },
-                { key: "transactions",   enabled: true,  featureFlags: { enableExport: true } },
-                { key: "manageWorker",   enabled: false, featureFlags: {} },
-                { key: "settings",       enabled: true,  featureFlags: {} }
-              ]},
-              mobile: { pages: [
-                { key: "mobilePos",           enabled: true,  featureFlags: { enableManualEntry: true, enableQuickSale: false } },
-                { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
-                { key: "mobileScanner",        enabled: true,  featureFlags: { enableCameraFlash: true } },
-                { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
-                { key: "mobileVendorPrices",   enabled: true,  featureFlags: {} },
-                { key: "mobilePriceBook",      enabled: true,  featureFlags: {} },
-                { key: "mobileTransactions",   enabled: true,  featureFlags: { enableExport: false } },
-                { key: "mobileReports",        enabled: false, featureFlags: {} },
-                { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
-                { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
-              ]}
-            }
-          },
-          {
-            roleName: "Store Operator", roleId: "store_operator",
-            accessKeys: {
-              electron: { pages: [
-                { key: "pos",            enabled: true,  featureFlags: { enableRefunds: false, enableDiscounts: false, enableVoidTransaction: false } },
-                { key: "dashboard",      enabled: true,  featureFlags: {} },
-                { key: "products",       enabled: true,  featureFlags: { enableBulkImport: false } },
-                { key: "vendors",        enabled: false, featureFlags: {} },
-                { key: "vendorPrices",   enabled: false, featureFlags: {} },
-                { key: "priceBook",      enabled: false, featureFlags: {} },
-                { key: "costAnalysis",   enabled: false, featureFlags: {} },
-                { key: "transactions",   enabled: true,  featureFlags: { enableExport: false } },
-                { key: "manageWorker",   enabled: false, featureFlags: {} },
-                { key: "settings",       enabled: false, featureFlags: {} }
-              ]},
-              mobile: { pages: [
-                { key: "mobilePos",           enabled: true,  featureFlags: { enableManualEntry: false, enableQuickSale: true } },
-                { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
-                { key: "mobileScanner",        enabled: true,  featureFlags: { enableCameraFlash: false } },
-                { key: "mobileProductSearch",  enabled: false, featureFlags: {} },
-                { key: "mobileVendorPrices",   enabled: false, featureFlags: {} },
-                { key: "mobilePriceBook",      enabled: false, featureFlags: {} },
-                { key: "mobileTransactions",   enabled: false, featureFlags: { enableExport: false } },
-                { key: "mobileReports",        enabled: false, featureFlags: {} },
-                { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
-                { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
-              ]}
-            }
-          },
-          {
-            roleName: "Viewer", roleId: "viewer",
-            accessKeys: {
-              electron: { pages: [
-                { key: "pos",            enabled: false, featureFlags: {} },
-                { key: "dashboard",      enabled: true,  featureFlags: {} },
-                { key: "products",       enabled: true,  featureFlags: { enableBulkImport: false } },
-                { key: "vendors",        enabled: false, featureFlags: {} },
-                { key: "vendorPrices",   enabled: false, featureFlags: {} },
-                { key: "priceBook",      enabled: false, featureFlags: {} },
-                { key: "costAnalysis",   enabled: false, featureFlags: {} },
-                { key: "transactions",   enabled: true,  featureFlags: { enableExport: false } },
-                { key: "manageWorker",   enabled: false, featureFlags: {} },
-                { key: "settings",       enabled: false, featureFlags: {} }
-              ]},
-              mobile: { pages: [
-                { key: "mobilePos",           enabled: false, featureFlags: {} },
-                { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
-                { key: "mobileScanner",        enabled: false, featureFlags: {} },
-                { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
-                { key: "mobileVendorPrices",   enabled: false, featureFlags: {} },
-                { key: "mobilePriceBook",      enabled: false, featureFlags: {} },
-                { key: "mobileTransactions",   enabled: false, featureFlags: {} },
-                { key: "mobileReports",        enabled: false, featureFlags: {} },
-                { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
-                { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
-              ]}
-            }
-          }
-        ]
-      }, null, 2);
-      setConfigJson(data.store.configJson || defaultJson);
-      setLicensePlan(data.store.licensePlan || "trial");
-      setTunnelUrl(data.store.tunnelUrl || "");
-      
-      if (data.store.tunnelUrl) {
-        checkTunnelStatus();
-      }
-      void loadRoles();
-      void loadPosCredentials();
-    } catch (err: unknown) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const requested = search.get("tab") as TabKey | null;
+  const tab: TabKey = requested && TAB_KEYS.includes(requested) ? requested : "overview";
+  const setTab = (key: TabKey) => router.replace(`${pathname}?tab=${key}`, { scroll: false });
 
-  async function loadRoles() {
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/roles`);
-      const data = await res.json();
-      if (res.ok && Array.isArray(data.roles)) setOrgRoles(data.roles as RoleEntry[]);
-    } catch {
-      toast("Could not load roles for this organization.", "error");
-    }
-  }
+  const orgHref = `/admin/organizations/${encodeURIComponent(orgId)}`;
 
-  async function saveRoles(next: RoleEntry[]) {
-    setOrgRoles(next);
-    setRolesSaving(true);
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/roles`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roles: next })
-      });
-      if (!res.ok) throw new Error((await res.json())?.error || "Save failed");
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not save role access.", "error");
-      void loadRoles();
-    } finally {
-      setRolesSaving(false);
-    }
-  }
-
-  async function loadPosCredentials() {
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}/pos-credentials`);
-      const data = await res.json();
-      if (!res.ok) return;
-      setPosHost(data.posIpAddress || "");
-      setPosUser(data.posUsername || "");
-      setPosPasswordOnFile(Boolean(data.passwordOnFile));
-      setPosSecretStorage(data.secretStorageAvailable !== false);
-    } catch {
-      /* non-fatal: the section shows empty fields */
-    }
-  }
-
-  async function savePosCredentials() {
-    setPosSaving(true);
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}/pos-credentials`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          posIpAddress: posHost.trim(),
-          posUsername: posUser.trim(),
-          // Omitted when blank, so the stored password survives a host edit.
-          ...(posPassword ? { posPassword } : {})
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message || "Save failed");
-      setPosPassword("");
-      setPosPasswordOnFile(Boolean(data.passwordOnFile));
-      toast("Register settings saved. The store's Worker picks them up on its next sync.", "success");
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not save register settings.", "error");
-    } finally {
-      setPosSaving(false);
-    }
-  }
-
-  async function checkTunnelStatus() {
-    setTunnelStatus("checking");
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}/tunnel/status`);
-      const data = await res.json();
-      setTunnelStatus(data.status || "unknown");
-      setTunnelMessage(data.message || "");
-    } catch {
-      setTunnelStatus("offline");
-      setTunnelMessage("Failed to check status");
-    }
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          licensePlan,
-          tunnelUrl,
-          configJson
-        })
-      });
-      if (res.ok) {
-        toast("Store updated successfully", "success");
-        loadData();
-      } else {
-        const err = await res.json();
-        toast(`Failed to save: ${err.error || 'Unknown error'}`, "error");
-      }
-    } catch (err: unknown) {
-      console.error(err);
-      toast("Error saving store", "error");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleGenerateKey() {
-    setIsGeneratingKey(true);
-    setGeneratedKey(null);
-    try {
-      const res = await fetch(`/api/v1/admin/setup-keys`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId: orgId, storeId })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setGeneratedKey(data.setupKey);
-        setKeyExpiresAt(data.expiresAt);
-      } else {
-        toast(data.error?.message || typeof data.error === "string" ? data.error : (data.error?.code || "Failed to generate key"), "error");
-      }
-    } catch {
-      toast("Error generating setup key", "error");
-    } finally {
-      setIsGeneratingKey(false);
-    }
-  }
-
-  async function handleDeleteTunnel() {
-    if (!confirm("Are you sure you want to delete the Cloudflare Tunnel configuration for this store? This will break the connection to the Edge server.")) return;
-    setIsDeletingTunnel(true);
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}/tunnel`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        toast("Tunnel configuration deleted", "success");
-        setTunnelUrl("");
-        loadData();
-      } else {
-        const err = await res.json();
-        toast(`Failed to delete tunnel: ${err.error || 'Unknown error'}`, "error");
-      }
-    } catch {
-      toast("Error deleting tunnel", "error");
-    } finally {
-      setIsDeletingTunnel(false);
-    }
-  }
-
-  async function handleDeleteStore() {
-    if (!confirm("Are you absolutely sure you want to delete this store? This action cannot be undone and will delete all worker installations and keys.")) return;
-    setIsDeletingStore(true);
-    try {
-      const res = await fetch(`/api/v1/admin/organizations/${orgId}/stores/${storeId}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        toast("Store deleted", "success");
-        window.location.href = `/admin/organizations/${orgId}`;
-      } else {
-        const err = await res.json();
-        toast(`Failed to delete store: ${err.error || 'Unknown error'}`, "error");
-      }
-    } catch {
-      toast("Error deleting store", "error");
-    } finally {
-      setIsDeletingStore(false);
-    }
-  }
-
-  const copyToClipboard = () => {
-    if (generatedKey) {
-      navigator.clipboard.writeText(generatedKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  if (loading) {
+  if (detail.error && !detail.data) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-[var(--sd-blue)]" />
-      </div>
-    );
-  }
-
-  if (!store) {
-    return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-900">Store not found</h2>
-        <Link href={`/admin/organizations/${orgId}`} className="text-[var(--sd-blue)] hover:underline mt-4 inline-block">
-          Return to Organization
+      <div className="space-y-4">
+        <Link href={`${orgHref}?tab=stores`} className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-500 hover:text-[#111827]">
+          <ChevronLeft className="h-4 w-4" aria-hidden /> Stores
         </Link>
+        <ErrorBanner error={detail.error} onRetry={detail.reload} />
       </div>
     );
   }
+  if (!detail.data) return <Spinner />;
+
+  const { store, org } = detail.data;
+  const props: StoreTabProps = { orgId, storeId, store, org, refreshStore: () => void detail.reload() };
+  const state = pcState(store.installation);
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
-      <Link href={`/admin/organizations/${orgId}`} className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 mb-6 transition-colors">
-        <ArrowLeft className="h-4 w-4 mr-1" />
-        Back to Organization Details
-      </Link>
+    <div>
+      <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 text-[13px] font-semibold text-slate-500">
+        <Link href="/admin/organizations" className="hover:text-[#111827]">Organizations</Link>
+        <span aria-hidden>/</span>
+        <Link href={orgHref} className="hover:text-[#111827]">{org?.name ?? "Organization"}</Link>
+        <span aria-hidden>/</span>
+        <Link href={`${orgHref}?tab=stores`} className="hover:text-[#111827]">Stores</Link>
+      </nav>
 
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{store.name}</h1>
-          <p className="text-[var(--muted)] mt-1 font-mono text-sm">{store.storeId}</p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-[22px] font-extrabold tracking-tight">
+              {store.storeNumber ? `Store ${store.storeNumber} · ` : ""}
+              {store.name}
+            </h1>
+            <StoreStatusChip status={store.status} />
+          </div>
+          {store.address ? <p className="mt-1 text-sm text-slate-600">{store.address}</p> : null}
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 bg-[var(--sd-blue)] text-white px-5 py-2.5 rounded-xl font-medium shadow-md shadow-blue-500/20 hover:bg-blue-700 hover:shadow-lg transition-all duration-200 disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save Changes
-        </button>
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <span className="font-semibold">PC:</span>
+          <PcChip installation={store.installation} />
+          {store.installation?.lastSeenAt && (state === "online" || state === "offline") ? (
+            <span className="sd-num">seen {relativeTime(store.installation.lastSeenAt)}</span>
+          ) : null}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* Tunnel Settings */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Server className="h-5 w-5 text-indigo-500" />
-              <h2 className="text-lg font-semibold text-gray-900">Cloudflare Tunnel</h2>
-            </div>
-            {store?.tunnelUrl && (
-              <button
-                onClick={handleDeleteTunnel}
-                disabled={isDeletingTunnel}
-                className="text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {isDeletingTunnel ? "Deleting..." : "Clear Tunnel Config"}
-              </button>
-            )}
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tunnel URL</label>
-              <input 
-                type="text" 
-                value={tunnelUrl}
-                onChange={e => setTunnelUrl(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--sd-blue)] focus:border-transparent outline-none transition-all font-mono text-sm"
-                placeholder="https://store-123.storedesk.net"
-              />
-            </div>
-            
-            {store?.tunnelUrl && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tunnel Token</label>
-                {revealedToken ? (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={revealedToken}
-                      className="flex-1 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-500 font-mono text-xs overflow-hidden text-ellipsis"
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(revealedToken);
-                        toast("Token copied to clipboard", "success");
-                      }}
-                      className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
-                      title="Copy token"
-                    >
-                      <Copy className="h-4 w-4 text-gray-600" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => void revealTunnelToken()}
-                    disabled={isRevealingToken}
-                    className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium text-gray-700 disabled:opacity-50"
-                  >
-                    {isRevealingToken ? "Revealing…" : "Reveal tunnel token"}
-                  </button>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Activation delivers this token to the Worker automatically. Reveal it only to run
-                  <code className="mx-1">cloudflared</code> by hand — the request is recorded in the audit log.
-                </p>
-              </div>
-            )}
-            
-            <div className="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-100">
-              <div>
-                <div className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  Connection Status
-                  {tunnelStatus === 'checking' && <Loader2 className="h-3 w-3 animate-spin text-gray-400" />}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">{tunnelMessage || "Status unknown"}</div>
-              </div>
-              <div>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
-                  tunnelStatus === 'online' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 
-                  tunnelStatus === 'offline' ? 'bg-red-50 text-red-700 border border-red-200/60' : 
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  <Activity className="h-3 w-3" />
-                  {tunnelStatus === 'online' ? 'ONLINE' : tunnelStatus === 'offline' ? 'OFFLINE' : 'CHECKING'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Role-Based Page Access Editor */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Settings2 className="h-5 w-5 text-indigo-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Role access</h2>
-            {rolesSaving ? (
-              <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
-                <Loader2 className="h-3 w-3 animate-spin" /> Saving…
-              </span>
-            ) : null}
-          </div>
-          <p className="text-sm text-gray-500 mb-6">
-            Each role gets its own list of pages. Changes save as you toggle them, and
-            apply the next time someone with that role signs in.
-          </p>
-
-          {(() => {
-            const roles = orgRoles;
-
-            // Labels, descriptions and flags come from the generated registry
-            // mirror. This was a hand-maintained fourth copy of the page list,
-            // so a new page silently rendered with a raw key and no toggles.
-            const PAGE_META: Record<string, { label: string; desc: string; flags: Record<string, string> }> =
-              Object.fromEntries(
-                ALL_PAGES.map((page) => [
-                  page.key,
-                  {
-                    label: page.label,
-                    desc: page.description,
-                    flags: Object.fromEntries(
-                      Object.entries(page.knownFeatureFlags).map(([flag, def]) => [flag, def.label])
-                    )
-                  }
-                ])
-              );
-
-            const updateRoles = (newRoles: RoleEntry[]) => {
-              void saveRoles(newRoles);
-            };
-
-            const togglePage = (ri: number, app: "electron" | "mobile", pageKey: string) => {
-              const nr = JSON.parse(JSON.stringify(roles)) as RoleEntry[];
-              const p = nr[ri].accessKeys[app].pages.find(p => p.key === pageKey);
-              if (p) p.enabled = !p.enabled;
-              updateRoles(nr);
-            };
-
-            const toggleFlag = (ri: number, app: "electron" | "mobile", pageKey: string, fk: string) => {
-              const nr = JSON.parse(JSON.stringify(roles)) as RoleEntry[];
-              const p = nr[ri].accessKeys[app].pages.find(p => p.key === pageKey);
-              if (p) p.featureFlags[fk] = !p.featureFlags[fk];
-              updateRoles(nr);
-            };
-
-            const renderPlatform = (ri: number, app: "electron" | "mobile", pages: PageEntry[]) => (
-              <div className="mb-2">
-                <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold mb-3 ${
-                  app === "electron" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"
-                }`}>{app === "electron" ? "🖥 Desktop" : "📱 Mobile"}</div>
-                <div className="space-y-1.5">
-                  {pages.map(page => {
-                    const m = PAGE_META[page.key] ?? { label: page.key, desc: "", flags: {} };
-                    const fks = Object.keys(m.flags);
-                    return (
-                      <div key={page.key} className={`rounded-xl border transition-all ${
-                        page.enabled ? "bg-white border-gray-200" : "bg-gray-50/60 border-gray-100 opacity-55"
-                      }`}>
-                        <div className="flex items-center justify-between px-4 py-2.5">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <code className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">{page.key}</code>
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium text-gray-900">{m.label}</div>
-                              <div className="text-xs text-gray-400 truncate">{m.desc}</div>
-                            </div>
-                          </div>
-                          <button onClick={() => togglePage(ri, app, page.key)}
-                            className={`ml-4 relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                              page.enabled ? "bg-emerald-500" : "bg-gray-200"
-                            }`} role="switch" aria-checked={page.enabled}>
-                            <span aria-hidden="true" className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
-                              page.enabled ? "translate-x-4" : "translate-x-0"
-                            }`} />
-                          </button>
-                        </div>
-                        {page.enabled && fks.length > 0 && (
-                          <div className="px-4 pb-3 flex flex-wrap gap-2 border-t border-gray-50 pt-2">
-                            {fks.map(fk => {
-                              const on = !!page.featureFlags[fk];
-                              return (
-                                <button key={fk} onClick={() => toggleFlag(ri, app, page.key, fk)}
-                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                                    on ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-400"
-                                  }`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-gray-300"}`} />
-                                  {m.flags[fk]}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-
-            const addCustomRole = () => {
-              const rName = prompt("Enter Custom Role Name (e.g. Cashier, Shift Supervisor):");
-              if (!rName || !rName.trim()) return;
-              const rId = prompt("Enter Custom Role ID (e.g. cashier, shift_supervisor):", rName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")) || "";
-              if (!rId || !rId.trim()) return;
-
-              if (roles.some(r => r.roleId === rId.trim())) {
-                toast(`Role ID "${rId.trim()}" already exists.`, "error");
-                return;
-              }
-
-              const newRole: RoleEntry = {
-                roleName: rName.trim(),
-                roleId: rId.trim(),
-                accessKeys: {
-                  electron: {
-                    pages: [
-                      { key: "pos",            enabled: true,  featureFlags: { enableRefunds: false, enableDiscounts: false } },
-                      { key: "dashboard",      enabled: true,  featureFlags: {} },
-                      { key: "products",       enabled: true,  featureFlags: {} },
-                      { key: "vendors",        enabled: false, featureFlags: {} },
-                      { key: "vendorPrices",   enabled: false, featureFlags: {} },
-                      { key: "priceBook",      enabled: false, featureFlags: {} },
-                      { key: "costAnalysis",   enabled: false, featureFlags: {} },
-                      { key: "transactions",   enabled: true,  featureFlags: {} },
-                      { key: "manageWorker",   enabled: false, featureFlags: {} },
-                      { key: "settings",       enabled: false, featureFlags: {} }
-                    ]
-                  },
-                  mobile: {
-                    pages: [
-                      { key: "mobilePos",           enabled: true,  featureFlags: {} },
-                      { key: "mobileDashboard",      enabled: true,  featureFlags: {} },
-                      { key: "mobileScanner",        enabled: true,  featureFlags: {} },
-                      { key: "mobileProductSearch",  enabled: true,  featureFlags: {} },
-                      { key: "mobileVendorPrices",   enabled: false, featureFlags: {} },
-                      { key: "mobilePriceBook",      enabled: false, featureFlags: {} },
-                      { key: "mobileTransactions",   enabled: false, featureFlags: {} },
-                      { key: "mobileReports",        enabled: false, featureFlags: {} },
-                      { key: "mobileAnalytics",      enabled: false, featureFlags: {} },
-                      { key: "mobileSalesTax",       enabled: false, featureFlags: {} }
-                    ]
-                  }
-                }
-              };
-
-              updateRoles([...roles, newRole]);
-            };
-
-            const deleteRole = (ri: number) => {
-              const target = roles[ri];
-              if (target.roleId === "org_admin") {
-                toast("Cannot delete the Organization Admin role.", "error");
-                return;
-              }
-              if (!confirm(`Delete role "${target.roleName}" (${target.roleId})?`)) return;
-              const nr = roles.filter((_, idx) => idx !== ri);
-              updateRoles(nr);
-            };
-
-            const ROLE_CHIP: Record<string, string> = {
-              org_admin: "bg-indigo-50 border-indigo-200 text-indigo-700",
-            };
-
-            return (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center bg-gray-50/80 p-4 rounded-xl border border-gray-200/80">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">Custom Organization Roles</h3>
-                    <p className="text-xs text-gray-500">Create custom roles with customized Electron & Mobile page access keys.</p>
-                  </div>
-                  <button
-                    onClick={addCustomRole}
-                    className="px-3.5 py-1.5 bg-[var(--sd-blue)] text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                  >
-                    + Add Custom Role
-                  </button>
-                </div>
-
-                {roles.map((role, ri) => (
-                  <div key={role.roleId} className="border border-gray-200 rounded-2xl overflow-hidden bg-white">
-                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50/60">
-                      <div className="flex items-center gap-3">
-                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                          ROLE_CHIP[role.roleId] ?? "bg-blue-50 border-blue-200 text-blue-700"
-                        }`}>{role.roleName}</div>
-                        <code className="text-[11px] font-mono text-gray-400">{role.roleId}</code>
-                      </div>
-                      {role.roleId !== "org_admin" && (
-                        <button
-                          onClick={() => deleteRole(ri)}
-                          className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                        >
-                          Delete Role
-                        </button>
-                      )}
-                    </div>
-                    <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {renderPlatform(ri, "electron", role.accessKeys.electron?.pages || [])}
-                      {renderPlatform(ri, "mobile",   role.accessKeys.mobile?.pages || [])}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Register credentials */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Server className="h-5 w-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Register connection</h2>
-          </div>
-          <p className="text-sm text-gray-500 mb-5">
-            The Verifone Commander this store reads prices and sales from. Saved here, it
-            reaches the store&apos;s Worker automatically — no need to read it down the phone.
-          </p>
-
-          {!posSecretStorage && (
-            <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-              This deployment has no <code className="font-mono">STORE_SECRET_KEY</code>, so a
-              register password cannot be stored. Address and username still save.
-            </div>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="sm:col-span-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Register address</label>
-              <input
-                type="text"
-                value={posHost}
-                onChange={(event) => setPosHost(event.target.value)}
-                placeholder="192.168.31.11"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Just the IP is enough — StoreDesk adds https and port 443.
-              </p>
-            </div>
-            <div className="sm:col-span-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-              <input
-                type="text"
-                value={posUser}
-                onChange={(event) => setPosUser(event.target.value)}
-                placeholder="MANAGER"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">Needs the vPLUs permission.</p>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                value={posPassword}
-                onChange={(event) => setPosPassword(event.target.value)}
-                placeholder={posPasswordOnFile ? "Saved — leave blank to keep it" : "Enter the register password"}
-                disabled={!posSecretStorage}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Encrypted before it is stored, and sent only to this store&apos;s Worker.
-                It is never shown again.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex justify-end">
-            <button
-              onClick={() => void savePosCredentials()}
-              disabled={posSaving || !posHost.trim() || !posUser.trim()}
-              className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors inline-flex items-center gap-2"
-            >
-              {posSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {posSaving ? "Saving…" : "Save register connection"}
-            </button>
-          </div>
-        </div>
-
-        {/* Setup & Activation Panel */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/60 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <KeyRound className="h-5 w-5 text-emerald-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Setup & Activation</h2>
-          </div>
-          
-          <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-5">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h3 className="font-medium text-emerald-900">Generate Worker Setup Key</h3>
-                <p className="text-sm text-emerald-700/80 mt-1 max-w-md">
-                  Issue a one-time setup key for the store owner to activate their physical Edge server.
-                  This requires the Cloudflare Tunnel URL to be configured and saved first.
-                </p>
-              </div>
-              
-              {!generatedKey ? (
-                <button
-                  onClick={handleGenerateKey}
-                  disabled={!tunnelUrl || isGeneratingKey}
-                  className="flex-shrink-0 flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isGeneratingKey ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
-                  ) : (
-                    <><KeyRound className="h-4 w-4" /> Issue Setup Key</>
-                  )}
-                </button>
-              ) : null}
-            </div>
-
-            {generatedKey && (
-              <div className="mt-4 bg-white border border-emerald-200 rounded-xl p-3 shadow-sm flex items-center gap-3 w-full">
-                <div className="bg-emerald-50 text-emerald-600 p-2 rounded-lg flex-shrink-0">
-                  <KeyRound className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-0.5">One-Time Setup Key</div>
-                  <div className="text-sm font-mono text-gray-900 truncate" title={generatedKey}>
-                    {generatedKey}
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 whitespace-nowrap hidden sm:block px-2">
-                  Expires: {new Date(keyExpiresAt!).toLocaleTimeString()}
-                </div>
-                <button 
-                  onClick={copyToClipboard}
-                  className="flex-shrink-0 flex items-center justify-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors cursor-pointer"
-                >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </div>
-            )}
-            
-            {!tunnelUrl && (
-              <div className="mt-3 text-xs font-medium text-amber-600 flex items-center gap-1.5">
-                <ShieldCheck className="h-3 w-3" />
-                Tunnel URL is missing. Save the tunnel URL before issuing a key.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Danger Zone */}
-        <div className="bg-red-50/50 backdrop-blur-xl rounded-2xl border border-red-200/60 shadow-sm p-6 mt-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
-              <p className="text-sm text-red-700 mt-1">
-                Permanently delete this store and all associated data. This action cannot be undone.
-              </p>
-            </div>
-            <button
-              onClick={handleDeleteStore}
-              disabled={isDeletingStore}
-              className="flex-shrink-0 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 shadow-sm disabled:opacity-50 transition-colors"
-            >
-              {isDeletingStore ? "Deleting..." : "Delete Store"}
-            </button>
-          </div>
-        </div>
-
-      </div>
+      <Tabs<TabKey>
+        label="Store sections"
+        active={tab}
+        onChange={setTab}
+        tabs={[
+          { key: "overview", label: "Overview" },
+          { key: "features", label: "Features" },
+          { key: "integrations", label: "Integrations" },
+          { key: "register", label: "Register" },
+          { key: "pc", label: "PC & phones" },
+          { key: "access", label: "Access preview" }
+        ]}
+      />
+      <TabPanel id={tab}>
+        {tab === "overview" ? <StoreOverviewTab {...props} /> : null}
+        {tab === "features" ? <FeaturesTab {...props} /> : null}
+        {tab === "integrations" ? <IntegrationsTab {...props} /> : null}
+        {tab === "register" ? <RegisterTab {...props} /> : null}
+        {tab === "pc" ? <PcPhonesTab {...props} /> : null}
+        {tab === "access" ? <AccessPreviewTab {...props} /> : null}
+      </TabPanel>
     </div>
   );
 }
