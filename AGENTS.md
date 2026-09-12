@@ -56,7 +56,8 @@ src
 │       └── v1
 │           ├── admin/           admin API (staff session)
 │           ├── edge/            store-server API (worker credential): sync/access, sync/config,
-│           │                    roles/{roleId}, google/access-token
+│           │                    roles/{roleId}, google/sheets/{meta,values,append}
+│           │                    (the store's own configured sheet only)
 │           ├── setup-keys/redeem   activation (setup key)
 │           ├── organizations/…/worker-installations/…/bootstrap   store-server bootstrap
 │           └── app-auth/        org-tag lookup and enrollment (public, rate-limited)
