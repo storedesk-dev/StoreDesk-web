@@ -94,7 +94,6 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       "deals",
       "registerChanges",
       "transactions",
-      "reportMapping",
       "settings"
     ],
     mobile: [
@@ -109,7 +108,9 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       "mobileTransactions",
       "mobileReports",
       "mobileSettings"
-    ]
+    ],
+    // Report mapping is a section inside Settings.
+    flags: { settings: { reportMapping: true } }
   },
   cashier: {
     label: "Cashier",

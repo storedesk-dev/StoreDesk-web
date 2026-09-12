@@ -5,42 +5,48 @@ import { DEFAULT_ORG_ROLES } from "@/lib/roles";
 import { editorAccessKeys, pagesFor, templateAccessKeys } from "@/app/admin/_lib/registry";
 
 /**
- * Report Mapping (desktop page `reportMapping`, off by default in the
- * registry): on in the Organization Admin and Store Manager templates only.
- * The role editor and access preview list it from the registry.
+ * Report mapping is a section inside Settings: the `settings` page's feature
+ * flag `reportMapping` (off by default in the registry), on in the
+ * Organization Admin and Store Manager templates only. The role editor lists
+ * it under Settings from the registry, like Price Groups under Price Book.
  */
 
-const enabledIn = (pages: Array<{ key: string; enabled: boolean }>) => pages.find((page) => page.key === "reportMapping")?.enabled;
+type Page = { key: string; enabled: boolean; featureFlags: Record<string, boolean> };
+const flagIn = (pages: Page[]) => pages.find((page) => page.key === "settings")?.featureFlags.reportMapping;
 
-describe("reportMapping in the role templates", () => {
-  it("is a desktop page named Report Mapping in the registry", () => {
-    expect(getPage("reportMapping")).toMatchObject({ app: "electron", label: "Report Mapping", defaultEnabled: false });
-    expect(pagesFor("electron").map((page) => page.key)).toContain("reportMapping");
-    expect(pagesFor("mobile").map((page) => page.key)).not.toContain("reportMapping");
+describe("the reportMapping flag on Settings", () => {
+  it("is a flag of the settings page in the registry, not a page", () => {
+    expect(getPage("settings")?.knownFeatureFlags.reportMapping).toMatchObject({ label: "Report mapping", default: false });
+    expect(getPage("reportMapping")).toBeUndefined();
+    expect(pagesFor("electron").map((page) => page.key)).not.toContain("reportMapping");
   });
 
   it("is on for Organization Admin and Store Manager, off for Cashier and Viewer (server templates)", () => {
     const byId = Object.fromEntries(ROLE_TEMPLATES.map((template) => [template.templateId, template.accessKeys.electron.pages]));
-    expect(enabledIn(byId.org_admin)).toBe(true);
-    expect(enabledIn(byId.store_manager)).toBe(true);
-    expect(enabledIn(byId.cashier)).toBe(false);
-    expect(enabledIn(byId.viewer)).toBe(false);
+    expect(flagIn(byId.org_admin)).toBe(true);
+    expect(flagIn(byId.store_manager)).toBe(true);
+    expect(flagIn(byId.cashier)).toBe(false);
+    expect(flagIn(byId.viewer)).toBe(false);
+    for (const pages of Object.values(byId)) expect(pages.map((page) => page.key)).not.toContain("reportMapping");
     // New organizations get the templates as stored roles.
     const stored = Object.fromEntries(templateRoles(new Date()).map((role) => [role.roleId, role.accessKeys.electron.pages]));
-    expect(enabledIn(stored.store_manager)).toBe(true);
-    expect(enabledIn(stored.cashier)).toBe(false);
+    expect(flagIn(stored.store_manager)).toBe(true);
+    expect(flagIn(stored.cashier)).toBe(false);
   });
 
   it("the admin UI's templates match, and the fallback Organization Admin has it", () => {
     for (const template of ["org_admin", "store_manager", "cashier", "viewer", "blank"] as const) {
-      const server = template === "blank" ? false : enabledIn(ROLE_TEMPLATES.find((entry) => entry.templateId === template)!.accessKeys.electron.pages);
-      expect(enabledIn(templateAccessKeys(template).electron.pages)).toBe(server);
+      const server = template === "blank" ? false : flagIn(ROLE_TEMPLATES.find((entry) => entry.templateId === template)!.accessKeys.electron.pages);
+      expect(flagIn(templateAccessKeys(template).electron.pages)).toBe(server);
     }
-    expect(enabledIn(DEFAULT_ORG_ROLES[0].accessKeys.electron.pages)).toBe(true);
+    const fallback = DEFAULT_ORG_ROLES[0].accessKeys.electron.pages as Page[];
+    expect(flagIn(fallback)).toBe(true);
+    expect(fallback.map((page) => page.key)).not.toContain("reportMapping");
   });
 
-  it("the role editor lists it for a stored role that predates it, switched off", () => {
-    const older = { electron: { pages: [{ key: "pos", enabled: true, featureFlags: {} }] }, mobile: { pages: [] } };
-    expect(enabledIn(editorAccessKeys(older).electron.pages)).toBe(false);
+  it("the role editor shows it under Settings, off for a stored role that predates it", () => {
+    const older = { electron: { pages: [{ key: "settings", enabled: true, featureFlags: {} }] }, mobile: { pages: [] } };
+    const settings = editorAccessKeys(older).electron.pages.find((page) => page.key === "settings");
+    expect(settings).toMatchObject({ enabled: true, featureFlags: { reportMapping: false } });
   });
 });

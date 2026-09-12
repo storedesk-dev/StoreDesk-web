@@ -155,15 +155,6 @@ export const ALL_PAGES: PageDefinition[] = [
     knownFeatureFlags: {}
   },
   {
-    key: "reportMapping",
-    label: "Report Mapping",
-    description: "Map the register's report lines (tax rates, departments, payment types, cards) to StoreDesk's daily numbers, Sales Tax and Google Sheet columns.",
-    app: "electron",
-    filePath: "src/pages/SettingsPage.tsx",
-    defaultEnabled: false,
-    knownFeatureFlags: {}
-  },
-  {
     key: "settings",
     label: "Settings",
     description: "Store settings — POS config, receipt template, tax rates, and preferences.",
@@ -171,7 +162,9 @@ export const ALL_PAGES: PageDefinition[] = [
     filePath: "src/pages/SettingsPage.tsx",
     defaultEnabled: true,
     alwaysEnabled: true,
-    knownFeatureFlags: {}
+    knownFeatureFlags: {
+      reportMapping: { label: "Report mapping", description: "Map the register's report lines (tax rates, departments, payment types, cards) to daily numbers, Sales Tax and Google Sheet columns — a section inside Settings.", default: false }
+    }
   },
   {
     key: "mobilePos",

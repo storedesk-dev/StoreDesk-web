@@ -43,7 +43,6 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       "deals",
       "registerChanges",
       "transactions",
-      "reportMapping",
       "settings"
     ],
     mobile: [
@@ -58,7 +57,9 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       "mobileTransactions",
       "mobileReports",
       "mobileSettings"
-    ]
+    ],
+    // Report mapping is a section inside Settings.
+    flags: { settings: { reportMapping: true } }
   },
   cashier: {
     roleName: "Cashier",
