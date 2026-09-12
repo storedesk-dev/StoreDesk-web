@@ -33,8 +33,13 @@ const OrganizationSchema = new Schema(
   {
     organizationId: { ...id, unique: true },
     name: { type: String, required: true, trim: true },
+    /**
+     * The org tag phones type. New and edited slugs must match ORG_SLUG in
+     * lib/organizations.ts; older slugs that don't keep working for lookup.
+     */
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     billingEmail: { type: String, lowercase: true, trim: true },
+    // `pending` only for records written by older builds; admins set active | suspended.
     status: { type: String, enum: ["pending", "active", "suspended"], default: "active" },
     roles: { type: Schema.Types.Mixed, default: [] }
   },
@@ -46,6 +51,7 @@ const SubscriptionSchema = new Schema(
     ...tenant,
     subscriptionId: { ...id, unique: true },
     plan: { type: String, enum: ["trial", "standard", "custom"], required: true },
+    /** `expired` is written by a check on read once `entitlementExpiresAt` has passed. */
     status: {
       type: String,
       enum: ["trialing", "active", "suspended", "cancelled", "expired"],
@@ -54,13 +60,46 @@ const SubscriptionSchema = new Schema(
     startsAt: { type: Date, required: true },
     supportEndsAt: { type: Date, required: true },
     entitlementExpiresAt: { type: Date, required: true },
-    offlineGraceDays: { type: Number, min: 0, max: 90, default: 7 },
+    offlineGraceDays: { type: Number, min: 0, max: 30, default: 7 },
+    /** Counts the stores on this subscription. */
     maxStores: { type: Number, min: 1, required: true },
-    maxWorkerInstallations: { type: Number, min: 1, required: true },
-    maxDevices: { type: Number, min: 0, default: 5 },
-    features: { type: [String], default: ["desktop", "mobile", "edge"] }
+    /** Per store. */
+    maxWorkerInstallations: { type: Number, min: 1, required: true }
   },
   timestamps
+);
+
+/**
+ * Structured store settings (docs/design/control-plane-admin.md). Older
+ * records have none of these paths; lib/store-settings.ts reads a missing
+ * value as its default.
+ */
+const StoreSettingsSchema = new Schema(
+  {
+    capabilities: {
+      lottery: { type: Boolean, default: false },
+      coam: { type: Boolean, default: false },
+      fuel: { type: Boolean, default: false }
+    },
+    lottery: {
+      // The recording choices are "Coming soon"; null until one ships.
+      setupMode: { type: String, default: null }
+    },
+    integrations: {
+      googleSheets: {
+        enabled: { type: Boolean, default: false },
+        spreadsheetUrl: { type: String, default: null },
+        spreadsheetId: { type: String, default: null },
+        sheetName: { type: String, default: null },
+        headerRow: { type: Number, min: 1, max: 1000, default: 1 }
+      },
+      gtc: {
+        status: { type: String, enum: ["coming_soon"], default: "coming_soon" }
+      }
+    },
+    timeZone: { type: String, default: null }
+  },
+  { _id: false }
 );
 
 const TenantStoreSchema = new Schema(
@@ -73,7 +112,21 @@ const TenantStoreSchema = new Schema(
     address: { type: String, trim: true },
     contactEmail: { type: String, lowercase: true, trim: true },
     status: { type: String, enum: ["pending", "active", "suspended", "closed"], default: "active" },
+    settings: { type: StoreSettingsSchema, default: () => ({}) },
+    /** +1 on every settings change; a missing value reads as 1. */
+    settingsVersion: { type: Number, min: 1, default: 1 },
     tunnelUrl: { type: String, trim: true },
+    /** Hostname label the tunnel was (or will be) created under. */
+    tunnelLabel: { type: String, trim: true },
+    /** Last provisioning outcome; a store with a tunnelUrl reads as provisioned. */
+    tunnelStatus: { type: String, enum: ["provisioned", "not_configured", "failed"] },
+    tunnelError: { type: String },
+    tunnelUpdatedAt: Date,
+    /**
+     * Register connection only (`posIntegration`, `posIpAddress`,
+     * `posUsername`), built by the server — no route accepts a client-supplied
+     * configJson, and it never carries roles or the register password.
+     */
     configJson: { type: String },
     // Bearer credential for the store hostname. Never selected by default —
     // read it explicitly (`.select("+cloudflareToken")`) at the two places
@@ -138,10 +191,15 @@ const SetupKeySchema = new Schema(
     workerInstallationId: { type: String, index: true },
     subscriptionId: id,
     contactEmail: { type: String, required: true, lowercase: true, trim: true },
+    /**
+     * `shown`: handed to the admin once, on screen. `sent` / `delivery_failed`:
+     * e-mailed to the store contact (the admin still sees it once). `queued`
+     * is only on records written by older builds.
+     */
     status: {
       type: String,
-      enum: ["queued", "sent", "delivery_failed", "consumed", "expired", "revoked"],
-      default: "queued"
+      enum: ["queued", "shown", "sent", "delivery_failed", "consumed", "expired", "revoked"],
+      default: "shown"
     },
     expiresAt: { type: Date, required: true, index: true },
     consumedAt: Date,
@@ -150,6 +208,7 @@ const SetupKeySchema = new Schema(
     maxAttempts: { type: Number, default: 8 },
     deliveryProvider: String,
     deliveryMessageId: String,
+    deliveryError: String,
     deliveryReason: { type: String, required: true },
     idempotencyKey: { type: String, required: true },
     createdByAdminId: id
@@ -209,24 +268,10 @@ WorkerCredentialSchema.index(
   { unique: true, partialFilterExpression: { status: "active" } }
 );
 
-const RotationChallengeSchema = new Schema(
-  {
-    ...tenant,
-    challengeId: { ...id, unique: true },
-    challengeHash: { type: String, required: true, select: false },
-    storeId: id,
-    workerInstallationId: id,
-    currentCredentialId: id,
-    status: { type: String, enum: ["pending", "consumed", "expired", "revoked"], default: "pending" },
-    reason: { type: String, required: true },
-    expiresAt: { type: Date, required: true },
-    createdByAdminId: id,
-    consumedAt: Date
-  },
-  timestamps
-);
-
-/** Electron/Mobile product identity — cannot access Web admin. */
+/**
+ * Electron/Mobile product identity — cannot access Web admin. No organization
+ * field: a login belongs to organizations through its assignments.
+ */
 const AppUserSchema = new Schema(
   {
     appUserId: { ...id, unique: true },
@@ -240,6 +285,13 @@ const AppUserSchema = new Schema(
     passwordHash: { type: String, select: false },
     passwordChangedAt: Date,
     status: { type: String, enum: ["pending_enrollment", "active", "disabled"], default: "pending_enrollment" },
+    /**
+     * `email`: invited, sets their own password at /enroll. `managed`: login
+     * and password set by a StoreDesk admin; only an admin changes it. Missing
+     * on older records, which read as `email`.
+     */
+    loginType: { type: String, enum: ["email", "managed"], default: "email" },
+    passwordSetBy: { type: String, enum: ["user", "admin"] },
     enrollmentSecretHash: { type: String, select: false },
     enrollmentExpiresAt: Date,
     enrollmentConsumedAt: Date,
@@ -249,6 +301,12 @@ const AppUserSchema = new Schema(
   timestamps
 );
 
+/**
+ * Scope: one store (`storeId`) or the whole organization (no `storeId`).
+ * `workerInstallationId` is only on records written by older builds; no route
+ * creates an installation-scoped assignment any more. `role` must be one of
+ * the organization's role ids (checked by lib/users.ts).
+ */
 const UserAssignmentSchema = new Schema(
   {
     assignmentId: { ...id, unique: true },
@@ -277,38 +335,6 @@ const ClientDeviceSchema = new Schema(
     deviceName: { type: String, required: true, trim: true },
     status: { type: String, enum: ["active", "revoked"], default: "active" },
     lastSeenAt: Date,
-    revokedAt: Date
-  },
-  timestamps
-);
-
-const ClientRefreshCredentialSchema = new Schema(
-  {
-    refreshId: { ...id, unique: true },
-    secretHash: { type: String, required: true, select: false },
-    appUserId: id,
-    assignmentId: id,
-    deviceId: id,
-    status: { type: String, enum: ["active", "revoked"], default: "active" },
-    expiresAt: { type: Date, required: true },
-    revokedAt: Date
-  },
-  timestamps
-);
-
-const ClientSessionSchema = new Schema(
-  {
-    clientSessionId: { ...id, unique: true },
-    appUserId: id,
-    assignmentId: id,
-    deviceId: id,
-    organizationId: id,
-    storeId: id,
-    workerInstallationId: id,
-    audience: { type: String, enum: ["desktop", "mobile"], required: true },
-    scopes: { type: [String], default: [] },
-    status: { type: String, enum: ["active", "revoked", "expired"], default: "active" },
-    expiresAt: { type: Date, required: true },
     revokedAt: Date
   },
   timestamps
@@ -354,14 +380,8 @@ export const EulaAcceptanceModel =
   models.EulaAcceptance || model("EulaAcceptance", EulaAcceptanceSchema);
 export const WorkerCredentialModel =
   models.WorkerCredential || model("WorkerCredential", WorkerCredentialSchema);
-export const RotationChallengeModel =
-  models.RotationChallenge || model("RotationChallenge", RotationChallengeSchema);
 export const AppUserModel = models.AppUser || model("AppUser", AppUserSchema);
 export const UserAssignmentModel =
   models.UserAssignment || model("UserAssignment", UserAssignmentSchema);
 export const ClientDeviceModel = models.ClientDevice || model("ClientDevice", ClientDeviceSchema);
-export const ClientRefreshCredentialModel =
-  models.ClientRefreshCredential || model("ClientRefreshCredential", ClientRefreshCredentialSchema);
-export const ClientSessionModel =
-  models.ClientSession || model("ClientSession", ClientSessionSchema);
 export const AuditEventModel = models.AuditEvent || model("AuditEvent", AuditEventSchema);

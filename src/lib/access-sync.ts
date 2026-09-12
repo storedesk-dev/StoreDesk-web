@@ -15,6 +15,12 @@ import {
   sha256
 } from "@/lib/control-plane-security";
 import { normalizeRoles, toIsoOr, type OrgRole } from "@/lib/roles";
+import {
+  normalizeStoreSettings,
+  readSettingsVersion,
+  syncSettingsView,
+  type StoreCapabilities
+} from "@/lib/store-settings";
 
 /**
  * `GET /api/v1/edge/sync/access` — everything a store server needs to sign its
@@ -51,6 +57,11 @@ export type AccessSyncBody = {
     storeNumber: string | null;
     status: string;
     tunnelUrl: string | null;
+    /** The store's features; pages that need one it lacks are refused at this store. */
+    capabilities: StoreCapabilities;
+    /** Lottery, integrations (no secrets) and time zone. */
+    settings: ReturnType<typeof syncSettingsView>;
+    settingsVersion: number;
   };
   subscription: { status: string; entitlementExpiresAt: string | null; offlineGraceDays: number };
   roles: OrgRole[];
@@ -147,6 +158,7 @@ export function buildAccessSyncBody(input: {
   generatedAt: Date;
 }): AccessSyncBody {
   const { organization, store, subscription } = input;
+  const settings = normalizeStoreSettings(store.settings);
   // Everything but users goes through the scrubber, like any other response.
   const scrubbed = safeJson({
     organization: {
@@ -160,7 +172,10 @@ export function buildAccessSyncBody(input: {
       name: text(store.name),
       storeNumber: optionalText(store.storeNumber),
       status: text(store.status),
-      tunnelUrl: optionalText(store.tunnelUrl)
+      tunnelUrl: optionalText(store.tunnelUrl),
+      capabilities: settings.capabilities,
+      settings: syncSettingsView(settings),
+      settingsVersion: readSettingsVersion(store)
     },
     subscription: subscription
       ? {

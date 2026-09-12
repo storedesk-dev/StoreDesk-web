@@ -1,114 +1,30 @@
 import { NextResponse } from "next/server";
 import { requireInternalAdmin } from "@/lib/admin-auth";
-import { jsonError } from "@/lib/control-plane";
-import { connectDb } from "@/lib/db";
-import { AppUserModel, UserAssignmentModel } from "@/models/ControlPlane";
-import { safeJson, hashSecret, publicId } from "@/lib/control-plane-security";
-import { scheduleAppUserNotify } from "@/lib/store-notify";
-import { z } from "zod";
+import { gone, jsonError } from "@/lib/http";
+import { listUsers } from "@/lib/users";
 
 type Ctx = { params: Promise<{ organizationId: string }> };
 
+/**
+ * @deprecated Use `GET …/organizations/{org}/users`. Kept for the
+ * organization page written before it; same list under the old key.
+ */
 export async function GET(req: Request, ctx: Ctx) {
   try {
     await requireInternalAdmin(req);
     const { organizationId } = await ctx.params;
-    await connectDb();
-
-    // Get all assignments for this org
-    const assignments = await UserAssignmentModel.find({ organizationId, status: "active" }).lean();
-    const appUserIds = [...new Set(assignments.map(a => a.appUserId))];
-
-    // Hydrate users
-    const users = await AppUserModel.find({ appUserId: { $in: appUserIds } })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    // Join assignment data
-    const result = users.map(u => ({
-      ...safeJson(u),
-      assignments: assignments.filter(a => String(a.appUserId) === String(u.appUserId))
-    }));
-
-    return NextResponse.json({ appUsers: result });
+    return NextResponse.json({ appUsers: await listUsers(organizationId) });
   } catch (error) {
     return jsonError(error);
   }
 }
 
-const CreateAppUserSchema = z.object({
-  email: z.string().email(),
-  password: z.string().optional(),
-  name: z.string().optional(),
-  role: z.string().optional(),
-  storeId: z.string().optional()
-});
-
-export async function POST(req: Request, ctx: Ctx) {
-  try {
-    const admin = await requireInternalAdmin(req);
-    const { organizationId } = await ctx.params;
-    const body = await req.json();
-    let parsed;
-    try {
-      parsed = CreateAppUserSchema.parse(body);
-    } catch (zodError: unknown) {
-      const err = zodError as { errors?: { message: string }[] };
-      return NextResponse.json({ error: { message: err.errors?.[0]?.message || "Validation failed", code: "VALIDATION_FAILED" } }, { status: 400 });
-    }
-
-    await connectDb();
-
-    // 1. Find or Create the AppUser
-    let appUser = await AppUserModel.findOne({ email: parsed.email.toLowerCase() });
-    
-    if (!appUser) {
-      const passwordHash = parsed.password ? await hashSecret(parsed.password) : undefined;
-      appUser = await AppUserModel.create({
-        appUserId: publicId("apu"),
-        email: parsed.email.toLowerCase(),
-        name: parsed.name,
-        passwordHash,
-        passwordChangedAt: parsed.password ? new Date() : undefined,
-        status: parsed.password ? "active" : "pending_enrollment",
-        createdByAdminId: admin.adminId
-      });
-    } else {
-      // Optionally update name if missing or password if provided
-      if (parsed.name && !appUser.name) {
-        appUser.name = parsed.name;
-      }
-      if (parsed.password) {
-        appUser.passwordHash = await hashSecret(parsed.password);
-        appUser.passwordChangedAt = new Date();
-        appUser.status = "active";
-      }
-      await appUser.save();
-    }
-
-    // 2. Determine Role — First user in organization MUST be org_admin
-    const existingCount = await UserAssignmentModel.countDocuments({ organizationId, status: "active" });
-    const assignedRole = (existingCount === 0) ? "org_admin" : (parsed.role || "store_operator");
-
-    const assignment = await UserAssignmentModel.create({
-      assignmentId: publicId("asn"),
-      appUserId: appUser.appUserId,
-      organizationId,
-      storeId: parsed.storeId,
-      role: assignedRole,
-      status: "active",
-      createdByAdminId: admin.adminId
-    });
-
-    // Every store this user can now sign in at — the new assignment's and,
-    // when the password changed, the stores of their earlier assignments too.
-    scheduleAppUserNotify(String(appUser.appUserId), "assignment.create");
-
-    return NextResponse.json({
-      appUser: safeJson(appUser), 
-      assignment: safeJson(assignment)
-    });
-  } catch (error) {
-    return jsonError(error);
-  }
+/**
+ * Turned off (P1): adding a user whose e-mail existed overwrote that login's
+ * password — even one belonging to another organization — with no audit.
+ */
+export async function POST() {
+  return gone(
+    "This endpoint was removed because it could overwrite an existing login's password. Use POST /api/v1/admin/organizations/{org}/users."
+  );
 }

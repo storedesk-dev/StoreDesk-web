@@ -1,24 +1,33 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { z } from "zod";
 import {
   ADMIN_COOKIE,
   authenticateInternalAdminLogin,
   createAdminSession,
+  readAdminToken,
+  requireInternalAdmin,
   revokeSession
 } from "@/lib/admin-auth";
-import { ControlPlaneError } from "@/lib/control-plane-security";
+import { callerIp } from "@/lib/control-plane-security";
+import { jsonError, parseBody } from "@/lib/http";
 
+const LoginSchema = z.object({
+  email: z.string().trim().min(1, "Email is required").max(254),
+  password: z.string().min(1, "Password is required").max(500)
+});
+
+/**
+ * Staff sign-in. 10 failures per address and 5 per e-mail in 15 minutes lock
+ * further attempts out (429 LOGIN_RATE_LIMITED); every attempt is audited.
+ */
 export async function POST(req: Request) {
   try {
-    const body = (await req.json().catch(() => ({}))) as { email?: string; password?: string };
-    if (!body.email || !body.password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
-    }
-    const admin = await authenticateInternalAdminLogin(body.email, body.password);
+    const body = await parseBody(req, LoginSchema);
+    const admin = await authenticateInternalAdminLogin(body.email, body.password, callerIp(req));
     const session = await createAdminSession(String(admin.adminId));
     const res = NextResponse.json({
       ok: true,
-      admin: { adminId: admin.adminId, email: admin.email }
+      admin: { adminId: String(admin.adminId), email: String(admin.email), name: String(admin.name) }
     });
     res.cookies.set(ADMIN_COOKIE, session.token, {
       httpOnly: true,
@@ -29,15 +38,26 @@ export async function POST(req: Request) {
     });
     return res;
   } catch (error) {
-    const status = error instanceof ControlPlaneError ? error.status : 503;
-    const message = error instanceof Error ? error.message : "Login unavailable";
-    return NextResponse.json({ error: message }, { status });
+    return jsonError(error);
   }
 }
 
-export async function DELETE() {
-  const cookieStore = await cookies();
-  await revokeSession(cookieStore.get(ADMIN_COOKIE)?.value);
+/** The signed-in staff member, or 401. */
+export async function GET(req: Request) {
+  try {
+    const admin = await requireInternalAdmin(req);
+    return NextResponse.json({ admin });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    await revokeSession(await readAdminToken(req));
+  } catch {
+    /* signing out always clears the cookie */
+  }
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
   return res;

@@ -61,6 +61,39 @@ export type SetupKeyMessage = {
   expiresAt: Date;
 };
 
+export type InvitationMessage = {
+  to: string;
+  recipientName: string;
+  organizationName: string;
+  invitationCode: string;
+  expiresAt: Date;
+};
+
+/**
+ * A user invited by e-mail. The code is pasted at /enroll (never put in a
+ * link: a credential in a URL ends up in browser history and proxy logs).
+ */
+export function invitationEmailText(message: InvitationMessage): string {
+  return [
+    `Hello ${message.recipientName},`,
+    "",
+    `${message.organizationName} has given you a StoreDesk login. To choose your password, open https://${SITE.domain}/enroll and paste this code:`,
+    "",
+    `    ${message.invitationCode}`,
+    "",
+    `The code works once and expires ${formatExpiry(message.expiresAt)}.`,
+    "Then sign in to the StoreDesk app on the store PC or your phone with this e-mail address and your new password.",
+    "",
+    "Keep this e-mail to yourself — anyone with the code can set your password.",
+    "",
+    `Questions? Reply to this e-mail or write to ${SITE.supportEmail}.`,
+    "",
+    "— StoreDesk",
+    "",
+    "If you were not expecting this, you can ignore it; nothing happens until the code is used."
+  ].join("\n");
+}
+
 export type DeliveryResult = {
   provider: string;
   messageId: string;
@@ -68,6 +101,7 @@ export type DeliveryResult = {
 
 export interface EmailProvider {
   sendSetupKey(message: SetupKeyMessage): Promise<DeliveryResult>;
+  sendInvitation(message: InvitationMessage): Promise<DeliveryResult>;
 }
 
 class ResendEmailProvider implements EmailProvider {
@@ -76,7 +110,7 @@ class ResendEmailProvider implements EmailProvider {
     private readonly from: string
   ) {}
 
-  async sendSetupKey(message: SetupKeyMessage): Promise<DeliveryResult> {
+  private async send(to: string, subject: string, text: string, failure: string): Promise<DeliveryResult> {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -85,18 +119,36 @@ class ResendEmailProvider implements EmailProvider {
       },
       body: JSON.stringify({
         from: this.from,
-        to: [message.to],
-        subject: `Your StoreDesk setup key for ${message.storeName}`,
+        to: [to],
+        subject,
         // Replies go to a person, so "reply to this email" in the body is true.
         reply_to: SITE.supportEmail,
-        text: setupKeyEmailText(message)
+        text
       })
     });
     const data = (await response.json().catch(() => ({}))) as { id?: string; message?: string };
     if (!response.ok || !data.id) {
-      throw new Error(data.message || "Email provider rejected setup delivery");
+      throw new Error(data.message || failure);
     }
     return { provider: "resend", messageId: data.id };
+  }
+
+  sendSetupKey(message: SetupKeyMessage): Promise<DeliveryResult> {
+    return this.send(
+      message.to,
+      `Your StoreDesk setup key for ${message.storeName}`,
+      setupKeyEmailText(message),
+      "Email provider rejected setup delivery"
+    );
+  }
+
+  sendInvitation(message: InvitationMessage): Promise<DeliveryResult> {
+    return this.send(
+      message.to,
+      `Your StoreDesk login for ${message.organizationName}`,
+      invitationEmailText(message),
+      "Email provider rejected the invitation"
+    );
   }
 }
 
@@ -104,6 +156,15 @@ class UnconfiguredEmailProvider implements EmailProvider {
   async sendSetupKey(): Promise<DeliveryResult> {
     throw new Error("Setup email provider is not configured");
   }
+
+  async sendInvitation(): Promise<DeliveryResult> {
+    throw new Error("Email provider is not configured");
+  }
+}
+
+/** RESEND_API_KEY and SETUP_EMAIL_FROM are both set. */
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.SETUP_EMAIL_FROM?.trim());
 }
 
 export function getEmailProvider(): EmailProvider {

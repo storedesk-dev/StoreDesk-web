@@ -14,7 +14,8 @@ const MIN_PASSWORD_LENGTH = 8;
 const ENROLL_WINDOW_MS = 15 * 60_000;
 const ENROLL_PER_CALLER = 30;
 const ENROLL_PER_ACCOUNT = 10;
-const ENROLL_ACCOUNT = /^(appu_[a-f0-9]{32})\./;
+// `apu_` ids were minted by an older add-user path and still enroll (P16).
+const ENROLL_ACCOUNT = /^((?:appu|apu)_[a-f0-9]{32})\./;
 
 export async function POST(req: Request) {
   try {

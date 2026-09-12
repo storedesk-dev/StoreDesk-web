@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireInternalAdmin } from "@/lib/admin-auth";
-import { createStore, jsonError } from "@/lib/control-plane";
-import { connectDb } from "@/lib/db";
-import { TenantStoreModel, SubscriptionModel } from "@/models/ControlPlane";
-import { safeJson } from "@/lib/control-plane-security";
+import { jsonError, parseBody } from "@/lib/http";
+import { StoreCreateSchema, createStore, listStores } from "@/lib/tenant-stores";
 
 type Ctx = { params: Promise<{ organizationId: string }> };
 
@@ -11,55 +9,23 @@ export async function GET(req: Request, ctx: Ctx) {
   try {
     await requireInternalAdmin(req);
     const { organizationId } = await ctx.params;
-    await connectDb();
-    const stores = await TenantStoreModel.find({ organizationId }).lean();
-    return NextResponse.json({ stores: safeJson(stores) });
+    return NextResponse.json({ stores: await listStores(organizationId) });
   } catch (error) {
     return jsonError(error);
   }
 }
 
+/**
+ * Create a store on a subscription (its `maxStores` counts that
+ * subscription's stores) and try to create its tunnel. The answer says how
+ * the tunnel went: `tunnel.status` ok | not_configured | failed.
+ */
 export async function POST(req: Request, ctx: Ctx) {
   try {
     const admin = await requireInternalAdmin(req);
     const { organizationId } = await ctx.params;
-    const body = (await req.json()) as {
-      subscriptionId?: string;
-      name?: string;
-      storeNumber?: string;
-      address?: string;
-      contactEmail?: string;
-      slug?: string;
-    };
-    
-    if (!body.name?.trim()) {
-      return NextResponse.json({ error: "name is required" }, { status: 400 });
-    }
-
-    let subId = body.subscriptionId;
-    if (!subId) {
-      // Auto-resolve to the first active subscription
-      await connectDb();
-      const sub = await SubscriptionModel.findOne({
-        organizationId,
-        status: { $in: ["trialing", "active"] }
-      }).lean();
-      
-      if (!sub) {
-        return NextResponse.json({ error: "No active subscription found for this organization" }, { status: 400 });
-      }
-      subId = String(sub.subscriptionId);
-    }
-
-    const store = await createStore(admin, organizationId, {
-      subscriptionId: subId,
-      name: body.name,
-      storeNumber: body.storeNumber,
-      address: body.address,
-      contactEmail: body.contactEmail,
-      slug: body.slug
-    });
-    return NextResponse.json({ store }, { status: 201 });
+    const body = await parseBody(req, StoreCreateSchema);
+    return NextResponse.json(await createStore(admin, organizationId, body), { status: 201 });
   } catch (error) {
     return jsonError(error);
   }

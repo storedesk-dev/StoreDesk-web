@@ -98,7 +98,18 @@ describe("buildAccessSyncBody", () => {
       name: "Store 42",
       storeNumber: "42",
       status: "active",
-      tunnelUrl: "https://store-42.example.invalid"
+      tunnelUrl: "https://store-42.example.invalid",
+      // A store record from an older build: every setting reads as its default.
+      capabilities: { lottery: false, coam: false, fuel: false },
+      settings: {
+        lottery: { setupMode: null },
+        integrations: {
+          googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
+          gtc: { status: "coming_soon" }
+        },
+        timeZone: null
+      },
+      settingsVersion: 1
     });
     expect(body.subscription).toEqual({
       status: "active",
@@ -173,6 +184,17 @@ describe("access sync version", () => {
     const bumped = normalizeRoles([], "2030-01-01T00:00:00.000Z");
     bumped[0] = { ...bumped[0], version: 2 };
     expect(build({ roles: bumped }).version).not.toBe(base);
+  });
+
+  it("changes when the store's features or settings change", () => {
+    const base = build().version;
+    const withFuel = build({ store: { ...store, settings: { capabilities: { fuel: true } }, settingsVersion: 2 } });
+    expect(withFuel.store.capabilities).toEqual({ lottery: false, coam: false, fuel: true });
+    expect(withFuel.store.settingsVersion).toBe(2);
+    expect(withFuel.version).not.toBe(base);
+    const withZone = build({ store: { ...store, settings: { timeZone: "America/Chicago" } } });
+    expect(withZone.store.settings.timeZone).toBe("America/Chicago");
+    expect(withZone.version).not.toBe(base);
   });
 });
 

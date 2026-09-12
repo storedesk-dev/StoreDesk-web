@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireInternalAdmin } from "@/lib/admin-auth";
-import { jsonError } from "@/lib/control-plane";
-import { connectDb } from "@/lib/db";
-import { TenantStoreModel } from "@/models/ControlPlane";
-import { safeJson } from "@/lib/control-plane-security";
-import { revokeInstallationsAndNotify, scheduleNotify } from "@/lib/store-notify";
+import { gone, jsonError, parseBody } from "@/lib/http";
+import { StorePatchSchema, deleteStore, getStoreDetail, updateStore } from "@/lib/tenant-stores";
 
 type Ctx = { params: Promise<{ organizationId: string; storeId: string }> };
 
@@ -12,108 +9,39 @@ export async function GET(req: Request, ctx: Ctx) {
   try {
     await requireInternalAdmin(req);
     const { organizationId, storeId } = await ctx.params;
-    await connectDb();
-    
-    const store = await TenantStoreModel.findOne({ organizationId, storeId }).lean();
-    if (!store) {
-      return NextResponse.json({ error: "Store not found" }, { status: 404 });
-    }
-    
-    return NextResponse.json({ store: safeJson(store) });
+    return NextResponse.json(await getStoreDetail(organizationId, storeId));
   } catch (error) {
     return jsonError(error);
   }
 }
 
-import { z } from "zod";
-
-const ConfigSchema = z.object({
-  posIntegration: z.string().optional(),
-  posIpAddress: z.string().optional(),
-  posUsername: z.string().optional(),
-  posPassword: z.string().optional(),
-  featureFlags: z.record(z.string(), z.boolean()).optional()
-}).catchall(z.any());
-
-export async function PUT(req: Request, ctx: Ctx) {
+/** Name, number, address, contact e-mail, status (active | suspended | closed). */
+export async function PATCH(req: Request, ctx: Ctx) {
   try {
-    await requireInternalAdmin(req);
+    const admin = await requireInternalAdmin(req);
     const { organizationId, storeId } = await ctx.params;
-    const body = await req.json();
-    
-    await connectDb();
-    const store = await TenantStoreModel.findOne({ organizationId, storeId });
-    
-    if (!store) {
-      return NextResponse.json({ error: "Store not found" }, { status: 404 });
-    }
-
-    if (body.name !== undefined) store.name = body.name;
-    if (body.storeNumber !== undefined) store.storeNumber = body.storeNumber;
-    if (body.address !== undefined) store.address = body.address;
-    if (body.contactEmail !== undefined) store.contactEmail = body.contactEmail;
-    if (body.status !== undefined) store.status = body.status;
-    if (body.tunnelUrl !== undefined) store.tunnelUrl = body.tunnelUrl;
-    if (body.configJson !== undefined) {
-      if (body.configJson.trim()) {
-        try {
-          const parsed = JSON.parse(body.configJson);
-          ConfigSchema.parse(parsed);
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : "Invalid configuration";
-          return NextResponse.json({ error: `Invalid configuration: ${msg}` }, { status: 400 });
-        }
-      }
-      store.configJson = body.configJson;
-    }
-
-    await store.save();
-    // Name, number, status and tunnel URL are part of the store's access sync.
-    scheduleNotify({ organizationId, storeId, reason: "store.update" });
-
-    return NextResponse.json({ store: safeJson(store) });
+    const body = await parseBody(req, StorePatchSchema);
+    return NextResponse.json({ store: await updateStore(admin, organizationId, storeId, body) });
   } catch (error) {
     return jsonError(error);
   }
 }
 
-import { WorkerInstallationModel, SetupKeyModel } from "@/models/ControlPlane";
-import { deleteCloudflareTunnel } from "@/lib/cloudflare";
+/**
+ * Turned off (P2): it accepted a client-built `configJson` — stale copies
+ * reverted other edits, and a register password could land in it in plain text.
+ */
+export async function PUT() {
+  return gone(
+    "This endpoint was removed. Store details: PATCH …/stores/{store}. Features, integrations and time zone: PUT …/stores/{store}/settings. Register: PUT …/stores/{store}/pos-credentials."
+  );
+}
 
 export async function DELETE(req: Request, ctx: Ctx) {
   try {
-    await requireInternalAdmin(req);
+    const admin = await requireInternalAdmin(req);
     const { organizationId, storeId } = await ctx.params;
-    
-    await connectDb();
-    
-    const store = await TenantStoreModel.findOne({ organizationId, storeId });
-    if (!store) {
-      return NextResponse.json({ error: "Store not found" }, { status: 404 });
-    }
-
-    // Revoke first: the store's worker credentials are revoked and its server
-    // told, before the tunnel the notify travels through is deleted. A failed
-    // revoke stops the delete.
-    await revokeInstallationsAndNotify({ organizationId, storeId, reason: "store.delete" });
-
-    if (store.tunnelUrl) {
-      try {
-        const urlObj = new URL(store.tunnelUrl);
-        const tunnelSlug = urlObj.hostname.split('.')[0];
-        if (tunnelSlug) {
-          await deleteCloudflareTunnel(tunnelSlug);
-        }
-      } catch (err) {
-        console.warn("[delete store] Failed to delete tunnel gracefully:", err);
-      }
-    }
-
-    await TenantStoreModel.deleteOne({ organizationId, storeId });
-    await WorkerInstallationModel.deleteMany({ organizationId, storeId });
-    await SetupKeyModel.deleteMany({ organizationId, storeId });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json(await deleteStore(admin, organizationId, storeId));
   } catch (error) {
     return jsonError(error);
   }

@@ -13,11 +13,16 @@ export function issueRelayKey(): string {
 const SECRET_FIELD = /(secret|password|credential|setupkey|agentkey|authorization|token)$/i;
 
 export class ControlPlaneError extends Error {
+  /**
+   * `details` are spread next to `error` in the response body, e.g. the
+   * current role on a 409 so the caller can show it without a second request.
+   */
   constructor(
     public readonly status: number,
     public readonly code: string,
     message: string,
-    public readonly retryable = false
+    public readonly retryable = false,
+    public readonly details?: Record<string, unknown>
   ) {
     super(message);
   }
@@ -160,6 +165,38 @@ export function enforceRateLimit(
 
 export function resetRateLimitsForTests(): void {
   rateLimits.clear();
+}
+
+/**
+ * Failure counters (admin sign-in): check before the work, record only when it
+ * fails. Unlike enforceRateLimit, a success never spends the budget.
+ * In-memory per instance, like enforceRateLimit.
+ */
+export function rateLimitBlocked(key: string, limit: number, now = Date.now()): boolean {
+  const entry = rateLimits.get(key);
+  return Boolean(entry && entry.resetAt > now && entry.count >= limit);
+}
+
+export function recordRateHit(key: string, windowMs: number, now = Date.now()): void {
+  const entry = rateLimits.get(key);
+  if (!entry || entry.resetAt <= now) {
+    rateLimits.set(key, { count: 1, resetAt: now + windowMs });
+    return;
+  }
+  entry.count += 1;
+}
+
+export function clearRateLimit(key: string): void {
+  rateLimits.delete(key);
+}
+
+/** The caller's address as Vercel reports it; "unknown" outside a proxy. */
+export function callerIp(req: Request): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    "unknown"
+  );
 }
 
 /**

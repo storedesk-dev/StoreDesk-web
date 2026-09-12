@@ -262,7 +262,7 @@ async function compareAndSetRoles(
   const written = await OrganizationModel.findOneAndUpdate(
     { organizationId, updatedAt: stamp ?? null },
     { $set: { roles } },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
   return Boolean(written);
 }
@@ -292,6 +292,94 @@ export type EdgeRoleUpdateOutcome =
   | { status: "ok"; role: OrgRole }
   | { status: "conflict"; role: OrgRole }
   | { status: "not_found" };
+
+// ── One role at a time (admin UI, P3) ────────────────────────────────────────
+
+export const ROLE_ID = /^[a-z][a-z0-9_]{0,39}$/;
+
+/** `PUT /api/v1/admin/organizations/{org}/roles/{roleId}` — same shape as the edge route. */
+export const AdminRoleUpdateSchema = EdgeRoleUpdateSchema;
+
+/**
+ * Admin saves may only name pages the apps have, each under its own app (the
+ * editors list the registry; P10). The edge route stays lenient: a store
+ * server running a newer registry may know a page this build does not.
+ */
+export function unknownPageKeys(
+  accessKeys: RoleAccessKeys,
+  registry: Array<{ key: string; app: "electron" | "mobile" }>
+): string[] {
+  const known = new Set(registry.map((page) => `${page.app}:${page.key}`));
+  const unknown: string[] = [];
+  for (const app of ["electron", "mobile"] as const) {
+    for (const page of accessKeys[app].pages) {
+      if (!known.has(`${app}:${page.key}`)) unknown.push(`${app}.${page.key}`);
+    }
+  }
+  return unknown;
+}
+
+export type RoleCreateOutcome = { status: "ok"; role: OrgRole } | { status: "exists" } | { status: "not_found" };
+
+export async function createRole(
+  organizationId: string,
+  input: { roleId: string; roleName: string; accessKeys: RoleAccessKeys }
+): Promise<RoleCreateOutcome> {
+  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
+    const org = await loadOrganization(organizationId);
+    if (!org) return { status: "not_found" };
+    const roles = storedRoles(org);
+    if (roles.some((role) => role.roleId === input.roleId)) return { status: "exists" };
+    if (roles.length >= MAX_ROLES) {
+      throw new ControlPlaneError(409, "ROLE_LIMIT_REACHED", `An organization can have at most ${MAX_ROLES} roles`);
+    }
+    const role: OrgRole = {
+      roleId: input.roleId,
+      roleName: input.roleName,
+      accessKeys: normalizeAccessKeys(input.accessKeys),
+      version: 1,
+      updatedAt: new Date().toISOString()
+    };
+    if (await compareAndSetRoles(organizationId, org.updatedAt, [...roles, role])) {
+      return { status: "ok", role };
+    }
+  }
+  throw busy();
+}
+
+export type RoleDeleteOutcome = { status: "ok"; role: OrgRole } | { status: "not_found" };
+
+export async function deleteRole(organizationId: string, roleId: string): Promise<RoleDeleteOutcome> {
+  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
+    const org = await loadOrganization(organizationId);
+    if (!org) return { status: "not_found" };
+    const roles = storedRoles(org);
+    const role = roles.find((entry) => entry.roleId === roleId);
+    if (!role) return { status: "not_found" };
+    if (await compareAndSetRoles(organizationId, org.updatedAt, roles.filter((entry) => entry.roleId !== roleId))) {
+      return { status: "ok", role };
+    }
+  }
+  throw busy();
+}
+
+/** Store the given roles as they are (a new organization's templates). */
+export async function writeInitialRoles(organizationId: string, roles: OrgRole[]): Promise<void> {
+  await connectDb();
+  await OrganizationModel.updateOne({ organizationId }, { $set: { roles } });
+}
+
+/**
+ * Save one role, accepted only on top of the stored version — for a store
+ * server (`PUT /api/v1/edge/roles/{roleId}`) and the admin UI alike.
+ */
+export async function updateRole(
+  organizationId: string,
+  roleId: string,
+  update: EdgeRoleUpdate
+): Promise<EdgeRoleUpdateOutcome> {
+  return updateRoleFromEdge(organizationId, roleId, update);
+}
 
 /** A store server's edit of one role, accepted only on top of the stored version. */
 export async function updateRoleFromEdge(
