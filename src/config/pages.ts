@@ -8,6 +8,10 @@
 
 export type App = "electron" | "mobile";
 
+export type StoreCapability = "lottery" | "coam" | "fuel";
+
+export const STORE_CAPABILITIES: StoreCapability[] = ["lottery", "coam", "fuel"];
+
 export interface PageFeatureFlagDef {
   label: string;
   description: string;
@@ -22,6 +26,7 @@ export interface PageDefinition {
   filePath: string;
   defaultEnabled: boolean;
   alwaysEnabled?: boolean;
+  requiresCapability?: StoreCapability;
   knownFeatureFlags: Record<string, PageFeatureFlagDef>;
 }
 
@@ -98,6 +103,7 @@ export const ALL_PAGES: PageDefinition[] = [
     app: "electron",
     filePath: "src/pages/FuelPricesPage.tsx",
     defaultEnabled: true,
+    requiresCapability: "fuel",
     knownFeatureFlags: {}
   },
   {
@@ -228,6 +234,7 @@ export const ALL_PAGES: PageDefinition[] = [
     app: "mobile",
     filePath: "lib/features/fuel/fuel_prices_screen.dart",
     defaultEnabled: true,
+    requiresCapability: "fuel",
     knownFeatureFlags: {}
   },
   {
