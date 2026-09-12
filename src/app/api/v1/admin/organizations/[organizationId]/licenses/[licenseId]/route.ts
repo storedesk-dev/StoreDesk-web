@@ -6,9 +6,10 @@ import { LicensePatchSchema, updateLicense } from "@/lib/licenses";
 type Ctx = { params: Promise<{ organizationId: string; licenseId: string }> };
 
 /**
- * Plan, status (suspend / resume / cancel), `renewDays`, end date, seats (not
- * below seats used), PCs per store, grace, notes. Audited; every store the
- * license covers is notified.
+ * Plan, status (suspend / resume / cancel), `renewDays`, end date, PCs per
+ * store, grace, notes. 409 LICENSE_MODE_MISMATCH for a license that doesn't
+ * fit the organization's mode. Audited; every store the license covers is
+ * notified.
  */
 export async function PATCH(req: Request, ctx: Ctx) {
   try {

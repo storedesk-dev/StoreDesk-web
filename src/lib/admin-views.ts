@@ -17,7 +17,7 @@ import { normalizeRoles, toIsoOr, type OrgRole } from "@/lib/roles";
 import { normalizeStoreSettings } from "@/lib/store-settings";
 import { requireOrganization } from "@/lib/organizations";
 import { requireStore } from "@/lib/tenant-stores";
-import { ENTITLED_STATUSES, coveringLicenseId, expireLapsedLicenses, licenseCovers } from "@/lib/licenses";
+import { ENTITLED_STATUSES, coverageIndex, expireLapsedLicenses } from "@/lib/licenses";
 import { tunnelView } from "@/lib/tunnel";
 
 type Doc = Record<string, unknown>;
@@ -214,15 +214,19 @@ export async function dashboard() {
   await connectDb();
   await expireLapsedLicenses();
   const now = Date.now();
-  const [orgs, stores, installations, licenses] = (await Promise.all([
+  const [orgs, stores, installations, index] = (await Promise.all([
     OrganizationModel.find({}).select("organizationId name status").lean(),
     TenantStoreModel.find({}).lean(),
     WorkerInstallationModel.find({}).lean(),
-    LicenseModel.find({ status: { $ne: "cancelled" } }).lean()
-  ])) as [Doc[], Doc[], Doc[], Doc[]];
+    coverageIndex()
+  ])) as [Doc[], Doc[], Doc[], Awaited<ReturnType<typeof coverageIndex>>];
   const orgById = new Map(orgs.map((org) => [String(org.organizationId), org]));
   const storeById = new Map(stores.map((store) => [String(store.storeId), store]));
-  const licenseById = new Map(licenses.map((license) => [String(license.licenseId), license]));
+  // Only licenses that cover under their organization's mode: the master of a
+  // master-mode organization, the store licenses of a store-wise one.
+  const licenses = index.licenses.filter(
+    (license) => (index.mode(String(license.organizationId)) === "master") === (license.scope === "organization")
+  );
   const live = installations.filter((row) => LIVE_INSTALL.includes(String(row.status)));
   const online = live.filter((row) => row.lastSeenAt && now - new Date(String(row.lastSeenAt)).getTime() <= ONLINE_WINDOW_MS);
 
@@ -239,9 +243,9 @@ export async function dashboard() {
   const coveredCount = new Map<string, number>();
   const unlicensed: Doc[] = [];
   for (const store of stores) {
-    const license = licenseById.get(coveringLicenseId(store) ?? "");
-    if (licenseCovers(license, store)) {
-      coveredCount.set(String(license!.licenseId), (coveredCount.get(String(license!.licenseId)) ?? 0) + 1);
+    const license = index.licenseFor(store);
+    if (license) {
+      coveredCount.set(String(license.licenseId), (coveredCount.get(String(license.licenseId)) ?? 0) + 1);
     } else if (store.status === "active" && activeOrg(String(store.organizationId))) {
       unlicensed.push(store);
     }
@@ -299,7 +303,7 @@ export async function dashboard() {
         at: ends.toISOString(),
         message:
           ends.getTime() > now
-            ? `License ${number} ends ${ends.toISOString().slice(0, 10)}${license.scope === "organization" ? ` (${covered} store${covered === 1 ? "" : "s"})` : ""}`
+            ? `${license.scope === "organization" ? "Master license" : "License"} ${number} ends ${ends.toISOString().slice(0, 10)}${license.scope === "organization" ? ` (${covered} store${covered === 1 ? "" : "s"})` : ""}`
             : `License ${number} ended ${ends.toISOString().slice(0, 10)}`
       })
     );

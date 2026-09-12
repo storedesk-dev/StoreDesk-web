@@ -61,19 +61,15 @@ export async function lastAudit(action: string) {
   return AuditEventModel.findOne({ action }).sort({ _id: -1 }).lean();
 }
 
-/** An organization with a standard organization license (5 seats, 1 PC per store) and one store on it. */
+/** A master-license organization (standard, 1 PC per store) with one store, which the master covers. */
 export async function seedOrganization(
   admin: InternalAdminActor,
-  options: { slug?: string; name?: string; maxStores?: number; maxPcsPerStore?: number; maxWorkerInstallations?: number; storeName?: string } = {}
+  options: { slug?: string; name?: string; maxPcsPerStore?: number; maxWorkerInstallations?: number; storeName?: string } = {}
 ) {
   const { organization, license } = await createOrganization(admin, {
     name: options.name ?? "Example Retail",
     slug: options.slug ?? "example-retail",
-    license: {
-      plan: "standard",
-      maxStores: options.maxStores ?? 5,
-      maxPcsPerStore: options.maxPcsPerStore ?? options.maxWorkerInstallations ?? 1
-    }
+    license: { plan: "standard", maxPcsPerStore: options.maxPcsPerStore ?? options.maxWorkerInstallations ?? 1 }
   });
   const { store } = await createStore(admin, organization.organizationId, {
     name: options.storeName ?? "Store 42",

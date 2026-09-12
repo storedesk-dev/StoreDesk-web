@@ -34,8 +34,9 @@ export function LicenseStatusChip({ status }: { status: LicenseStatus | null | u
 }
 
 /**
- * How a store is licensed, in one chip: "Org license · ends 2027-09-12",
- * "Own license · trial ends 2026-10-12", or "Unlicensed".
+ * How a store is licensed, in one chip: "Master license", "Own license · trial"
+ * or "Unlicensed" — plus the status when the license is not in force. The
+ * number and end date are in the tooltip.
  */
 export function StoreLicenseChip({ license }: { license: StoreLicenseSummary | null | undefined }) {
   if (!license) {
@@ -45,15 +46,15 @@ export function StoreLicenseChip({ license }: { license: StoreLicenseSummary | n
       </Chip>
     );
   }
-  const who = license.scope === "organization" ? "Org license" : "Own license";
   const inForce = license.status === "active" || license.status === "trialing";
-  const ends = formatDate(license.entitlementExpiresAt);
   const days = daysUntil(license.entitlementExpiresAt);
-  const what = !inForce ? LICENSE_STATUS[license.status]?.label.toLowerCase() ?? license.status : `${license.plan === "trial" ? "trial ends" : "ends"} ${ends}`;
+  const parts = [license.scope === "organization" ? "Master license" : "Own license"];
+  if (license.scope === "store" && license.plan === "trial") parts.push("trial");
+  if (!inForce) parts.push((LICENSE_STATUS[license.status]?.label ?? license.status).toLowerCase());
   const tone: Tone = !inForce ? "red" : days !== null && days <= 30 ? "amber" : license.scope === "organization" ? "blue" : "green";
   return (
-    <Chip tone={tone} dot title={license.licenseNumber}>
-      {who} · {what}
+    <Chip tone={tone} dot title={`${license.licenseNumber} · ends ${formatDate(license.entitlementExpiresAt)}`}>
+      {parts.join(" · ")}
     </Chip>
   );
 }

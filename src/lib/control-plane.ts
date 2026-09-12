@@ -28,7 +28,7 @@ import { DEFAULT_ORG_ROLES } from "@/lib/roles";
 import { scheduleAppUserNotify } from "@/lib/store-notify";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
-import { coveringLicense, licenseProblem } from "@/lib/licenses";
+import { coverageFor, coveringLicense, licenseProblem } from "@/lib/licenses";
 
 /**
  * The store-facing half of the control plane: activation (setup-key redeem),
@@ -119,8 +119,10 @@ export async function redeemSetupKey(body: RedeemBody) {
   if (org.status === "suspended" || store.status === "suspended" || store.status === "closed") {
     throw new ControlPlaneError(423, "STORE_SUSPENDED", "This organization or store is suspended");
   }
-  // The store's covering license decides, not the one the key was issued under.
-  const problem = licenseProblem(await coveringLicense(store));
+  // The store's covering license (from the organization's licensing mode)
+  // decides, not the one the key was issued under.
+  const coverage = await coverageFor(store, org);
+  const problem = licenseProblem(coverage.license, coverage.mode);
   if (problem) {
     // SUBSCRIPTION_INACTIVE is the code the store server already maps here.
     throw new ControlPlaneError(402, problem.code === "STORE_UNLICENSED" ? "STORE_UNLICENSED" : "SUBSCRIPTION_INACTIVE", problem.message);

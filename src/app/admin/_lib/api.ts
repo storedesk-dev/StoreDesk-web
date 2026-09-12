@@ -14,9 +14,10 @@ import type { StoreCapability } from "@/config/pages";
 export type OrgStatus = "active" | "suspended" | "pending";
 export type LicenseStatus = "trialing" | "active" | "suspended" | "cancelled" | "expired";
 export type LicensePlan = "trial" | "standard" | "custom";
+/** "organization" is the master license. */
 export type LicenseScope = "organization" | "store";
-/** How a store is covered: a seat on the organization license, its own store license, or none. */
-export type CoverageMode = "organization" | "store" | "none";
+/** One licensing mode per organization: one master license for every store, or a license per store. */
+export type LicensingMode = "master" | "storeWise";
 export type StoreStatus = "pending" | "active" | "suspended" | "closed";
 export type InstallationStatus =
   | "not_installed"
@@ -39,19 +40,18 @@ export interface Organization {
   slug: string;
   billingEmail?: string | null;
   status: OrgStatus;
+  licensingMode: LicensingMode;
   createdAt?: string;
   updatedAt?: string;
 }
 
-/** The organization license as the organizations list shows it. */
+/** The master license as the organizations list shows it. */
 export interface OrgLicenseSummary {
   licenseId: string;
   licenseNumber: string;
   plan: LicensePlan;
   status: LicenseStatus;
   entitlementExpiresAt: string | null;
-  seatsUsed: number;
-  maxStores: number;
 }
 
 /** A row of `GET /organizations`: the organization plus its counts and licensing. */
@@ -66,7 +66,7 @@ export interface OrganizationSummary extends Organization {
 export interface OrganizationDetail {
   organization: Organization;
   counts?: { stores: number; roles: number; users: number; licenses: number; unlicensedStores: number };
-  /** The organization license, with the stores it covers. */
+  /** The master license (master mode), with every store it covers. */
   license?: License | null;
 }
 
@@ -84,11 +84,9 @@ export interface License {
   entitlementExpiresAt: string | null;
   daysRemaining: number | null;
   offlineGraceDays: number;
-  /** Seats; always 1 for a store license. */
-  maxStores: number;
   maxPcsPerStore: number;
   notes: string | null;
-  seatsUsed: number;
+  /** Master: every store. Store license: its store. Cancelled: none. */
   coveredStores: Array<{ storeId: string; name: string }>;
 }
 
@@ -100,12 +98,15 @@ export interface StoreLicenseSummary {
   plan: LicensePlan;
   status: LicenseStatus;
   entitlementExpiresAt: string | null;
+  offlineGraceDays: number;
   maxPcsPerStore: number;
 }
 
 export interface NewLicenseInput {
   plan: LicensePlan;
+  status?: "trialing" | "active";
   entitlementDays?: number;
+  entitlementExpiresAt?: string;
   maxPcsPerStore?: number;
   offlineGraceDays?: number;
   notes?: string;
@@ -114,7 +115,6 @@ export interface NewLicenseInput {
 export interface LicenseCreateInput extends NewLicenseInput {
   scope: LicenseScope;
   storeId?: string;
-  maxStores?: number;
 }
 
 export type LicensePatch = Partial<{
@@ -122,15 +122,43 @@ export type LicensePatch = Partial<{
   status: LicenseStatus;
   renewDays: number;
   entitlementExpiresAt: string;
-  maxStores: number;
   maxPcsPerStore: number;
   offlineGraceDays: number;
   notes: string | null;
 }>;
 
-export interface Coverage {
-  mode: CoverageMode;
-  newLicense?: NewLicenseInput;
+/** `PUT …/stores/{store}/license`: issue (plan + length) when the store has none, else the PATCH fields. */
+export type StoreLicenseInput = LicensePatch & { entitlementDays?: number };
+
+/** A store's coverage before or after a mode switch; `licenseNumber` is null for a license not created yet. */
+export interface CoverageNote {
+  scope: LicenseScope;
+  licenseNumber: string | null;
+  plan: LicensePlan;
+  status: LicenseStatus;
+  entitlementExpiresAt: string | null;
+}
+
+export interface LicensingModeInput {
+  mode: LicensingMode;
+  dryRun?: boolean;
+  /** master → storeWise: copy the master to each store (default) or leave them Unlicensed. */
+  copyToStores?: boolean;
+  /** storeWise → master: the new master license. */
+  master?: NewLicenseInput;
+}
+
+export interface LicensingModeResult {
+  dryRun: boolean;
+  from: LicensingMode;
+  to: LicensingMode;
+  copyToStores: boolean;
+  stores: Array<{ storeId: string; name: string; before: CoverageNote | null; after: CoverageNote | null; createsLicense: boolean }>;
+  licenses: {
+    created: Array<CoverageNote & { storeId: string | null }>;
+    cancelled: Array<{ licenseId: string; licenseNumber: string; scope: LicenseScope; storeId: string | null; reason: string }>;
+  };
+  master?: License | null;
 }
 
 export interface StoreInstallationSummary {
@@ -211,6 +239,7 @@ export interface StoreSetup {
   contactEmail?: string | null;
   tunnel: StoreTunnel;
   license?: StoreLicenseSummary | null;
+  licensingMode?: LicensingMode;
   /** Why a key cannot be issued right now (unlicensed, license ended, no tunnel, …), or null. */
   keyBlockedReason?: string | null;
   keyBlockedCode?: string | null;
@@ -472,8 +501,9 @@ export const api = {
     name: string;
     slug: string;
     billingEmail?: string;
-    /** The organization license, created with it. */
-    license?: NewLicenseInput & { maxStores: number };
+    licensingMode: LicensingMode;
+    /** The master license (master mode, required there). */
+    license?: NewLicenseInput;
   }) =>
     request<{ organization: Organization; license?: License | null }>("POST", `${ADMIN}/organizations`, input),
   getOrganization: (orgId: string) => request<OrganizationDetail>("GET", org(orgId)),
@@ -485,7 +515,10 @@ export const api = {
     request<{ deleted: string }>("DELETE", org(orgId), { confirmSlug }),
 
   // Licenses
-  listLicenses: (orgId: string) => request<{ licenses: License[] }>("GET", `${org(orgId)}/licenses`),
+  listLicenses: (orgId: string) =>
+    request<{ licensingMode: LicensingMode; licenses: License[] }>("GET", `${org(orgId)}/licenses`),
+  changeLicensingMode: (orgId: string, input: LicensingModeInput) =>
+    request<LicensingModeResult>("POST", `${org(orgId)}/licensing/mode`, input),
   createLicense: (orgId: string, input: LicenseCreateInput) =>
     request<{ license: License }>("POST", `${org(orgId)}/licenses`, input),
   updateLicense: (orgId: string, licenseId: string, patch: LicensePatch) =>
@@ -501,11 +534,12 @@ export const api = {
       address?: string;
       contactEmail?: string;
       timeZone?: string;
-      license: Coverage;
+      /** Store-wise organizations: issue the store's license now. */
+      storeLicense?: NewLicenseInput;
     }
   ) => request<{ store: Store }>("POST", `${org(orgId)}/stores`, input),
   getStore: (orgId: string, storeId: string) =>
-    request<{ store: Store; license: StoreLicenseSummary | null }>("GET", store(orgId, storeId)),
+    request<{ store: Store; license: StoreLicenseSummary | null; licensingMode: LicensingMode }>("GET", store(orgId, storeId)),
   updateStore: (
     orgId: string,
     storeId: string,
@@ -519,11 +553,11 @@ export const api = {
   ) => request<{ store: Store }>("PATCH", store(orgId, storeId), patch),
   deleteStore: (orgId: string, storeId: string) =>
     request<{ deleted: string }>("DELETE", store(orgId, storeId)),
-  setStoreLicense: (orgId: string, storeId: string, coverage: Coverage) =>
-    request<{ store: Store; license: StoreLicenseSummary | null; changed: boolean }>(
+  upsertStoreLicense: (orgId: string, storeId: string, input: StoreLicenseInput) =>
+    request<{ store: Store; license: StoreLicenseSummary | null; licensingMode: LicensingMode; created: boolean }>(
       "PUT",
       `${store(orgId, storeId)}/license`,
-      coverage
+      input
     ),
 
   // Store settings (features, integrations, time zone)
@@ -621,6 +655,7 @@ export const ADMIN_ROUTES = [
   "GET    /api/v1/admin/organizations/{org}/licenses",
   "POST   /api/v1/admin/organizations/{org}/licenses",
   "PATCH  /api/v1/admin/organizations/{org}/licenses/{licenseId}",
+  "POST   /api/v1/admin/organizations/{org}/licensing/mode",
   "GET    /api/v1/admin/organizations/{org}/stores",
   "POST   /api/v1/admin/organizations/{org}/stores",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}",

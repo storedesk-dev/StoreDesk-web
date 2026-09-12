@@ -87,12 +87,13 @@ describe("POST /organizations", () => {
         body: {
           name: "Trial Co",
           slug: "trial-co",
-          license: { plan: "trial", entitlementDays: 30, maxStores: 2, maxPcsPerStore: 1, offlineGraceDays: 7 }
+          license: { plan: "trial", entitlementDays: 30, maxPcsPerStore: 1, offlineGraceDays: 7 }
         }
       })
     );
     expect(res.status).toBe(201);
-    expect(res.body.license).toMatchObject({ scope: "organization", plan: "trial", status: "trialing", maxStores: 2, maxPcsPerStore: 1 });
+    expect(res.body.organization.licensingMode).toBe("master");
+    expect(res.body.license).toMatchObject({ scope: "organization", plan: "trial", status: "trialing", maxPcsPerStore: 1 });
     expect(res.body.license.licenseNumber).toMatch(/^SD-ORG-/);
     expect(await lastAudit("license.create")).toBeTruthy();
   });
@@ -129,9 +130,10 @@ describe("GET /organizations and /organizations/{org}", () => {
       organizationId: organization.organizationId,
       storeCount: 1,
       userCount: 0,
+      licensingMode: "master",
       storeLicenseCount: 0,
       unlicensedStoreCount: 0,
-      license: { licenseNumber: license.licenseNumber, status: "active", seatsUsed: 1, maxStores: 5 }
+      license: { licenseNumber: license.licenseNumber, status: "active" }
     });
     expect(res.body.organizations[0].license.entitlementExpiresAt).toMatch(/^\d{4}-/);
   });
@@ -141,7 +143,8 @@ describe("GET /organizations and /organizations/{org}", () => {
     const res = await call(detail, request("GET", "/", { token: admin.token }), { organizationId: organization.organizationId });
     expect(res.status).toBe(200);
     expect(res.body.counts).toEqual({ stores: 1, roles: 4, users: 0, licenses: 1, unlicensedStores: 0 });
-    expect(res.body.license).toMatchObject({ status: "active", seatsUsed: 1, coveredStores: [expect.objectContaining({ name: "Store 42" })] });
+    expect(res.body.organization.licensingMode).toBe("master");
+    expect(res.body.license).toMatchObject({ status: "active", coveredStores: [expect.objectContaining({ name: "Store 42" })] });
     const missing = await call(detail, request("GET", "/", { token: admin.token }), { organizationId: "org_nope" });
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe("RESOURCE_NOT_FOUND");

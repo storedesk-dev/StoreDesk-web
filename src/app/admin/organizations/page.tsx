@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
-import { ApiError, api, type LicensePlan } from "../_lib/api";
+import { ApiError, api, type LicensePlan, type LicensingMode } from "../_lib/api";
 import { daysLeftLabel, daysUntil, formatDate, orgTagProblem, suggestOrgTag } from "../_lib/format";
 import {
   Button,
@@ -102,7 +102,7 @@ function OrganizationsList() {
                 <th scope="col" className={table.th}>Name</th>
                 <th scope="col" className={table.th}>Org tag</th>
                 <th scope="col" className={table.th}>Status</th>
-                <th scope="col" className={table.th}>Organization license</th>
+                <th scope="col" className={table.th}>Licensing</th>
                 <th scope="col" className={`${table.th} text-right`}>Stores</th>
                 <th scope="col" className={table.th}>License ends</th>
               </tr>
@@ -125,19 +125,19 @@ function OrganizationsList() {
                       <OrgStatusChip status={org.status} />
                     </td>
                     <td className={table.td}>
-                      {org.license ? (
+                      {org.licensingMode === "master" ? (
                         <span className="flex flex-wrap items-center gap-2">
-                          <LicenseStatusChip status={org.license.status} />
-                          <span className="text-xs text-slate-500 sd-num">
-                            {org.license.seatsUsed}/{org.license.maxStores} seats
-                          </span>
+                          <span className="text-sm font-semibold">Master</span>
+                          {org.license ? <LicenseStatusChip status={org.license.status} /> : <span className="text-xs font-semibold text-red-700">none in force</span>}
                         </span>
                       ) : (
-                        <span className="text-sm text-slate-400">None</span>
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold">Store-wise</span>
+                          <span className="text-xs text-slate-500 sd-num">
+                            {org.storeLicenseCount} store license{org.storeLicenseCount === 1 ? "" : "s"}
+                          </span>
+                        </span>
                       )}
-                      {org.storeLicenseCount ? (
-                        <div className="mt-0.5 text-[11.5px] text-slate-500">+ {org.storeLicenseCount} store license{org.storeLicenseCount === 1 ? "" : "s"}</div>
-                      ) : null}
                     </td>
                     <td className={`${table.td} text-right`}>
                       {org.storeCount ?? 0}
@@ -193,10 +193,9 @@ function NewOrganizationDialog({
   const [tag, setTag] = useState("");
   const [tagEdited, setTagEdited] = useState(false);
   const [billingEmail, setBillingEmail] = useState("");
-  const [withSub, setWithSub] = useState(true);
+  const [mode, setMode] = useState<LicensingMode>("master");
   const [plan, setPlan] = useState<LicensePlan>("standard");
   const [days, setDays] = useState("365");
-  const [maxStores, setMaxStores] = useState("1");
   const [pcsPerStore, setPcsPerStore] = useState("1");
   const [grace, setGrace] = useState("7");
   const [busy, setBusy] = useState(false);
@@ -210,10 +209,9 @@ function NewOrganizationDialog({
     setTag("");
     setTagEdited(false);
     setBillingEmail("");
-    setWithSub(true);
+    setMode("master");
     setPlan("standard");
     setDays("365");
-    setMaxStores("1");
     setPcsPerStore("1");
     setGrace("7");
     setError(null);
@@ -224,8 +222,8 @@ function NewOrganizationDialog({
   const effectiveTag = tagEdited ? tag : suggestOrgTag(name);
   const tagError = tagTaken === effectiveTag ? "That org tag is already used by another organization." : orgTagProblem(effectiveTag);
   const numbersOk =
-    !withSub ||
-    [days, maxStores, pcsPerStore].every((v) => Number.isInteger(Number(v)) && Number(v) >= 1) &&
+    mode === "storeWise" ||
+    [days, pcsPerStore].every((v) => Number.isInteger(Number(v)) && Number(v) >= 1) &&
       Number.isInteger(Number(grace)) &&
       Number(grace) >= 0 &&
       Number(grace) <= 30;
@@ -243,15 +241,16 @@ function NewOrganizationDialog({
         name: name.trim(),
         slug: effectiveTag,
         billingEmail: billingEmail.trim() || undefined,
-        license: withSub
-          ? {
-              plan,
-              entitlementDays: Number(days),
-              maxStores: Number(maxStores),
-              maxPcsPerStore: Number(pcsPerStore),
-              offlineGraceDays: Number(grace)
-            }
-          : undefined
+        licensingMode: mode,
+        license:
+          mode === "master"
+            ? {
+                plan,
+                entitlementDays: Number(days),
+                maxPcsPerStore: Number(pcsPerStore),
+                offlineGraceDays: Number(grace)
+              }
+            : undefined
       });
       toast(`${res.organization.name} created`, "success");
       onClose();
@@ -330,12 +329,24 @@ function NewOrganizationDialog({
         </Field>
 
         <fieldset className="rounded-md border border-slate-200 p-3">
-          <legend className="px-1 text-[13px] font-semibold text-slate-700">Organization license</legend>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="h-4 w-4 accent-[#1A63F4]" checked={withSub} onChange={(e) => setWithSub(e.target.checked)} />
-            Create it now
-          </label>
-          {withSub ? (
+          <legend className="px-1 text-[13px] font-semibold text-slate-700">Licensing</legend>
+          <div className="space-y-1.5" role="radiogroup" aria-label="Licensing mode">
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" name="org-licensing" className="mt-0.5 h-4 w-4 accent-[#1A63F4]" checked={mode === "master"} onChange={() => setMode("master")} />
+              <span>
+                <span className="font-semibold">Master license</span>
+                <span className="block text-[12.5px] text-slate-600">One license covers every store, including stores added later.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" name="org-licensing" className="mt-0.5 h-4 w-4 accent-[#1A63F4]" checked={mode === "storeWise"} onChange={() => setMode("storeWise")} />
+              <span>
+                <span className="font-semibold">Store-wise</span>
+                <span className="block text-[12.5px] text-slate-600">Each store gets its own license when it is added.</span>
+              </span>
+            </label>
+          </div>
+          {mode === "master" ? (
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Field label="Plan">
                 {(p) => (
@@ -357,9 +368,6 @@ function NewOrganizationDialog({
               <Field label="Length (days)">
                 {(p) => <Input {...p} type="number" min={1} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} />}
               </Field>
-              <Field label="Seats" hint="Stores it can cover.">
-                {(p) => <Input {...p} type="number" min={1} inputMode="numeric" value={maxStores} onChange={(e) => setMaxStores(e.target.value)} />}
-              </Field>
               <Field label="PCs per store">
                 {(p) => <Input {...p} type="number" min={1} inputMode="numeric" value={pcsPerStore} onChange={(e) => setPcsPerStore(e.target.value)} />}
               </Field>
@@ -369,7 +377,7 @@ function NewOrganizationDialog({
             </div>
           ) : (
             <p className="mt-2 text-xs text-slate-500">
-              You can add one from the Licenses tab. Stores can still have their own license, or none for now.
+              You issue each store its license when you add it, or later from the Licenses tab. You can switch modes at any time.
             </p>
           )}
         </fieldset>

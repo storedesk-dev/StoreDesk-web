@@ -13,7 +13,7 @@ import { getEmailProvider, isEmailConfigured } from "@/lib/email-provider";
 import { PLANS, SITE } from "@/lib/site";
 import { requireOrganization } from "@/lib/organizations";
 import { installationSummary, requireStore } from "@/lib/tenant-stores";
-import { coveringLicense, expireLapsedLicenses, licenseProblem, licenseSummary } from "@/lib/licenses";
+import { coverageFor, expireLapsedLicenses, licenseProblem, licenseSummary } from "@/lib/licenses";
 import { cloudflareConfigured, rotateStoreTunnel, tunnelView } from "@/lib/tunnel";
 import { revokeInstallationsAndNotify } from "@/lib/store-notify";
 import type { InternalAdminActor } from "@/lib/admin-auth";
@@ -39,11 +39,11 @@ async function loadContext(organizationId: string, storeId: string) {
   const org = await requireOrganization(organizationId);
   const store = await requireStore(organizationId, storeId);
   await expireLapsedLicenses({ organizationId });
-  const [license, installations] = (await Promise.all([
-    coveringLicense(store),
+  const [coverage, installations] = (await Promise.all([
+    coverageFor(store, org),
     WorkerInstallationModel.find({ organizationId, storeId }).sort({ createdAt: -1 }).lean()
-  ])) as [Doc | null, Doc[]];
-  return { org, store, license, installations };
+  ])) as [Awaited<ReturnType<typeof coverageFor>>, Doc[]];
+  return { org, store, license: coverage.license, licensingMode: coverage.mode, installations };
 }
 
 function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | null {
@@ -54,7 +54,7 @@ function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | nul
     return { status: 409, code: "STORE_SUSPENDED", message: `The store is ${String(ctx.store.status)}; reactivate it first.` };
   }
   // The store's covering license: STORE_UNLICENSED or LICENSE_INACTIVE.
-  const problem = licenseProblem(ctx.license);
+  const problem = licenseProblem(ctx.license, ctx.licensingMode);
   if (problem) return { status: 402, code: problem.code, message: problem.message };
   if (ctx.store.tunnelRotationRequired === true) {
     return {
@@ -123,6 +123,7 @@ export async function getStoreSetup(organizationId: string, storeId: string) {
     setupKey: keyView(latestKey as Doc | null),
     tunnel,
     license: licenseSummary(ctx.license),
+    licensingMode: ctx.licensingMode,
     keyBlockedReason: blocked?.message ?? null,
     keyBlockedCode: blocked?.code ?? null,
     emailConfigured: isEmailConfigured(),

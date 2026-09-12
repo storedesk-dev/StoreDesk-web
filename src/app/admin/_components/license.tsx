@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage, type License, type LicensePlan, type NewLicenseInput } from "../_lib/api";
+import { api, errorMessage, type License, type LicensePlan, type LicensingMode, type NewLicenseInput } from "../_lib/api";
 import { daysLeftLabel, daysUntil, formatDate, plural } from "../_lib/format";
 import { Button, Card, ConfirmDialog, DefinitionList, Dialog, Field, Input, Notice, Select, Textarea } from "./ui";
 import { RowMenu } from "./Menu";
@@ -11,13 +11,19 @@ import { LicenseStatusChip } from "./status";
 
 /**
  * Licenses in the admin console (docs/design/control-plane-admin.md,
- * "Licenses"): the dialogs to create, edit and renew one, and the actions
- * (renew, suspend, resume, cancel) shared by the organization's Licenses tab
- * and a store's License tab.
+ * "Licenses"). An organization is either on a master license (one license
+ * covers every store) or store-wise (a license per store). These are the
+ * dialogs to create, edit and renew a license, and the actions (renew,
+ * suspend, resume, cancel) shared by the organization's Licenses tab and a
+ * store's License tab.
  */
 
 export const PLAN_LABEL: Record<LicensePlan, string> = { trial: "Trial", standard: "Standard", custom: "Custom" };
 export const PLAN_DEFAULT_DAYS: Record<LicensePlan, number> = { trial: 30, standard: 365, custom: 365 };
+export const MODE_LABEL: Record<LicensingMode, string> = {
+  master: "Master license · one license covers every store",
+  storeWise: "Store-wise · each store has its own license"
+};
 
 export const inForce = (license: { status: string } | null | undefined) =>
   license?.status === "active" || license?.status === "trialing";
@@ -25,7 +31,7 @@ export const inForce = (license: { status: string } | null | undefined) =>
 const storeHref = (orgId: string, storeId: string, tab?: string) =>
   `/admin/organizations/${encodeURIComponent(orgId)}/stores/${encodeURIComponent(storeId)}${tab ? `?tab=${tab}` : ""}`;
 
-export function LicenseEnds({ license }: { license: Pick<License, "entitlementExpiresAt"> }) {
+export function LicenseEnds({ license }: { license: { entitlementExpiresAt: string | null } }) {
   const days = daysUntil(license.entitlementExpiresAt);
   return (
     <span className="sd-num">
@@ -42,14 +48,13 @@ export function LicenseEnds({ license }: { license: Pick<License, "entitlementEx
 export interface LicenseFormValues {
   plan: LicensePlan;
   entitlementDays: number;
-  maxStores: number;
   maxPcsPerStore: number;
   offlineGraceDays: number;
   notes: string;
   storeId: string;
 }
 
-/** Plan and length for a store's new license, inline in a form (New store, Store · License). */
+/** Plan and length for a new license, inline in a form (New store, Store · License, Change mode). */
 export function NewLicenseFields({ value, onChange }: { value: NewLicenseInput; onChange: (next: NewLicenseInput) => void }) {
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -92,8 +97,8 @@ export function validNewLicense(value: NewLicenseInput): boolean {
 }
 
 /**
- * Create an organization license, create a store's own license (pick the
- * store), or edit one (plan, seats, PCs per store, grace, notes).
+ * Create the master license, issue a store's license (pick the store), or
+ * edit one (plan, PCs per store, grace, notes).
  */
 export function LicenseFormDialog({
   open,
@@ -104,17 +109,15 @@ export function LicenseFormDialog({
   onSubmit
 }: {
   open: boolean;
-  mode: "organization" | "store" | "edit";
+  mode: "master" | "store" | "edit";
   license?: License;
-  /** For `store`: the stores that can get their own license. */
-  stores?: Array<{ storeId: string; name: string; note?: string }>;
+  /** For `store`: the stores that can be issued a license. */
+  stores?: Array<{ storeId: string; name: string }>;
   onClose: () => void;
   onSubmit: (values: LicenseFormValues) => Promise<void>;
 }) {
-  const scope = mode === "edit" ? license?.scope : mode;
   const [plan, setPlan] = useState<LicensePlan>("standard");
   const [days, setDays] = useState("365");
-  const [seats, setSeats] = useState("5");
   const [pcs, setPcs] = useState("1");
   const [grace, setGrace] = useState("7");
   const [notes, setNotes] = useState("");
@@ -124,9 +127,8 @@ export function LicenseFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setPlan(license?.plan ?? (mode === "store" ? "trial" : "standard"));
-    setDays(mode === "store" ? "30" : "365");
-    setSeats(String(license?.maxStores ?? 5));
+    setPlan(license?.plan ?? "standard");
+    setDays("365");
     setPcs(String(license?.maxPcsPerStore ?? 1));
     setGrace(String(license?.offlineGraceDays ?? 7));
     setNotes(license?.notes ?? "");
@@ -136,23 +138,16 @@ export function LicenseFormDialog({
   }, [open, license, mode]);
 
   const int = (v: string, min: number, max: number) => Number.isInteger(Number(v)) && Number(v) >= min && Number(v) <= max;
-  const valid =
-    int(pcs, 1, 50) &&
-    int(grace, 0, 30) &&
-    (scope !== "organization" || int(seats, 1, 1000)) &&
-    (mode === "edit" || int(days, 1, 3650)) &&
-    (mode !== "store" || Boolean(storeId));
-  const belowUsage = mode === "edit" && license && scope === "organization" && Number(seats) < license.seatsUsed;
+  const valid = int(pcs, 1, 50) && int(grace, 0, 30) && (mode === "edit" || int(days, 1, 3650)) && (mode !== "store" || Boolean(storeId));
 
   async function submit() {
-    if (!valid || belowUsage) return;
+    if (!valid) return;
     setBusy(true);
     setError(null);
     try {
       await onSubmit({
         plan,
         entitlementDays: Number(days),
-        maxStores: Number(seats),
         maxPcsPerStore: Number(pcs),
         offlineGraceDays: Number(grace),
         notes: notes.trim(),
@@ -166,8 +161,15 @@ export function LicenseFormDialog({
     }
   }
 
+  const single = mode === "store" && stores.length === 1 ? stores[0] : null;
   const title =
-    mode === "organization" ? "New organization license" : mode === "store" ? "New store license" : `Edit ${license?.licenseNumber ?? "license"}`;
+    mode === "master"
+      ? "Add master license"
+      : mode === "store"
+        ? single
+          ? `Issue a license to ${single.name}`
+          : "Issue a store license"
+        : `Edit ${license?.licenseNumber ?? "license"}`;
 
   return (
     <Dialog
@@ -176,10 +178,10 @@ export function LicenseFormDialog({
       dismissable={!busy}
       title={title}
       description={
-        mode === "organization"
-          ? "Covers any of the organization's stores, up to its seats."
+        mode === "master"
+          ? "Covers every store of the organization, including stores added later."
           : mode === "store"
-            ? "Covers exactly one store. If the store was on the organization license, its seat is freed."
+            ? "Covers exactly this one store."
             : undefined
       }
       footer={
@@ -187,8 +189,8 @@ export function LicenseFormDialog({
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="primary" type="submit" form="license-form" busy={busy} disabled={!valid || Boolean(belowUsage)}>
-            {mode === "edit" ? "Save" : "Create license"}
+          <Button variant="primary" type="submit" form="license-form" busy={busy} disabled={!valid}>
+            {mode === "edit" ? "Save" : mode === "master" ? "Add master license" : "Issue license"}
           </Button>
         </>
       }
@@ -201,7 +203,7 @@ export function LicenseFormDialog({
           void submit();
         }}
       >
-        {mode === "store" ? (
+        {mode === "store" && !single ? (
           <Field label="Store" className="col-span-2">
             {(p) =>
               stores.length ? (
@@ -209,12 +211,11 @@ export function LicenseFormDialog({
                   {stores.map((s) => (
                     <option key={s.storeId} value={s.storeId}>
                       {s.name}
-                      {s.note ? ` — ${s.note}` : ""}
                     </option>
                   ))}
                 </Select>
               ) : (
-                <p className="text-sm text-slate-600">Every store already has its own license.</p>
+                <p className="text-sm text-slate-600">Every store already has its license.</p>
               )
             }
           </Field>
@@ -243,11 +244,6 @@ export function LicenseFormDialog({
         ) : (
           <div />
         )}
-        {scope === "organization" ? (
-          <Field label="Seats" hint="Stores it can cover.">
-            {(p) => <Input {...p} type="number" min={1} inputMode="numeric" value={seats} onChange={(e) => setSeats(e.target.value)} />}
-          </Field>
-        ) : null}
         <Field label="PCs per store">
           {(p) => <Input {...p} type="number" min={1} max={50} inputMode="numeric" value={pcs} onChange={(e) => setPcs(e.target.value)} />}
         </Field>
@@ -257,14 +253,11 @@ export function LicenseFormDialog({
         <Field label="Notes" optional className="col-span-2">
           {(p) => <Textarea {...p} rows={2} maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />}
         </Field>
-        <div className="col-span-2 space-y-2">
-          {belowUsage ? (
-            <Notice tone="amber">
-              {license?.seatsUsed} stores use this license. Move stores to their own license, or off it, before lowering the seats.
-            </Notice>
-          ) : null}
-          {error ? <Notice tone="red">{error}</Notice> : null}
-        </div>
+        {error ? (
+          <div className="col-span-2">
+            <Notice tone="red">{error}</Notice>
+          </div>
+        ) : null}
       </form>
     </Dialog>
   );
@@ -287,10 +280,10 @@ function RenewDialog({
 
   useEffect(() => {
     if (open) {
-      setDays(String(PLAN_DEFAULT_DAYS[license.plan] ?? 365));
+      setDays("365");
       setError(null);
     }
-  }, [open, license.plan]);
+  }, [open]);
 
   const n = Number(days);
   const valid = Number.isInteger(n) && n >= 1 && n <= 3650;
@@ -364,10 +357,10 @@ export function useLicenseActions(orgId: string, license: License, onChanged: ()
   const [open, setOpen] = useState<"renew" | "edit" | "suspend" | "cancel" | null>(null);
   const [resuming, setResuming] = useState(false);
   const close = () => setOpen(null);
+  const count = license.coveredStores.length;
   const covers =
-    license.scope === "organization"
-      ? `the ${plural(license.seatsUsed, "store")} it covers`
-      : license.storeName ?? "its store";
+    license.scope === "organization" ? `Every store (${plural(count, "store")})` : license.storeName ?? "Its store";
+  const verb = (singular: string, many: string) => (license.scope === "organization" && count !== 1 ? many : singular);
 
   async function resume() {
     setResuming(true);
@@ -402,7 +395,6 @@ export function useLicenseActions(orgId: string, license: License, onChanged: ()
         onSubmit={async (values) => {
           await api.updateLicense(orgId, license.licenseId, {
             plan: values.plan,
-            ...(license.scope === "organization" ? { maxStores: values.maxStores } : {}),
             maxPcsPerStore: values.maxPcsPerStore,
             offlineGraceDays: values.offlineGraceDays,
             notes: values.notes || null
@@ -424,9 +416,8 @@ export function useLicenseActions(orgId: string, license: License, onChanged: ()
         }}
       >
         <p>
-          {covers[0].toUpperCase() + covers.slice(1)} lose{license.scope === "organization" && license.seatsUsed !== 1 ? "" : "s"} the
-          license. PCs keep working offline for {plural(license.offlineGraceDays, "day")}, then stop, and no new setup keys can be
-          issued. Resume at any time.
+          {covers} {verb("loses", "lose")} the license. PCs keep working offline for {plural(license.offlineGraceDays, "day")}, then stop,
+          and no new setup keys can be issued. Resume at any time.
         </p>
       </ConfirmDialog>
       <ConfirmDialog
@@ -443,9 +434,8 @@ export function useLicenseActions(orgId: string, license: License, onChanged: ()
         }}
       >
         <p>
-          {covers[0].toUpperCase() + covers.slice(1)} become{license.scope === "organization" && license.seatsUsed !== 1 ? "" : "s"}{" "}
-          Unlicensed: PCs can&apos;t activate and sign-in is refused. A cancelled license can&apos;t be renewed — you would create a
-          new one.
+          {covers} {verb("becomes", "become")} Unlicensed: PCs can&apos;t activate and sign-in is refused. A cancelled license can&apos;t be
+          renewed — you would issue a new one.
         </p>
       </ConfirmDialog>
     </>
@@ -462,19 +452,22 @@ export function useLicenseActions(orgId: string, license: License, onChanged: ()
   };
 }
 
-/** A license as a card: number, plan and status, end date, seats, PCs, grace, what it covers. */
+/** A license as a card: number, plan and status, end and days left, grace, PCs per store, what it covers. */
 export function LicenseCard({
   orgId,
   license,
   title,
   onChanged,
-  extraActions
+  allowCancel = true,
+  showCovered = true
 }: {
   orgId: string;
   license: License;
   title: string;
   onChanged: () => void;
-  extraActions?: ReactNode;
+  /** The master is replaced by switching mode, not cancelled from its card. */
+  allowCancel?: boolean;
+  showCovered?: boolean;
 }) {
   const actions = useLicenseActions(orgId, license, onChanged);
   const cancelled = license.status === "cancelled";
@@ -491,32 +484,10 @@ export function LicenseCard({
       actions={
         !cancelled ? (
           <>
-            {extraActions}
-            <Button size="sm" onClick={actions.edit}>
-              Edit
+            <Button size="sm" variant="primary" onClick={actions.renew}>
+              Renew +365 d
             </Button>
-            <Button size="sm" variant="danger-ghost" onClick={actions.cancel}>
-              Cancel license
-            </Button>
-          </>
-        ) : undefined
-      }
-    >
-      <DefinitionList
-        rows={[
-          {
-            label: "Ends",
-            value: <LicenseEnds license={license} />,
-            action: !cancelled ? (
-              <Button size="sm" variant="primary" onClick={actions.renew}>
-                Renew
-              </Button>
-            ) : undefined
-          },
-          {
-            label: "Status",
-            value: <LicenseStatusChip status={license.status} />,
-            action: inForce(license) ? (
+            {inForce(license) ? (
               <Button size="sm" variant="danger-ghost" onClick={actions.suspend}>
                 Suspend
               </Button>
@@ -524,39 +495,47 @@ export function LicenseCard({
               <Button size="sm" busy={actions.resuming} onClick={actions.resume}>
                 Resume
               </Button>
-            ) : undefined
-          },
-          ...(license.scope === "organization"
+            ) : null}
+            <Button size="sm" onClick={actions.edit}>
+              Edit
+            </Button>
+            {allowCancel ? (
+              <Button size="sm" variant="danger-ghost" onClick={actions.cancel}>
+                Cancel license
+              </Button>
+            ) : null}
+          </>
+        ) : undefined
+      }
+    >
+      <DefinitionList
+        rows={[
+          { label: "Ends", value: <LicenseEnds license={license} /> },
+          { label: "Status", value: <LicenseStatusChip status={license.status} /> },
+          { label: "Offline grace", value: <span className="sd-num">{plural(license.offlineGraceDays, "day")}</span> },
+          { label: "PCs per store", value: <span className="sd-num">{license.maxPcsPerStore}</span> },
+          ...(showCovered
             ? [
                 {
-                  label: "Seats",
-                  value: (
-                    <span className="sd-num">
-                      {license.seatsUsed} of {license.maxStores} used
+                  label: license.scope === "organization" ? "Covers" : "Store",
+                  value: license.coveredStores.length ? (
+                    <span className="flex flex-wrap gap-x-2 gap-y-0.5">
+                      {license.scope === "organization" ? <span className="text-slate-500">Every store:</span> : null}
+                      {license.coveredStores.map((s, i) => (
+                        <span key={s.storeId}>
+                          <Link href={storeHref(orgId, s.storeId, "license")} className="font-semibold hover:text-[#0E43D8] hover:underline">
+                            {s.name}
+                          </Link>
+                          {i < license.coveredStores.length - 1 ? "," : ""}
+                        </span>
+                      ))}
                     </span>
+                  ) : (
+                    <span className="text-slate-400">{license.scope === "organization" ? "Every store (none yet)" : "—"}</span>
                   )
                 }
               ]
             : []),
-          { label: "PCs per store", value: <span className="sd-num">{license.maxPcsPerStore}</span> },
-          { label: "Offline grace", value: <span className="sd-num">{plural(license.offlineGraceDays, "day")}</span> },
-          {
-            label: license.scope === "organization" ? "Covers" : "Store",
-            value: license.coveredStores.length ? (
-              <span className="flex flex-wrap gap-x-2 gap-y-0.5">
-                {license.coveredStores.map((s, i) => (
-                  <span key={s.storeId}>
-                    <Link href={storeHref(orgId, s.storeId, "license")} className="font-semibold hover:text-[#0E43D8] hover:underline">
-                      {s.name}
-                    </Link>
-                    {i < license.coveredStores.length - 1 ? "," : ""}
-                  </span>
-                ))}
-              </span>
-            ) : (
-              <span className="text-slate-400">No stores yet</span>
-            )
-          },
           ...(license.notes ? [{ label: "Notes", value: <span className="whitespace-pre-line">{license.notes}</span> }] : [])
         ]}
       />

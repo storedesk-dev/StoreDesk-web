@@ -262,7 +262,7 @@ export async function loadAccessSync(worker: {
   // treating the answer as a transient error and running on offline grace.
   // A license that has lapsed or is suspended still answers 200 with its
   // status, so the store applies the offline grace.
-  const subscription = await coveringLicense(store);
+  const subscription = await coveringLicense(store, organization);
   if (!subscription) {
     throw new ControlPlaneError(403, "STORE_UNLICENSED", "This store has no license. Ask StoreDesk to license it.");
   }

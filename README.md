@@ -21,10 +21,10 @@ npm run dev:local     # throwaway database with sample data — no .env.local ne
 ```
 
 `dev:local` starts an in-memory MongoDB replica set, seeds one staff login, the organization
-**Example Retail** (org tag `example-retail`) with an organization license (5 seats) and four stores, one
-per licensing case: Store 42 (fuel and lottery) and Store 17 on the organization license, Store 88 with its
-own trial license, Store 90 unlicensed. It also seeds the four template roles, a managed login, an invited
-user and a waiting setup key, prints the logins and each store's license, and runs `next dev`. Open `http://localhost:3000/admin`. Cloudflare and e-mail are
+**Example Retail** (org tag `example-retail`) on a master license covering Stores 42 (fuel, lottery,
+Google Sheets on), 17 and 88, with the four template roles, a managed login, an invited user and a waiting
+setup key; and **Corner Mart Group** (`corner-mart`), store-wise: Store 5 with its own license, Store 6
+Unlicensed. It prints the logins and each store's license, and runs `next dev`. Open `http://localhost:3000/admin`. Cloudflare and e-mail are
 turned off for the run (stores show the tunnel as *not configured*); the data is gone when you stop it.
 Set `DEV_ADMIN_EMAIL`, `DEV_ADMIN_PASSWORD`, `DEV_USER_PASSWORD` or `PORT` to choose them. The first run
 downloads a MongoDB binary once (to `~/.cache/mongodb-binaries`).
@@ -65,8 +65,9 @@ See `.env.example` for the full list with notes.
 - `src/app/api/v1/edge/**`, `src/app/api/v1/setup-keys/redeem`, `…/worker-installations/*/bootstrap*` —
   store-server API (worker credential, or the setup key).
 - `src/app/api/v1/app-auth/organizations/{slug}` — the phone's public org-tag lookup.
-- `src/lib/` — one module per area: `organizations`, `licenses` (organization and store licenses, seats,
-  store coverage), `migrations` (old subscriptions → licenses, run once per process on connect),
+- `src/lib/` — one module per area: `organizations`, `licenses` (licensing modes — master or store-wise —
+  the one coverage rule, the mode switch), `migrations` (subscriptions → licenses → modes, run once per
+  process on connect),
   `tenant-stores` (stores and settings), `setup` (setup keys, Replace PC), `users`, `roles`,
   `role-templates`, `admin-views` (dashboard, audit, access preview), `access-sync`, `store-notify`,
   `google`, `tunnel`, `http` (errors and body parsing), `audit`.

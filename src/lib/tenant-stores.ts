@@ -24,17 +24,16 @@ import {
   type StoreSettingsUpdate
 } from "@/lib/store-settings";
 import {
-  CoverageSchema,
+  NewLicenseSchema,
+  checkNewLicense,
+  coverageFor,
   coveringLicense,
-  coveringLicenseId,
   coveringLicenses,
   expireLapsedLicenses,
-  giveStoreOwnLicense,
+  issueStoreLicense,
   licenseSummary,
-  prepareNewStoreCoverage,
-  seatsFull,
-  seatsUsed,
-  seatsWithinLimit
+  modeMismatch,
+  organizationMode
 } from "@/lib/licenses";
 import {
   freeTunnelLabel,
@@ -105,7 +104,7 @@ export function installationSummary(installation: Doc | null | undefined) {
   };
 }
 
-/** `license` is the store's covering license (already checked to cover it), or null: Unlicensed. */
+/** `license` is the store's covering license (lib/licenses.ts, coveringFrom), or null: Unlicensed. */
 export function storeView(store: Doc, installation?: Doc | null, license?: Doc | null) {
   const settings = normalizeStoreSettings(store.settings);
   const tunnel = tunnelView(store);
@@ -172,10 +171,11 @@ export async function listStores(organizationId: string) {
 export async function getStoreDetail(organizationId: string, storeId: string) {
   await expireLapsedLicenses({ organizationId });
   const store = await requireStore(organizationId, storeId);
-  const [installations, license] = await Promise.all([primaryInstallations([storeId]), coveringLicense(store)]);
+  const [installations, coverage] = await Promise.all([primaryInstallations([storeId]), coverageFor(store)]);
   return {
-    store: storeView(store, installations.get(storeId) ?? null, license),
-    license: licenseSummary(license)
+    store: storeView(store, installations.get(storeId) ?? null, coverage.license),
+    license: licenseSummary(coverage.license),
+    licensingMode: coverage.mode
   };
 }
 
@@ -193,10 +193,11 @@ export const StoreCreateSchema = z.object({
   contactEmail: optionalEmail.optional(),
   timeZone: timeZoneSchema.nullish(),
   /**
-   * Coverage: `organization` (a seat on the organization license — the
-   * default), `store` with `newLicense` (its own license), or `none`.
+   * Store-wise organizations only: issue the store's license now (plan, end).
+   * Left out: the store starts Unlicensed. In master mode the master license
+   * covers the new store and this is refused (409 LICENSE_MODE_MISMATCH).
    */
-  license: CoverageSchema.optional(),
+  storeLicense: NewLicenseSchema.optional(),
   /** The tunnel hostname label; defaults to `<org tag>-<store name>`. `slug` is the older name. */
   tunnelLabel: z.string().trim().max(63).optional(),
   slug: z.string().trim().max(63).optional()
@@ -231,7 +232,13 @@ export async function createStore(
     throw new ControlPlaneError(409, "ORGANIZATION_SUSPENDED", "The organization is suspended; reactivate it first");
   }
   await expireLapsedLicenses({ organizationId });
-  const coverage = await prepareNewStoreCoverage(organizationId, body.license);
+  const mode = await organizationMode(organizationId, org);
+  if (body.storeLicense) {
+    if (mode !== "storeWise") {
+      throw modeMismatch("This organization's master license covers every store, including new ones; send no store license.", mode);
+    }
+    checkNewLicense(body.storeLicense);
+  }
 
   const storeId = publicId("store");
   // A label the operator chose must be free; a derived one gets -2, -3, … .
@@ -256,28 +263,18 @@ export async function createStore(
     status: "active",
     settings,
     settingsVersion: 1,
-    licenseId: coverage.license ? String(coverage.license.licenseId) : null,
     // The tunnel label is saved only once a tunnel exists under it.
     configJson: registerConfigJson({})
   });
-  if (coverage.license && !(await seatsWithinLimit(coverage.license))) {
-    // A concurrent change took the last seat.
-    await TenantStoreModel.deleteOne({ storeId });
-    throw seatsFull(coverage.license, await seatsUsed(String(coverage.license.licenseId)));
-  }
   await auditAdmin(admin, {
     organizationId,
     storeId,
     action: "store.create",
     targetType: "store",
     targetId: storeId,
-    metadata: {
-      name: body.name,
-      licenseMode: coverage.mode,
-      ...(coverage.license ? { licenseId: coverage.license.licenseId, licenseNumber: coverage.license.licenseNumber } : {})
-    }
+    metadata: { name: body.name, licensingMode: mode, storeLicense: Boolean(body.storeLicense) }
   });
-  if (coverage.newLicense) await giveStoreOwnLicense(admin, organizationId, storeId, coverage.newLicense, null);
+  if (body.storeLicense) await issueStoreLicense(admin, organizationId, { storeId, name: body.name }, body.storeLicense);
 
   const tunnel = await provisionStoreTunnel(storeId, label);
   await auditAdmin(admin, {
@@ -345,8 +342,7 @@ export async function deleteStore(admin: InternalAdminActor, organizationId: str
     WorkerCredentialModel.deleteMany({ workerInstallationId: { $in: installationIds } }),
     WorkerInstallationModel.deleteMany({ workerInstallationId: { $in: installationIds } }),
     UserAssignmentModel.deleteMany({ assignmentId: { $in: assignments.map((row) => String(row.assignmentId)) } }),
-    // A store license covers nothing without its store. An organization-license
-    // seat frees itself: seats are counted from the stores.
+    // A store license covers nothing without its store.
     LicenseModel.deleteMany({ licenseId: { $in: ownLicenses.map((row) => String(row.licenseId)) } })
   ]);
   await TenantStoreModel.deleteOne({ organizationId, storeId });
@@ -360,7 +356,6 @@ export async function deleteStore(admin: InternalAdminActor, organizationId: str
       name: store.name,
       installations: installationIds.length,
       assignments: assignments.length,
-      licenseId: coveringLicenseId(store),
       storeLicensesDeleted: ownLicenses.map((row) => row.licenseNumber),
       tunnelDeleted: tunnel.tunnelDeleted,
       ...(tunnel.manualCleanup ? { tunnelNeedsManualCleanup: tunnel.manualCleanup } : {})

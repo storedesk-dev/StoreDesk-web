@@ -6,7 +6,7 @@ import { api } from "../../../_lib/api";
 import { formatDate, plural } from "../../../_lib/format";
 import { Card, CopyButton, DefinitionList, ErrorBanner, Spinner, useLoad } from "../../../_components/ui";
 import { LicenseStatusChip, OrgStatusChip, PcChip, StoreLicenseChip, pcState } from "../../../_components/status";
-import { LicenseEnds, PLAN_LABEL, inForce } from "../../../_components/license";
+import { LicenseEnds, MODE_LABEL, PLAN_LABEL, inForce } from "../../../_components/license";
 import type { OrgTabProps } from "./types";
 
 type Goto = (tab: "licenses" | "stores" | "roles" | "users" | "activity") => void;
@@ -20,7 +20,7 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
         api.listRoles(orgId).catch(() => ({ roles: [] })),
         api.listUsers(orgId).catch(() => ({ users: [] }))
       ]);
-      return { licenses: licenses.licenses, stores: stores.stores, roles: roles.roles, users: users.users };
+      return { licensingMode: licenses.licensingMode, licenses: licenses.licenses, stores: stores.stores, roles: roles.roles, users: users.users };
     },
     [orgId]
   );
@@ -79,32 +79,24 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
       >
         <DefinitionList
           rows={[
-            {
-              label: "Organization license",
-              value: orgLicense ? (
-                <span className="flex flex-wrap items-center gap-2">
-                  <code className="font-mono text-[12.5px]">{orgLicense.licenseNumber}</code>
-                  <span>{PLAN_LABEL[orgLicense.plan] ?? orgLicense.plan}</span>
-                  <LicenseStatusChip status={orgLicense.status} />
-                </span>
-              ) : (
-                <span className="text-slate-500">None</span>
-              )
-            },
-            ...(orgLicense
+            { label: "Licensing", value: MODE_LABEL[data.licensingMode] },
+            ...(data.licensingMode === "master"
               ? [
-                  { label: "Ends", value: <LicenseEnds license={orgLicense} /> },
                   {
-                    label: "Seats",
-                    value: (
-                      <span className="sd-num">
-                        {orgLicense.seatsUsed} of {orgLicense.maxStores} used
+                    label: "Master license",
+                    value: orgLicense ? (
+                      <span className="flex flex-wrap items-center gap-2">
+                        <code className="font-mono text-[12.5px]">{orgLicense.licenseNumber}</code>
+                        <span>{PLAN_LABEL[orgLicense.plan] ?? orgLicense.plan}</span>
+                        <LicenseStatusChip status={orgLicense.status} />
                       </span>
+                    ) : (
+                      <span className="font-semibold text-red-700">None in force</span>
                     )
-                  }
+                  },
+                  ...(orgLicense ? [{ label: "Ends", value: <LicenseEnds license={orgLicense} /> }] : [])
                 ]
-              : []),
-            { label: "Store licenses", value: <span className="sd-num">{storeLicenses.length}</span> },
+              : [{ label: "Store licenses", value: <span className="sd-num">{storeLicenses.length}</span> }]),
             {
               label: "Unlicensed stores",
               value: (

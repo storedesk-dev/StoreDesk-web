@@ -1,28 +1,28 @@
 import { NextResponse } from "next/server";
 import { requireInternalAdmin } from "@/lib/admin-auth";
 import { jsonError, parseBody } from "@/lib/http";
-import { requireOrganization } from "@/lib/organizations";
 import { LicenseCreateSchema, createLicense, listLicenses } from "@/lib/licenses";
 
 type Ctx = { params: Promise<{ organizationId: string }> };
 
-/** Both scopes, the organization license first, each with the stores it covers and seats used. */
+/** `{licensingMode, licenses}`: every license (cancelled ones too), the master first, each with the stores it covers. */
 export async function GET(req: Request, ctx: Ctx) {
   try {
     await requireInternalAdmin(req);
     const { organizationId } = await ctx.params;
-    await requireOrganization(organizationId);
-    return NextResponse.json({ licenses: await listLicenses(organizationId) });
+    return NextResponse.json(await listLicenses(organizationId));
   } catch (error) {
     return jsonError(error);
   }
 }
 
 /**
- * Create a license: `{scope: "organization", plan, entitlementDays |
- * entitlementExpiresAt, maxStores, maxPcsPerStore, offlineGraceDays, notes}`
- * or `{scope: "store", storeId, …}` (which becomes that store's covering
- * license). 409 LICENSE_EXISTS when the scope already has a non-cancelled one.
+ * Create a license that fits the organization's mode: `{scope:
+ * "organization", plan, entitlementDays | entitlementExpiresAt,
+ * maxPcsPerStore, offlineGraceDays, notes}` — the master license, master mode,
+ * none yet — or `{scope: "store", storeId, …}` — a store's license,
+ * store-wise mode. 409 LICENSE_MODE_MISMATCH otherwise (a second master
+ * included); 409 LICENSE_EXISTS for a store that has one.
  */
 export async function POST(req: Request, ctx: Ctx) {
   try {

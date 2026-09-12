@@ -50,28 +50,33 @@ vi.mock("@/models/ControlPlane", () => {
           name: "Example Retail",
           status: "active",
           roles: [],
+          licensing: { mode: "master" },
           createdAt: new Date("2030-01-01T00:00:00Z")
         }))
     },
     TenantStoreModel: {
       findOne: () =>
-        h.query(() => ({ organizationId: "org_1", storeId: "store_1", name: "Store 42", status: "active", licenseId: "lic_1", tunnelUrl: "https://s.example.invalid" }))
+        h.query(() => ({ organizationId: "org_1", storeId: "store_1", name: "Store 42", status: "active", tunnelUrl: "https://s.example.invalid" }))
     },
     WorkerInstallationModel: {
       findOne: () => h.query(() => ({ workerInstallationId: "winst_1", subscriptionId: "sub_1" })),
       find: many
     },
     LicenseModel: {
-      findOne: () =>
-        h.query(() => ({
-          licenseId: "lic_1",
-          licenseNumber: "SD-ORG-7K3Q92",
-          organizationId: "org_1",
-          scope: "organization",
-          status: "trialing",
-          entitlementExpiresAt: new Date("2030-02-01T00:00:00Z"),
-          offlineGraceDays: 5
-        }))
+      // The master license, found by its coverage key.
+      find: () =>
+        h.query(() => [
+          {
+            licenseId: "lic_1",
+            licenseNumber: "SD-ORG-7K3Q92",
+            organizationId: "org_1",
+            scope: "organization",
+            status: "trialing",
+            entitlementExpiresAt: new Date("2030-02-01T00:00:00Z"),
+            offlineGraceDays: 5,
+            coverageKey: "org:org_1"
+          }
+        ])
     },
     UserAssignmentModel: {
       find: (filter: unknown) => {

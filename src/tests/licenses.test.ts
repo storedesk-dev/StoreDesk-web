@@ -12,18 +12,20 @@ import {
 } from "./helpers/api";
 import { GET as listLicensesRoute, POST as createLicenseRoute } from "@/app/api/v1/admin/organizations/[organizationId]/licenses/route";
 import { PATCH as patchLicenseRoute } from "@/app/api/v1/admin/organizations/[organizationId]/licenses/[licenseId]/route";
-import { PUT as coverageRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/license/route";
+import { PUT as storeLicenseRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/license/route";
+import { POST as modeRoute } from "@/app/api/v1/admin/organizations/[organizationId]/licensing/mode/route";
 import { POST as createStoreRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/route";
+import { POST as createOrgRoute } from "@/app/api/v1/admin/organizations/route";
 import { GET as setupRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup/route";
 import { POST as issueKeyRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
 import { GET as accessSync } from "@/app/api/v1/edge/sync/access/route";
 import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { GET as dashboardRoute } from "@/app/api/v1/admin/dashboard/route";
 import { createOrganization } from "@/lib/organizations";
-import { LICENSE_NUMBER } from "@/lib/licenses";
-import { migrateSubscriptionsToLicenses } from "@/lib/migrations";
+import { LICENSE_NUMBER, coveringLicense } from "@/lib/licenses";
+import { migrateLicensingModes, migrateSubscriptionsToLicenses } from "@/lib/migrations";
 import { scheduleNotify } from "@/lib/store-notify";
-import { LegacySubscriptionModel, LicenseModel, TenantStoreModel } from "@/models/ControlPlane";
+import { AuditEventModel, LegacySubscriptionModel, LicenseModel, OrganizationModel, TenantStoreModel } from "@/models/ControlPlane";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/store-notify")>();
@@ -36,65 +38,85 @@ vi.mock("@/lib/cloudflare", () => ({
 }));
 
 /**
- * Licenses (docs/design/control-plane-admin.md, "Licenses"): one organization
- * license with seats plus one store license per store, a covering license
- * per store (or none), the checks that follow from it, and the migration
- * from subscriptions.
+ * Licensing modes (docs/design/control-plane-admin.md, "Licenses"): a master
+ * license covering every store, or a license per store; coverage derived from
+ * the mode; switching mode (dry run, copy, atomic); the checks that follow;
+ * and the migrations.
  */
 
 setupMemoryMongo();
 
 const DAY = 86_400_000;
 let admin: TestAdmin;
-let organizationId: string;
 
 beforeEach(async () => {
   vi.clearAllMocks();
   admin = await createAdmin();
-  organizationId = (await createOrganization(admin, { name: "Example Retail", slug: "example-retail" })).organization.organizationId;
 });
 
-const org = () => ({ organizationId });
-const post = <T>(handler: T, body: unknown, params: Record<string, string> = org()) =>
-  call(handler as Parameters<typeof call>[0], request("POST", "/", { token: admin.token, body }), params);
+const as = (method: string, body?: unknown) => request(method, "/", { token: admin.token, ...(body === undefined ? {} : { body }) });
 
-async function orgLicense(maxStores = 2, extra: Record<string, unknown> = {}) {
-  const res = await post(createLicenseRoute, { scope: "organization", plan: "standard", maxStores, ...extra });
-  expect(res.status).toBe(201);
-  return res.body.license;
+async function masterOrg(slug = "example-retail", terms: Record<string, unknown> = {}) {
+  const { organization, license } = await createOrganization(admin, {
+    name: "Example Retail",
+    slug,
+    license: { plan: "standard", maxPcsPerStore: 1, offlineGraceDays: 7, ...terms }
+  });
+  return { organizationId: organization.organizationId, master: license! };
 }
 
-async function newStore(name: string, license: unknown = { mode: "organization" }) {
-  return post(createStoreRoute, { name, license });
+async function storeWiseOrg(slug = "corner-mart") {
+  const { organization } = await createOrganization(admin, { name: "Corner Mart Group", slug, licensingMode: "storeWise" });
+  return organization.organizationId;
 }
 
-async function coverage(storeId: string, body: unknown) {
-  return call(coverageRoute, request("PUT", "/", { token: admin.token, body }), { organizationId, storeId });
+async function newStore(organizationId: string, name: string, extra: Record<string, unknown> = {}) {
+  return call(createStoreRoute, as("POST", { name, ...extra }), { organizationId });
 }
+const list = (organizationId: string) => call(listLicensesRoute, as("GET"), { organizationId });
+const patch = (organizationId: string, licenseId: string, body: unknown) =>
+  call(patchLicenseRoute, as("PATCH", body), { organizationId, licenseId });
+const storeLicense = (organizationId: string, storeId: string, body: unknown) =>
+  call(storeLicenseRoute, as("PUT", body), { organizationId, storeId });
+const switchMode = (organizationId: string, body: unknown) => call(modeRoute, as("POST", body), { organizationId });
+const pull = (token: string) => call(accessSync, request("GET", "/", { headers: { Authorization: `Bearer ${token}` } }));
 
-async function storeLicenseId(storeId: string) {
-  return (await TenantStoreModel.findOne({ storeId }).lean())?.licenseId;
-}
-
-describe("creating licenses, one per scope", () => {
-  it("creates an organization license with a readable number, and refuses a second one", async () => {
-    const license = await orgLicense(5, { maxPcsPerStore: 2, offlineGraceDays: 10, notes: "Chain of 5" });
-    expect(license).toMatchObject({ scope: "organization", status: "active", maxStores: 5, maxPcsPerStore: 2, offlineGraceDays: 10, seatsUsed: 0, notes: "Chain of 5" });
-    expect(license.licenseNumber).toMatch(/^SD-ORG-[0-9A-HJKMNP-TV-Z]{6}$/);
-    expect(await lastAudit("license.create")).toMatchObject({ targetId: license.licenseId, metadata: expect.objectContaining({ licenseNumber: license.licenseNumber }) });
-
-    const second = await post(createLicenseRoute, { scope: "organization", plan: "trial" });
-    expect(second.status).toBe(409);
-    expect(second.body.error.code).toBe("LICENSE_EXISTS");
-    expect(second.body.error.message).toContain(license.licenseNumber);
-
-    // Once cancelled, another may be created.
-    await call(patchLicenseRoute, request("PATCH", "/", { token: admin.token, body: { status: "cancelled" } }), { ...org(), licenseId: license.licenseId });
-    expect((await post(createLicenseRoute, { scope: "organization", plan: "trial" })).status).toBe(201);
+describe("master mode", () => {
+  it("the master covers every store, including stores added later, with no store limit", async () => {
+    const { organizationId, master } = await masterOrg();
+    expect(master.licenseNumber).toMatch(/^SD-ORG-[0-9A-HJKMNP-TV-Z]{6}$/);
+    for (let i = 1; i <= 7; i += 1) {
+      const created = await newStore(organizationId, `Store ${i}`);
+      expect(created.status).toBe(201);
+      expect(created.body.store.license).toMatchObject({ licenseId: master.licenseId, scope: "organization" });
+    }
+    const listed = await list(organizationId);
+    expect(listed.body.licensingMode).toBe("master");
+    expect(listed.body.licenses[0].coveredStores).toHaveLength(7);
+    expect(listed.body.licenses[0]).not.toHaveProperty("maxStores");
+    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, reason: "license.change" });
   });
 
-  it("the database refuses a second non-cancelled license for the same scope, whatever the code does", async () => {
-    await orgLicense();
+  it("refuses anything that doesn't fit the mode with 409 LICENSE_MODE_MISMATCH", async () => {
+    const { organizationId, master } = await masterOrg();
+    const store = (await newStore(organizationId, "Main St")).body.store;
+    const cases = [
+      await call(createLicenseRoute, as("POST", { scope: "store", storeId: store.storeId, plan: "trial" }), { organizationId }),
+      await call(createLicenseRoute, as("POST", { scope: "organization", plan: "trial" }), { organizationId }),
+      await storeLicense(organizationId, store.storeId, { plan: "trial", entitlementDays: 30 }),
+      await newStore(organizationId, "Hwy 9", { storeLicense: { plan: "trial" } })
+    ];
+    for (const res of cases) {
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("LICENSE_MODE_MISMATCH");
+      expect(res.body.licensingMode).toBe("master");
+    }
+    expect(cases[1].body.error.message).toContain(master.licenseNumber);
+    expect(await TenantStoreModel.countDocuments({ name: "Hwy 9" })).toBe(0);
+  });
+
+  it("the database refuses a second non-cancelled master, whatever the code does", async () => {
+    const { organizationId } = await masterOrg();
     await expect(
       LicenseModel.create({
         organizationId,
@@ -105,231 +127,280 @@ describe("creating licenses, one per scope", () => {
         status: "active",
         startsAt: new Date(),
         entitlementExpiresAt: new Date(Date.now() + DAY),
-        maxStores: 1,
         coverageKey: `org:${organizationId}`
       })
     ).rejects.toMatchObject({ code: 11000 });
   });
 
-  it("a store license covers its store at once (freeing its seat) and a second one for that store is refused", async () => {
-    await orgLicense(2);
-    const store = (await newStore("Main St")).body.store;
-    const license = (await post(createLicenseRoute, { scope: "store", storeId: store.storeId, plan: "trial" })).body.license;
-    expect(license).toMatchObject({ scope: "store", storeId: store.storeId, storeName: "Main St", status: "trialing", maxStores: 1, seatsUsed: 1 });
-    expect(license.licenseNumber).toMatch(LICENSE_NUMBER);
-    expect(license.licenseNumber.startsWith("SD-STR-")).toBe(true);
-    expect(await storeLicenseId(store.storeId)).toBe(license.licenseId);
-    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, storeId: store.storeId, reason: "store.license.change" });
-
-    const again = await post(createLicenseRoute, { scope: "store", storeId: store.storeId, plan: "standard" });
-    expect(again.status).toBe(409);
-    expect(again.body.error.code).toBe("LICENSE_EXISTS");
-  });
-
-  it.each([
-    ["a store license without its store", { scope: "store", plan: "trial" }],
-    ["a store license with 2 seats", { scope: "store", storeId: "store_x", plan: "trial", maxStores: 2 }],
-    ["an organization license naming a store", { scope: "organization", storeId: "store_x", plan: "trial" }],
-    ["31 days of grace", { scope: "organization", plan: "trial", offlineGraceDays: 31 }],
-    ["an unknown field", { scope: "organization", plan: "trial", maxDevices: 3 }]
-  ])("answers 400 for %s", async (_label, body) => {
-    expect((await post(createLicenseRoute, body)).status).toBe(400);
-  });
-
-  it("answers 401 without a session and 404 for an unknown organization", async () => {
-    expect((await call(listLicensesRoute, request("GET", "/"), org())).status).toBe(401);
-    expect((await call(listLicensesRoute, request("GET", "/", { token: admin.token }), { organizationId: "org_nope" })).status).toBe(404);
-  });
-
-  it("lists both scopes with the stores each covers", async () => {
-    await orgLicense(3);
-    const a = (await newStore("A St")).body.store;
-    await newStore("B St");
-    await post(createLicenseRoute, { scope: "store", storeId: a.storeId, plan: "trial" });
-    const res = await call(listLicensesRoute, request("GET", "/", { token: admin.token }), org());
-    expect(res.body.licenses.map((license: { scope: string }) => license.scope)).toEqual(["organization", "store"]);
-    expect(res.body.licenses[0]).toMatchObject({ seatsUsed: 1, coveredStores: [expect.objectContaining({ name: "B St" })] });
-    expect(res.body.licenses[1]).toMatchObject({ storeName: "A St", seatsUsed: 1 });
-  });
-});
-
-describe("seats", () => {
-  it("refuses a store beyond the organization license's seats, on create and on switch", async () => {
-    await orgLicense(2);
-    expect((await newStore("One")).status).toBe(201);
-    expect((await newStore("Two")).status).toBe(201);
-    const full = await newStore("Three");
-    expect(full.status).toBe(402);
-    expect(full.body).toMatchObject({ error: { code: "LICENSE_SEATS_FULL" }, seatsUsed: 2, maxStores: 2 });
-    expect(await TenantStoreModel.countDocuments({ name: "Three" })).toBe(0);
-
-    const unlicensed = (await newStore("Four", { mode: "none" })).body.store;
-    const switchFull = await coverage(unlicensed.storeId, { mode: "organization" });
-    expect(switchFull.status).toBe(402);
-    expect(await storeLicenseId(unlicensed.storeId)).toBeNull();
-  });
-
-  it("refuses lowering the seats below the stores on the license", async () => {
-    const license = await orgLicense(2);
-    await newStore("One");
-    await newStore("Two");
-    const res = await call(patchLicenseRoute, request("PATCH", "/", { token: admin.token, body: { maxStores: 1 } }), { ...org(), licenseId: license.licenseId });
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe("LIMIT_BELOW_USAGE");
-  });
-
-  it("refuses the organization-license default when there is none", async () => {
-    const res = await newStore("One");
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe("NO_ORGANIZATION_LICENSE");
-  });
-});
-
-describe("switching coverage", () => {
-  it("moves a store between the organization license, its own license and none; leaving its own license cancels it", async () => {
-    const license = await orgLicense(2);
-    const store = (await newStore("Main St")).body.store;
-    expect(store.license).toMatchObject({ licenseId: license.licenseId, scope: "organization" });
-
-    const own = await coverage(store.storeId, { mode: "store", newLicense: { plan: "trial", entitlementDays: 30 } });
-    expect(own.status).toBe(200);
-    expect(own.body.store.license).toMatchObject({ scope: "store", plan: "trial", status: "trialing" });
-    const ownId = own.body.store.license.licenseId;
-    expect((await call(listLicensesRoute, request("GET", "/", { token: admin.token }), org())).body.licenses[0].seatsUsed).toBe(0);
-
-    // Its own license again, without a new one: unchanged.
-    expect((await coverage(store.storeId, { mode: "store" })).body.changed).toBe(false);
-
-    const back = await coverage(store.storeId, { mode: "organization" });
-    expect(back.body.store.license.licenseId).toBe(license.licenseId);
-    expect((await LicenseModel.findOne({ licenseId: ownId }).lean())?.status).toBe("cancelled");
-    expect(await lastAudit("license.cancel")).toMatchObject({ targetId: ownId, metadata: expect.objectContaining({ reason: "coverage switched" }) });
-    expect((await lastAudit("store.license.change"))?.metadata).toMatchObject({ mode: "organization", from: ownId, to: license.licenseId });
-    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, storeId: store.storeId, reason: "store.license.change" });
-
-    const none = await coverage(store.storeId, { mode: "none" });
-    expect(none.body.store).toMatchObject({ licenseId: null, license: null });
-  });
-
-  it("asks for a new license when the store has none of its own, and refuses a second own license", async () => {
-    await orgLicense(2);
-    const store = (await newStore("Main St")).body.store;
-    const missing = await coverage(store.storeId, { mode: "store" });
-    expect(missing.status).toBe(400);
-    expect(missing.body.error.code).toBe("NEW_LICENSE_REQUIRED");
-    await coverage(store.storeId, { mode: "store", newLicense: { plan: "trial" } });
-    const twice = await coverage(store.storeId, { mode: "store", newLicense: { plan: "standard" } });
-    expect(twice.status).toBe(409);
-  });
-
-  it("creates a store with its own license or with none", async () => {
-    const own = await newStore("Hwy 9", { mode: "store", newLicense: { plan: "trial", entitlementDays: 30 } });
-    expect(own.status).toBe(201);
-    expect(own.body.store.license).toMatchObject({ scope: "store", plan: "trial" });
-    const none = await newStore("Pine Rd", { mode: "none" });
-    expect(none.body.store.license).toBeNull();
-    expect((await newStore("X", { mode: "store" })).status).toBe(400);
-  });
-});
-
-describe("what the covering license decides", () => {
-  const acks = { acknowledgements: VALID_ACKS, installation: VALID_INSTALLATION };
-
-  it("an unlicensed store: no key, no activation, and the access pull is refused (403 STORE_UNLICENSED)", async () => {
-    await orgLicense(2);
-    const store = (await newStore("Main St")).body.store;
-    const params = { organizationId, storeId: store.storeId };
-    const key = await post(issueKeyRoute, { deliver: "show" }, params);
-    expect(key.status).toBe(201);
-    const pc = await activatePc(organizationId, store.storeId);
-    await coverage(store.storeId, { mode: "none" });
-
-    const setup = await call(setupRoute, request("GET", "/", { token: admin.token }), params);
-    expect(setup.body.keyBlockedCode).toBe("STORE_UNLICENSED");
-    expect((await post(issueKeyRoute, { deliver: "show" }, params)).body.error.code).toBe("STORE_UNLICENSED");
-    const activation = await call(redeem, request("POST", "/", { body: { setupKey: key.body.setupKey, ...acks } }));
-    expect(activation.status).toBe(402);
-    expect(activation.body.error.code).toBe("STORE_UNLICENSED");
-    const pull = await call(accessSync, request("GET", "/", { headers: { Authorization: `Bearer ${pc.token}` } }));
-    expect(pull.status).toBe(403);
-    expect(pull.body.error.code).toBe("STORE_UNLICENSED");
-  });
-
-  it("a suspended or lapsed organization license stops every store on it, not a store with its own license", async () => {
-    const license = await orgLicense(3);
-    const covered = (await newStore("Main St")).body.store;
-    const ownStore = (await newStore("Hwy 9", { mode: "store", newLicense: { plan: "standard" } })).body.store;
-    const coveredPc = await activatePc(organizationId, covered.storeId);
-    const ownPc = await activatePc(organizationId, ownStore.storeId);
-    const pull = (token: string) => call(accessSync, request("GET", "/", { headers: { Authorization: `Bearer ${token}` } }));
+  it("a suspended or lapsed master stops every store; renewing brings them back", async () => {
+    const { organizationId, master } = await masterOrg();
+    const a = (await newStore(organizationId, "A St")).body.store;
+    const b = (await newStore(organizationId, "B St")).body.store;
+    const pc = await activatePc(organizationId, a.storeId);
 
     vi.mocked(scheduleNotify).mockClear();
-    await call(patchLicenseRoute, request("PATCH", "/", { token: admin.token, body: { status: "suspended" } }), { ...org(), licenseId: license.licenseId });
-    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, storeIds: [covered.storeId], reason: "license.change" });
+    await patch(organizationId, master.licenseId, { status: "suspended" });
+    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, storeIds: [a.storeId, b.storeId], reason: "license.change" });
     expect(await lastAudit("license.suspend")).toBeTruthy();
-    expect((await pull(coveredPc.token)).body.subscription).toMatchObject({ status: "suspended", licenseNumber: license.licenseNumber, scope: "organization" });
-    expect((await pull(ownPc.token)).body.subscription).toMatchObject({ status: "active", scope: "store" });
-    const blocked = await call(setupRoute, request("GET", "/", { token: admin.token }), { organizationId, storeId: covered.storeId });
+    expect((await pull(pc.token)).body.subscription).toMatchObject({ status: "suspended", licenseNumber: master.licenseNumber, scope: "organization" });
+    const blocked = await call(setupRoute, as("GET"), { organizationId, storeId: b.storeId });
     expect(blocked.body.keyBlockedCode).toBe("LICENSE_INACTIVE");
-    const fine = await call(setupRoute, request("GET", "/", { token: admin.token }), { organizationId, storeId: ownStore.storeId });
-    expect(fine.body.keyBlockedCode).not.toBe("LICENSE_INACTIVE");
 
-    // Resume, then let it lapse: expired on the next read.
-    await call(patchLicenseRoute, request("PATCH", "/", { token: admin.token, body: { status: "active" } }), { ...org(), licenseId: license.licenseId });
-    expect(await lastAudit("license.resume")).toBeTruthy();
-    await LicenseModel.updateOne({ licenseId: license.licenseId }, { $set: { entitlementExpiresAt: new Date(Date.now() - DAY) } });
-    const listed = await call(listLicensesRoute, request("GET", "/", { token: admin.token }), org());
-    expect(listed.body.licenses[0].status).toBe("expired");
-    expect((await pull(coveredPc.token)).body.subscription.status).toBe("expired");
-    expect((await pull(ownPc.token)).body.subscription.status).toBe("active");
-    const key = await post(issueKeyRoute, { deliver: "show" }, { organizationId, storeId: covered.storeId });
+    await patch(organizationId, master.licenseId, { status: "active" });
+    await LicenseModel.updateOne({ licenseId: master.licenseId }, { $set: { entitlementExpiresAt: new Date(Date.now() - DAY) } });
+    expect((await list(organizationId)).body.licenses[0].status).toBe("expired");
+    expect((await pull(pc.token)).body.subscription.status).toBe("expired");
+    const key = await call(issueKeyRoute, as("POST", { deliver: "show" }), { organizationId, storeId: b.storeId });
     expect(key.status).toBe(402);
     expect(key.body.error.code).toBe("LICENSE_INACTIVE");
 
-    // Renewing brings it back.
-    const renewed = await call(patchLicenseRoute, request("PATCH", "/", { token: admin.token, body: { renewDays: 365 } }), { ...org(), licenseId: license.licenseId });
+    const renewed = await patch(organizationId, master.licenseId, { renewDays: 365 });
     expect(renewed.body.license).toMatchObject({ status: "active", daysRemaining: 365 });
-    expect(await lastAudit("license.renew")).toBeTruthy();
+    expect((await pull(pc.token)).body.subscription.status).toBe("active");
   });
 
-  it("PCs per store come from the covering license", async () => {
-    await orgLicense(2, { maxPcsPerStore: 1 });
-    const store = (await newStore("Main St")).body.store;
-    await activatePc(organizationId, store.storeId);
-    const res = await post(issueKeyRoute, { deliver: "show" }, { organizationId, storeId: store.storeId });
-    expect(res.status).toBe(409);
-    expect(res.body.error.message).toContain("its license allows 1");
-  });
+  it("cancelling the master leaves every store Unlicensed: no key, no activation, access pull 403", async () => {
+    const { organizationId, master } = await masterOrg();
+    const store = (await newStore(organizationId, "Main St")).body.store;
+    const params = { organizationId, storeId: store.storeId };
+    const key = await call(issueKeyRoute, as("POST", { deliver: "show" }), params);
+    expect(key.status).toBe(201);
+    const pc = await activatePc(organizationId, store.storeId);
 
-  it("cancelling a license leaves its stores unlicensed and it can't be changed again", async () => {
-    const license = await orgLicense(2);
-    const store = (await newStore("Main St")).body.store;
-    const cancelled = await call(patchLicenseRoute, request("PATCH", "/", { token: admin.token, body: { status: "cancelled" } }), { ...org(), licenseId: license.licenseId });
-    expect(cancelled.body.license).toMatchObject({ status: "cancelled", seatsUsed: 0 });
-    expect(await storeLicenseId(store.storeId)).toBeNull();
-    const again = await call(patchLicenseRoute, request("PATCH", "/", { token: admin.token, body: { renewDays: 30 } }), { ...org(), licenseId: license.licenseId });
-    expect(again.status).toBe(409);
-    expect(again.body.error.code).toBe("LICENSE_CANCELLED");
-    const dash = await call(dashboardRoute, request("GET", "/", { token: admin.token }));
+    const cancelled = await patch(organizationId, master.licenseId, { status: "cancelled" });
+    expect(cancelled.body.license).toMatchObject({ status: "cancelled", coveredStores: [] });
+    expect((await patch(organizationId, master.licenseId, { renewDays: 30 })).body.error.code).toBe("LICENSE_CANCELLED");
+
+    const setup = await call(setupRoute, as("GET"), params);
+    expect(setup.body.keyBlockedCode).toBe("STORE_UNLICENSED");
+    expect(setup.body.keyBlockedReason).toContain("master license");
+    const activation = await call(redeem, request("POST", "/", { body: { setupKey: key.body.setupKey, acknowledgements: VALID_ACKS, installation: VALID_INSTALLATION } }));
+    expect(activation.status).toBe(402);
+    expect(activation.body.error.code).toBe("STORE_UNLICENSED");
+    const refused = await pull(pc.token);
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.code).toBe("STORE_UNLICENSED");
+
+    const dash = await call(dashboardRoute, as("GET"));
     expect(dash.body.counts.unlicensedStores).toBe(1);
     expect(dash.body.attention).toContainEqual(expect.objectContaining({ kind: "store_unlicensed", storeId: store.storeId }));
+
+    // A new master may be added, and covers the store again.
+    expect((await call(createLicenseRoute, as("POST", { scope: "organization", plan: "trial" }), { organizationId })).status).toBe(201);
+    expect((await pull(pc.token)).status).toBe(200);
   });
 
-  it("the dashboard lists licenses ending within 30 days", async () => {
-    const license = await orgLicense(2, { entitlementDays: 10 });
-    await newStore("Main St");
-    const dash = await call(dashboardRoute, request("GET", "/", { token: admin.token }));
+  it("PCs per store come from the master, and the dashboard lists it ending", async () => {
+    const { organizationId, master } = await masterOrg("example-retail", { entitlementDays: 10 });
+    const store = (await newStore(organizationId, "Main St")).body.store;
+    await activatePc(organizationId, store.storeId);
+    const res = await call(issueKeyRoute, as("POST", { deliver: "show" }), { organizationId, storeId: store.storeId });
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toContain("its license allows 1");
+    const dash = await call(dashboardRoute, as("GET"));
     expect(dash.body.counts.licensesEndingSoon).toBe(1);
     expect(dash.body.attention).toContainEqual(
-      expect.objectContaining({ kind: "license_ending", licenseId: license.licenseId, licenseNumber: license.licenseNumber })
+      expect.objectContaining({ kind: "license_ending", licenseId: master.licenseId, licenseNumber: master.licenseNumber })
     );
   });
 });
 
-describe("migrating subscriptions to licenses", () => {
-  async function legacy(organizationIdOf: string, subscriptionId: string, extra: Record<string, unknown> = {}) {
+describe("store-wise mode", () => {
+  it("each store has its own license or none; issue, edit, and one per store", async () => {
+    const organizationId = await storeWiseOrg();
+    const five = await newStore(organizationId, "Store 5", { storeLicense: { plan: "standard", entitlementDays: 365 } });
+    expect(five.status).toBe(201);
+    expect(five.body.store.license).toMatchObject({ scope: "store", plan: "standard", status: "active" });
+    expect(five.body.store.license.licenseNumber).toMatch(LICENSE_NUMBER);
+    expect(five.body.store.license.licenseNumber.startsWith("SD-STR-")).toBe(true);
+    const six = await newStore(organizationId, "Store 6");
+    expect(six.body.store).toMatchObject({ licenseId: null, license: null });
+
+    const issued = await storeLicense(organizationId, six.body.store.storeId, { plan: "trial", entitlementDays: 30 });
+    expect(issued.status).toBe(200);
+    expect(issued.body).toMatchObject({ created: true, licensingMode: "storeWise", license: { scope: "store", status: "trialing" } });
+    const edited = await storeLicense(organizationId, six.body.store.storeId, { renewDays: 30, maxPcsPerStore: 2 });
+    expect(edited.body).toMatchObject({ created: false, license: { maxPcsPerStore: 2 } });
+    expect(await lastAudit("license.renew")).toBeTruthy();
+
+    const again = await call(createLicenseRoute, as("POST", { scope: "store", storeId: six.body.store.storeId, plan: "trial" }), { organizationId });
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe("LICENSE_EXISTS");
+    const noMaster = await call(createLicenseRoute, as("POST", { scope: "organization", plan: "trial" }), { organizationId });
+    expect(noMaster.status).toBe(409);
+    expect(noMaster.body.error.code).toBe("LICENSE_MODE_MISMATCH");
+  });
+
+  it("an Unlicensed store gets no key and no activation, and its access pull is refused", async () => {
+    const organizationId = await storeWiseOrg();
+    const store = (await newStore(organizationId, "Store 5", { storeLicense: { plan: "standard" } })).body.store;
+    const params = { organizationId, storeId: store.storeId };
+    const key = await call(issueKeyRoute, as("POST", { deliver: "show" }), params);
+    expect(key.status).toBe(201);
+    const pc = await activatePc(organizationId, store.storeId);
+    expect((await pull(pc.token)).body.subscription).toMatchObject({ status: "active", scope: "store", licenseNumber: store.license.licenseNumber });
+
+    await patch(organizationId, store.license.licenseId, { status: "cancelled" });
+    const setup = await call(setupRoute, as("GET"), params);
+    expect(setup.body.keyBlockedCode).toBe("STORE_UNLICENSED");
+    expect((await call(issueKeyRoute, as("POST", { deliver: "show" }), params)).body.error.code).toBe("STORE_UNLICENSED");
+    const activation = await call(redeem, request("POST", "/", { body: { setupKey: key.body.setupKey, acknowledgements: VALID_ACKS, installation: VALID_INSTALLATION } }));
+    expect(activation.status).toBe(402);
+    expect(activation.body.error.code).toBe("STORE_UNLICENSED");
+    expect((await pull(pc.token)).status).toBe(403);
+  });
+
+  it("one store's license affects only that store", async () => {
+    const organizationId = await storeWiseOrg();
+    const a = (await newStore(organizationId, "A", { storeLicense: { plan: "standard" } })).body.store;
+    const b = (await newStore(organizationId, "B", { storeLicense: { plan: "standard" } })).body.store;
+    const pcB = await activatePc(organizationId, b.storeId);
+    vi.mocked(scheduleNotify).mockClear();
+    await patch(organizationId, a.license.licenseId, { status: "suspended" });
+    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, storeIds: [a.storeId], reason: "license.change" });
+    expect((await pull(pcB.token)).body.subscription.status).toBe("active");
+  });
+
+  it("organization create: the mode's defaults and the combinations it refuses", async () => {
+    const post = (body: unknown) => call(createOrgRoute, as("POST", body));
+    const wise = await post({ name: "A", slug: "a-org" });
+    expect(wise.status).toBe(201);
+    expect(wise.body.organization.licensingMode).toBe("storeWise");
+    expect(wise.body.license).toBeNull();
+    const master = await post({ name: "B", slug: "b-org", license: { plan: "trial" } });
+    expect(master.body.organization.licensingMode).toBe("master");
+    expect((await post({ name: "C", slug: "c-org", licensingMode: "master" })).body.error.code).toBe("MASTER_LICENSE_REQUIRED");
+    expect((await post({ name: "D", slug: "d-org", licensingMode: "storeWise", license: { plan: "trial" } })).status).toBe(400);
+    expect((await post({ name: "E", slug: "e-org", license: { plan: "trial", maxStores: 5 } })).status).toBe(400);
+    expect(await OrganizationModel.countDocuments({ slug: { $in: ["c-org", "d-org", "e-org"] } })).toBe(0);
+  });
+
+  it.each([
+    ["a store license without its store", { scope: "store", plan: "trial" }],
+    ["a master naming a store", { scope: "organization", storeId: "store_x", plan: "trial" }],
+    ["31 days of grace", { scope: "store", storeId: "store_x", plan: "trial", offlineGraceDays: 31 }],
+    ["seats", { scope: "store", storeId: "store_x", plan: "trial", maxStores: 2 }]
+  ])("answers 400 for %s", async (_label, body) => {
+    const organizationId = await storeWiseOrg();
+    expect((await call(createLicenseRoute, as("POST", body), { organizationId })).status).toBe(400);
+  });
+});
+
+describe("switching mode", () => {
+  it("master → store-wise: the dry run writes nothing; the real run copies the master to every store and cancels it", async () => {
+    const { organizationId, master } = await masterOrg("example-retail", { maxPcsPerStore: 2, offlineGraceDays: 5, plan: "custom" });
+    const a = (await newStore(organizationId, "A St")).body.store;
+    const b = (await newStore(organizationId, "B St")).body.store;
+    const pc = await activatePc(organizationId, a.storeId);
+    const before = await LicenseModel.countDocuments();
+
+    const dry = await switchMode(organizationId, { mode: "storeWise", dryRun: true });
+    expect(dry.status).toBe(200);
+    expect(dry.body).toMatchObject({ dryRun: true, from: "master", to: "storeWise", copyToStores: true });
+    expect(dry.body.stores).toHaveLength(2);
+    expect(dry.body.stores[0]).toMatchObject({
+      name: "A St",
+      before: { scope: "organization", licenseNumber: master.licenseNumber },
+      after: { scope: "store", licenseNumber: null, plan: "custom", status: "active", entitlementExpiresAt: master.entitlementExpiresAt },
+      createsLicense: true
+    });
+    expect(dry.body.licenses.created).toHaveLength(2);
+    expect(dry.body.licenses.cancelled).toEqual([expect.objectContaining({ licenseNumber: master.licenseNumber })]);
+    expect(await LicenseModel.countDocuments()).toBe(before);
+    expect((await OrganizationModel.findOne({ organizationId }).lean())?.licensing).toEqual({ mode: "master" });
+
+    vi.mocked(scheduleNotify).mockClear();
+    const done = await switchMode(organizationId, { mode: "storeWise" });
+    expect(done.status).toBe(200);
+    expect(done.body.dryRun).toBe(false);
+    expect(done.body.stores.every((row: { after: { licenseNumber: string } }) => row.after.licenseNumber.startsWith("SD-STR-"))).toBe(true);
+    expect((await OrganizationModel.findOne({ organizationId }).lean())?.licensing).toEqual({ mode: "storeWise" });
+    const cancelledMaster = await LicenseModel.findOne({ licenseId: master.licenseId }).lean();
+    expect(cancelledMaster?.status).toBe("cancelled");
+    expect(cancelledMaster?.coverageKey).toBeUndefined();
+    for (const store of [a, b]) {
+      const own = await coveringLicense({ organizationId, storeId: store.storeId });
+      expect(own).toMatchObject({ scope: "store", storeId: store.storeId, plan: "custom", status: "active", offlineGraceDays: 5, maxPcsPerStore: 2 });
+      expect((own?.entitlementExpiresAt as Date).toISOString()).toBe(master.entitlementExpiresAt);
+    }
+    expect((await pull(pc.token)).body.subscription).toMatchObject({ scope: "store", status: "active" });
+    expect((await lastAudit("organization.licensing.change"))?.metadata).toMatchObject({ from: "master", to: "storeWise", copyToStores: true });
+    expect(await AuditEventModel.countDocuments({ action: "license.create", "metadata.reason": "licensing switched to storeWise" })).toBe(2);
+    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, reason: "license.change" });
+
+    const again = await switchMode(organizationId, { mode: "storeWise" });
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe("LICENSING_MODE_UNCHANGED");
+  });
+
+  it("master → store-wise without copying leaves every store Unlicensed", async () => {
+    const { organizationId, master } = await masterOrg();
+    const store = (await newStore(organizationId, "A St")).body.store;
+    const dry = await switchMode(organizationId, { mode: "storeWise", copyToStores: false, dryRun: true });
+    expect(dry.body.stores[0]).toMatchObject({ before: { scope: "organization" }, after: null, createsLicense: false });
+    expect(dry.body.licenses.created).toEqual([]);
+    await switchMode(organizationId, { mode: "storeWise", copyToStores: false });
+    expect(await coveringLicense({ organizationId, storeId: store.storeId })).toBeNull();
+    expect((await LicenseModel.findOne({ licenseId: master.licenseId }).lean())?.status).toBe("cancelled");
+    expect((await list(organizationId)).body.licensingMode).toBe("storeWise");
+  });
+
+  it("store-wise → master: store licenses are superseded, the new master covers every store", async () => {
+    const organizationId = await storeWiseOrg();
+    const licensed = (await newStore(organizationId, "Store 5", { storeLicense: { plan: "standard" } })).body.store;
+    const unlicensed = (await newStore(organizationId, "Store 6")).body.store;
+
+    const missing = await switchMode(organizationId, { mode: "master" });
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.code).toBe("MASTER_LICENSE_REQUIRED");
+
+    const terms = { plan: "standard", entitlementDays: 200, maxPcsPerStore: 3, offlineGraceDays: 10 };
+    const dry = await switchMode(organizationId, { mode: "master", master: terms, dryRun: true });
+    expect(dry.body.stores).toEqual([
+      expect.objectContaining({ storeId: licensed.storeId, before: expect.objectContaining({ scope: "store" }), after: expect.objectContaining({ scope: "organization", licenseNumber: null }) }),
+      expect.objectContaining({ storeId: unlicensed.storeId, before: null, after: expect.objectContaining({ scope: "organization" }) })
+    ]);
+    expect(dry.body.licenses.cancelled).toEqual([expect.objectContaining({ licenseNumber: licensed.license.licenseNumber, reason: "superseded by master license" })]);
+    expect(await coveringLicense({ organizationId, storeId: unlicensed.storeId })).toBeNull();
+
+    const done = await switchMode(organizationId, { mode: "master", master: terms });
+    expect(done.body.master).toMatchObject({ scope: "organization", maxPcsPerStore: 3, offlineGraceDays: 10, daysRemaining: 200 });
+    const superseded = await LicenseModel.findOne({ licenseId: licensed.license.licenseId }).lean();
+    expect(superseded).toMatchObject({ status: "cancelled", notes: "superseded by master license" });
+    for (const store of [licensed, unlicensed]) {
+      expect(await coveringLicense({ organizationId, storeId: store.storeId })).toMatchObject({ licenseId: done.body.master.licenseId });
+    }
+    expect(await lastAudit("license.cancel")).toMatchObject({ targetId: licensed.license.licenseId, metadata: expect.objectContaining({ reason: "superseded by master license" }) });
+  });
+});
+
+describe("migrations", () => {
+  async function orgWithoutMode(organizationId: string) {
+    await OrganizationModel.collection.insertOne({ organizationId, name: organizationId, slug: organizationId, status: "active", roles: [] });
+  }
+  async function rawStore(organizationId: string, storeId: string, extra: Record<string, unknown> = {}) {
+    await TenantStoreModel.collection.insertOne({ organizationId, storeId, name: storeId, status: "active", ...extra });
+  }
+  async function rawLicense(organizationId: string, licenseId: string, scope: "organization" | "store", storeId?: string) {
+    await LicenseModel.collection.insertOne({
+      organizationId,
+      licenseId,
+      licenseNumber: `SD-${scope === "organization" ? "ORG" : "STR"}-${licenseId.slice(-6).toUpperCase().padStart(6, "0")}`,
+      scope,
+      ...(storeId ? { storeId } : {}),
+      plan: "standard",
+      status: "active",
+      startsAt: new Date(),
+      entitlementExpiresAt: new Date(Date.now() + 100 * DAY),
+      maxStores: 3,
+      maxPcsPerStore: 1,
+      offlineGraceDays: 7,
+      coverageKey: scope === "organization" ? `org:${organizationId}` : `store:${storeId}`
+    });
+  }
+  async function legacy(organizationId: string, subscriptionId: string, extra: Record<string, unknown> = {}) {
     await LegacySubscriptionModel.collection.insertOne({
-      organizationId: organizationIdOf,
+      organizationId,
       subscriptionId,
       plan: "standard",
       status: "active",
@@ -343,60 +414,73 @@ describe("migrating subscriptions to licenses", () => {
       ...extra
     });
   }
-  async function legacyStore(storeId: string, subscriptionId: string | null) {
-    await TenantStoreModel.collection.insertOne({
-      organizationId: "org_old",
-      storeId,
-      name: storeId,
-      status: "active",
-      ...(subscriptionId ? { subscriptionId } : {})
-    });
-  }
 
-  it("turns subscriptions into licenses with the same ids, links stores, and changes nothing on a second run", async () => {
+  it("subscriptions become a master license (the best one) and cancelled ones; the organization becomes master", async () => {
+    await orgWithoutMode("org_old");
     await legacy("org_old", "sub_main");
-    await legacy("org_old", "sub_single", { entitlementExpiresAt: new Date(Date.now() + 50 * DAY) });
-    await legacy("org_old", "sub_multi", { entitlementExpiresAt: new Date(Date.now() + 40 * DAY), maxStores: 5 });
-    await legacy("org_old", "sub_old", { status: "cancelled" });
-    await legacyStore("s1", "sub_main");
-    await legacyStore("s2", "sub_main");
-    await legacyStore("s3", "sub_single");
-    await legacyStore("s4", "sub_multi");
-    await legacyStore("s5", "sub_multi");
-    await legacyStore("s6", "sub_old");
-    await legacyStore("s7", "sub_gone");
+    await legacy("org_old", "sub_second", { entitlementExpiresAt: new Date(Date.now() + 40 * DAY) });
+    await legacy("org_old", "sub_gone", { status: "cancelled" });
+    await rawStore("org_old", "s1", { subscriptionId: "sub_main", licenseId: "sub_main" });
+    await rawStore("org_old", "s2", { subscriptionId: "sub_second" });
 
-    const report = await migrateSubscriptionsToLicenses();
-    expect(report).toMatchObject({ organizationLicenses: 2, storeLicenses: 1, merged: 1 });
-
+    expect(await migrateSubscriptionsToLicenses()).toEqual({ masterLicenses: 1, cancelledLicenses: 2 });
     const main = await LicenseModel.findOne({ licenseId: "sub_main" }).lean();
     expect(main).toMatchObject({ scope: "organization", status: "active", maxPcsPerStore: 2, offlineGraceDays: 5, coverageKey: "org:org_old" });
     expect(main?.licenseNumber).toMatch(LICENSE_NUMBER);
-    expect(await LicenseModel.findOne({ licenseId: "sub_single" }).lean()).toMatchObject({ scope: "store", storeId: "s3", maxStores: 1 });
-    expect(await LicenseModel.findOne({ licenseId: "sub_multi" }).lean()).toMatchObject({ status: "cancelled" });
-    expect(await LicenseModel.findOne({ licenseId: "sub_old" }).lean()).toMatchObject({ status: "cancelled", scope: "organization" });
+    expect(await LicenseModel.findOne({ licenseId: "sub_second" }).lean()).toMatchObject({ status: "cancelled", scope: "organization" });
 
-    const link = async (storeId: string) => (await TenantStoreModel.findOne({ storeId }).lean())?.licenseId;
-    expect(await link("s1")).toBe("sub_main");
-    expect(await link("s2")).toBe("sub_main");
-    expect(await link("s3")).toBe("sub_single");
-    // The stores of a second multi-store subscription moved onto the organization license, whose seats grew.
-    expect(await link("s4")).toBe("sub_main");
-    expect(await link("s5")).toBe("sub_main");
-    expect((await LicenseModel.findOne({ licenseId: "sub_main" }).lean())?.maxStores).toBe(4);
-    expect(await link("s6")).toBeNull();
-    expect(await link("s7")).toBeNull();
+    expect(await migrateLicensingModes()).toMatchObject({ master: 1, storeWise: 0, storesUnlinked: 2 });
+    expect((await OrganizationModel.findOne({ organizationId: "org_old" }).lean())?.licensing).toEqual({ mode: "master" });
+    for (const storeId of ["s1", "s2"]) {
+      expect(await coveringLicense({ organizationId: "org_old", storeId })).toMatchObject({ licenseId: "sub_main" });
+      const raw = await TenantStoreModel.collection.findOne({ storeId });
+      expect(raw).not.toHaveProperty("licenseId");
+      expect(raw).not.toHaveProperty("subscriptionId");
+    }
 
     const count = await LicenseModel.countDocuments();
-    const second = await migrateSubscriptionsToLicenses();
-    expect(second).toEqual({ organizationLicenses: 0, storeLicenses: 0, merged: 0, storesLinked: 0, storesUnlicensed: 0 });
+    expect(await migrateSubscriptionsToLicenses()).toEqual({ masterLicenses: 0, cancelledLicenses: 0 });
+    expect(await migrateLicensingModes()).toEqual({ master: 0, storeWise: 0, supersededStoreLicenses: 0, storesUnlinked: 0 });
     expect(await LicenseModel.countDocuments()).toBe(count);
   });
 
-  it("reads an unmigrated store's old subscriptionId until it is linked", async () => {
-    const license = await orgLicense(2);
-    await TenantStoreModel.collection.insertOne({ organizationId, storeId: "s_old", name: "Old", status: "active", subscriptionId: license.licenseId });
-    const listed = await call(listLicensesRoute, request("GET", "/", { token: admin.token }), org());
-    expect(listed.body.licenses[0].coveredStores).toEqual([{ storeId: "s_old", name: "Old" }]);
+  it("an organization with a master and store licenses becomes master; the store licenses are superseded and audited", async () => {
+    await orgWithoutMode("org_mixed");
+    await rawLicense("org_mixed", "lic_master", "organization");
+    await rawLicense("org_mixed", "lic_str_a", "store", "sa");
+    await rawStore("org_mixed", "sa", { licenseId: "lic_str_a" });
+    await rawStore("org_mixed", "sb", { licenseId: null });
+
+    expect(await migrateLicensingModes()).toMatchObject({ master: 1, supersededStoreLicenses: 1 });
+    expect(await LicenseModel.findOne({ licenseId: "lic_str_a" }).lean()).toMatchObject({ status: "cancelled", notes: "superseded by master license" });
+    expect(await AuditEventModel.findOne({ action: "license.cancel", targetId: "lic_str_a" }).lean()).toMatchObject({
+      actorType: "system",
+      metadata: expect.objectContaining({ reason: "superseded by master license" })
+    });
+    for (const storeId of ["sa", "sb"]) {
+      expect(await coveringLicense({ organizationId: "org_mixed", storeId })).toMatchObject({ licenseId: "lic_master" });
+    }
+  });
+
+  it("only store licenses → store-wise; neither → store-wise with every store Unlicensed", async () => {
+    await orgWithoutMode("org_wise");
+    await rawLicense("org_wise", "lic_str_w", "store", "w1");
+    await rawStore("org_wise", "w1");
+    await rawStore("org_wise", "w2");
+    await orgWithoutMode("org_none");
+    await rawStore("org_none", "n1");
+
+    expect(await migrateLicensingModes()).toMatchObject({ master: 0, storeWise: 2 });
+    expect((await OrganizationModel.findOne({ organizationId: "org_wise" }).lean())?.licensing).toEqual({ mode: "storeWise" });
+    expect(await coveringLicense({ organizationId: "org_wise", storeId: "w1" })).toMatchObject({ licenseId: "lic_str_w" });
+    expect(await coveringLicense({ organizationId: "org_wise", storeId: "w2" })).toBeNull();
+    expect(await coveringLicense({ organizationId: "org_none", storeId: "n1" })).toBeNull();
+  });
+
+  it("before the migration reaches an organization, its mode is read from its licenses", async () => {
+    await orgWithoutMode("org_later");
+    await rawLicense("org_later", "lic_later", "organization");
+    await rawStore("org_later", "l1");
+    expect(await coveringLicense({ organizationId: "org_later", storeId: "l1" })).toMatchObject({ licenseId: "lic_later" });
   });
 });

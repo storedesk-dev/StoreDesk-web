@@ -9,10 +9,12 @@ import { issueStoreSetupKey } from "@/lib/setup";
 
 /**
  * Sample data for `npm run dev:local` (a throwaway in-memory database): one
- * internal admin, one organization with an organization license, four
- * stores showing every way a store is licensed — two on the organization
- * license (one with fuel and lottery, one without), one with its own trial
- * license, one unlicensed — the four template roles, and users of both kinds.
+ * internal admin and one organization per licensing mode —
+ * - Example Retail, on a master license covering Stores 42 (fuel and
+ *   lottery, Google Sheets on), 17 and 88, with the four template roles and
+ *   users of both kinds;
+ * - Corner Mart Group, store-wise: Store 5 with its own license, Store 6
+ *   Unlicensed.
  * Built through the same library calls the admin routes use. No tunnel is
  * created unless Cloudflare is configured.
  */
@@ -25,8 +27,8 @@ export type SeedOptions = {
 
 export type SeedResult = {
   admin: { email: string; password: string };
-  organization: { organizationId: string; name: string; slug: string };
-  stores: Array<{ storeId: string; name: string; features: string; license: string }>;
+  organizations: Array<{ organizationId: string; name: string; slug: string; licensing: string }>;
+  stores: Array<{ storeId: string; organization: string; name: string; features: string; license: string }>;
   users: Array<{ email: string; kind: "managed" | "invite"; role: string; where: string; password?: string; invitationCode?: string }>;
   setupKey: { store: string; key: string; expiresAt: string } | null;
 };
@@ -51,22 +53,23 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
   });
   const admin: InternalAdminActor = { adminId, email: adminEmail };
 
+  // ── Example Retail: master license ─────────────────────────────────────────
   const { organization, license } = await createOrganization(admin, {
     name: "Example Retail",
     slug: "example-retail",
     billingEmail: "billing@example-retail.test",
-    license: { plan: "standard", maxStores: 5, maxPcsPerStore: 1, offlineGraceDays: 7 }
+    licensingMode: "master",
+    license: { plan: "standard", entitlementDays: 365, maxPcsPerStore: 1, offlineGraceDays: 7 }
   });
   const organizationId = organization.organizationId;
-  const orgNumber = license!.licenseNumber;
+  const masterNumber = license!.licenseNumber;
 
   const { store: main } = await createStore(admin, organizationId, {
     name: "Store 42 · Main St",
     storeNumber: "42",
     address: "42 Main St, Atlanta, GA 30303",
     contactEmail: "store42@example-retail.test",
-    timeZone: "America/New_York",
-    license: { mode: "organization" }
+    timeZone: "America/New_York"
   });
   await updateStoreSettings(
     admin,
@@ -84,24 +87,14 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
     storeNumber: "17",
     address: "17 Elm Ave, Decatur, GA 30030",
     contactEmail: "store17@example-retail.test",
-    timeZone: "America/New_York",
-    license: { mode: "organization" }
+    timeZone: "America/New_York"
   });
   const { store: hwy } = await createStore(admin, organizationId, {
     name: "Store 88 · Hwy 9",
     storeNumber: "88",
     address: "8800 Hwy 9, Alpharetta, GA 30004",
-    timeZone: "America/New_York",
-    license: { mode: "store", newLicense: { plan: "trial", entitlementDays: 30 } }
+    timeZone: "America/New_York"
   });
-  const { store: pine } = await createStore(admin, organizationId, {
-    name: "Store 90 · Pine Rd",
-    storeNumber: "90",
-    address: "90 Pine Rd, Marietta, GA 30060",
-    timeZone: "America/New_York",
-    license: { mode: "none" }
-  });
-  const hwyNumber = hwy.license?.licenseNumber ?? "";
 
   const owner = "owner@example-retail.test";
   const manager = "rakesh@storedesk.com";
@@ -130,17 +123,49 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
   // A key waiting on Store 42's PC, so the dashboard has something to show.
   const key = await issueStoreSetupKey(admin, organizationId, main.storeId, { deliver: "show" });
 
+  // ── Corner Mart Group: store-wise ──────────────────────────────────────────
+  const { organization: corner } = await createOrganization(admin, {
+    name: "Corner Mart Group",
+    slug: "corner-mart",
+    billingEmail: "accounts@corner-mart.test",
+    licensingMode: "storeWise"
+  });
+  const { store: five } = await createStore(admin, corner.organizationId, {
+    name: "Store 5 · Oak St",
+    storeNumber: "5",
+    address: "5 Oak St, Savannah, GA 31401",
+    timeZone: "America/New_York",
+    storeLicense: { plan: "standard", entitlementDays: 365 }
+  });
+  const { store: six } = await createStore(admin, corner.organizationId, {
+    name: "Store 6 · Bay Rd",
+    storeNumber: "6",
+    address: "6 Bay Rd, Savannah, GA 31405",
+    timeZone: "America/New_York"
+  });
+
+  const onMaster = `master license ${masterNumber}`;
   return {
     admin: { email: adminEmail, password: adminPassword },
-    organization: { organizationId, name: organization.name, slug: organization.slug },
+    organizations: [
+      { organizationId, name: organization.name, slug: organization.slug, licensing: `master license ${masterNumber} (covers every store)` },
+      { organizationId: corner.organizationId, name: corner.name, slug: corner.slug, licensing: "store-wise (a license per store)" }
+    ],
     stores: [
-      { storeId: main.storeId, name: main.name, features: "fuel, lottery", license: `organization license ${orgNumber}` },
-      { storeId: elm.storeId, name: elm.name, features: "none", license: `organization license ${orgNumber}` },
-      { storeId: hwy.storeId, name: hwy.name, features: "none", license: `own trial license ${hwyNumber}` },
-      { storeId: pine.storeId, name: pine.name, features: "none", license: "unlicensed" }
+      { storeId: main.storeId, organization: organization.name, name: main.name, features: "fuel, lottery, Google Sheets", license: onMaster },
+      { storeId: elm.storeId, organization: organization.name, name: elm.name, features: "none", license: onMaster },
+      { storeId: hwy.storeId, organization: organization.name, name: hwy.name, features: "none", license: onMaster },
+      {
+        storeId: five.storeId,
+        organization: corner.name,
+        name: five.name,
+        features: "none",
+        license: `own license ${five.license?.licenseNumber ?? ""}`
+      },
+      { storeId: six.storeId, organization: corner.name, name: six.name, features: "none", license: "Unlicensed" }
     ],
     users: [
-      { email: owner, kind: "managed", role: "Organization Admin", where: "every store", password: userPassword },
+      { email: owner, kind: "managed", role: "Organization Admin", where: "every Example Retail store", password: userPassword },
       { email: manager, kind: "managed", role: "Store Manager", where: main.name, password: userPassword },
       {
         email: cashier,

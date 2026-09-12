@@ -41,7 +41,15 @@ const OrganizationSchema = new Schema(
     billingEmail: { type: String, lowercase: true, trim: true },
     // `pending` only for records written by older builds; admins set active | suspended.
     status: { type: String, enum: ["pending", "active", "suspended"], default: "active" },
-    roles: { type: Schema.Types.Mixed, default: [] }
+    roles: { type: Schema.Types.Mixed, default: [] },
+    /**
+     * How the organization is licensed (lib/licenses.ts): `master` — one master
+     * license covers every store — or `storeWise` — each store has its own
+     * license or none. Set on create; older records get it from the migration.
+     */
+    licensing: {
+      mode: { type: String, enum: ["master", "storeWise"] }
+    }
   },
   timestamps
 );
@@ -70,10 +78,10 @@ const SubscriptionSchema = new Schema(
 );
 
 /**
- * Licenses (docs/design/control-plane-admin.md, "Licenses"). An organization
- * license covers any of the organization's stores up to `maxStores` seats; a
- * store license covers exactly its one store. A store's covering license is
- * `TenantStore.licenseId`.
+ * Licenses (docs/design/control-plane-admin.md, "Licenses"). In a master-mode
+ * organization its one organization license (the master) covers every store;
+ * in a store-wise one each store license covers its one store. Which license
+ * covers a store is derived from the mode (lib/licenses.ts), never stored.
  */
 const LicenseSchema = new Schema(
   {
@@ -94,8 +102,8 @@ const LicenseSchema = new Schema(
     startsAt: { type: Date, required: true },
     entitlementExpiresAt: { type: Date, required: true },
     offlineGraceDays: { type: Number, min: 0, max: 30, default: 7 },
-    /** Seats: stores it may cover. Always 1 for a store license. */
-    maxStores: { type: Number, min: 1, required: true },
+    /** Unused: the master license has no store limit. Kept (and ignored) on older records. */
+    maxStores: { type: Number, min: 1, default: 1 },
     maxPcsPerStore: { type: Number, min: 1, default: 1 },
     notes: { type: String, trim: true, maxlength: 1000 },
     /**
@@ -151,14 +159,8 @@ const TenantStoreSchema = new Schema(
   {
     ...tenant,
     storeId: { ...id, unique: true },
-    /**
-     * The covering license (lib/licenses.ts): the store's own store license,
-     * the organization license, or null ("Unlicensed"). Missing only on records
-     * the license migration has not reached, which read `subscriptionId`.
-     */
-    licenseId: { type: String, index: true },
-    /** Written by older builds; read only until the license migration has linked the store. */
-    subscriptionId: { type: String, index: true },
+    // No license link: coverage follows from the organization's licensing mode
+    // (lib/licenses.ts). The migration removes the older licenseId / subscriptionId.
     name: { type: String, required: true, trim: true },
     storeNumber: { type: String, trim: true },
     address: { type: String, trim: true },

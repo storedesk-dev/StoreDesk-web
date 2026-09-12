@@ -54,11 +54,11 @@ afterEach(() => {
   delete process.env.CLOUDFLARE_ACCOUNT_ID;
 });
 
-async function orgWithLicense(maxStores = 5) {
+async function orgWithLicense() {
   const { organization, license } = await createOrganization(admin, {
     name: "Example Retail",
     slug: "example-retail",
-    license: { plan: "standard", maxStores, maxPcsPerStore: 1 }
+    license: { plan: "standard", maxPcsPerStore: 1 }
   });
   return { organizationId: organization.organizationId, licenseId: license!.licenseId };
 }
@@ -162,28 +162,28 @@ describe("POST …/stores", () => {
     expect(refused.body.tunnel).toMatchObject({ status: "failed", message: "quota" });
   });
 
-  it("puts a store on a seat of the organization license, or gives it its own license when the seats are used", async () => {
-    const { organizationId, licenseId } = await orgWithLicense(1);
-    const first = await createStoreCall(organizationId, { name: "One" });
-    expect(first.status).toBe(201);
-    expect(first.body.store.license).toMatchObject({ licenseId, scope: "organization" });
-    const full = await createStoreCall(organizationId, { name: "Two" });
-    expect(full.status).toBe(402);
-    expect(full.body.error.code).toBe("LICENSE_SEATS_FULL");
-    const own = await createStoreCall(organizationId, { name: "Two", license: { mode: "store", newLicense: { plan: "trial" } } });
-    expect(own.status).toBe(201);
-    expect(own.body.store.license).toMatchObject({ scope: "store", plan: "trial" });
+  it("a master-license organization covers every new store; a store license is refused there", async () => {
+    const { organizationId, licenseId } = await orgWithLicense();
+    for (const name of ["One", "Two", "Three"]) {
+      const created = await createStoreCall(organizationId, { name });
+      expect(created.status).toBe(201);
+      expect(created.body.store.license).toMatchObject({ licenseId, scope: "organization" });
+    }
+    const own = await createStoreCall(organizationId, { name: "Four", storeLicense: { plan: "trial" } });
+    expect(own.status).toBe(409);
+    expect(own.body.error.code).toBe("LICENSE_MODE_MISMATCH");
   });
 
-  it("refuses without an organization license unless another coverage is chosen, and for a suspended organization", async () => {
-    const { organization } = await createOrganization(admin, { name: "No License", slug: "no-license" });
-    const none = await createStoreCall(organization.organizationId, { name: "S" });
-    expect(none.status).toBe(409);
-    expect(none.body.error.code).toBe("NO_ORGANIZATION_LICENSE");
-    const unlicensed = await createStoreCall(organization.organizationId, { name: "S", license: { mode: "none" } });
+  it("store-wise: issues the store's license now or leaves it Unlicensed; a suspended organization is refused", async () => {
+    const { organization } = await createOrganization(admin, { name: "Corner Mart", slug: "corner-mart", licensingMode: "storeWise" });
+    const unlicensed = await createStoreCall(organization.organizationId, { name: "S" });
     expect(unlicensed.status).toBe(201);
     expect(unlicensed.body.store).toMatchObject({ licenseId: null, license: null });
-    expect((await createStoreCall(organization.organizationId, { name: "S", license: { mode: "everyone" } })).status).toBe(400);
+    const licensed = await createStoreCall(organization.organizationId, { name: "T", storeLicense: { plan: "trial", entitlementDays: 30 } });
+    expect(licensed.body.store.license).toMatchObject({ scope: "store", plan: "trial", status: "trialing" });
+    const past = await createStoreCall(organization.organizationId, { name: "U", storeLicense: { plan: "trial", entitlementExpiresAt: "2020-01-01T00:00:00Z" } });
+    expect(past.status).toBe(400);
+    expect(await TenantStoreModel.countDocuments({ name: "U" })).toBe(0);
 
     const { organizationId } = await orgWithLicense();
     await updateOrganization(admin, organizationId, { status: "suspended" });

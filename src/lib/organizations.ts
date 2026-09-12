@@ -20,13 +20,16 @@ import { templateRoles } from "@/lib/role-templates";
 import { removeStoreTunnel } from "@/lib/tunnel";
 import { revokeInstallationsAndNotify, scheduleNotify } from "@/lib/store-notify";
 import {
-  OrganizationLicenseSchema,
-  coveringLicenseId,
+  LICENSING_MODES,
+  MasterLicenseSchema,
+  checkNewLicense,
+  coverageIndex,
   createLicense,
   expireLapsedLicenses,
-  licenseCovers,
   licenseView,
-  type LicenseView
+  storedMode,
+  type LicenseView,
+  type LicensingMode
 } from "@/lib/licenses";
 import type { InternalAdminActor } from "@/lib/admin-auth";
 
@@ -56,13 +59,15 @@ export function suggestSlug(name: string): string {
 
 const iso = (value: unknown): string | null => (value ? toIsoOr(value, "") || null : null);
 
-export function organizationView(org: Doc) {
+export function organizationView(org: Doc, mode?: LicensingMode) {
   return {
     organizationId: String(org.organizationId),
     name: String(org.name),
     slug: String(org.slug),
     billingEmail: org.billingEmail ? String(org.billingEmail) : null,
     status: String(org.status ?? "active"),
+    /** `master` (one license covers every store) or `storeWise` (a license per store). */
+    licensingMode: mode ?? storedMode(org) ?? "storeWise",
     createdAt: iso(org.createdAt),
     updatedAt: iso(org.updatedAt)
   };
@@ -89,8 +94,10 @@ export const OrganizationCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   slug: slugSchema.optional(),
   billingEmail: optionalEmail.optional(),
-  /** Optional: the organization license, created in the same request. */
-  license: OrganizationLicenseSchema.optional()
+  /** Default: `master` when `license` is given, else `storeWise`. */
+  licensingMode: z.enum(LICENSING_MODES).optional(),
+  /** The master license, created in the same request (master mode only, and required there). */
+  license: MasterLicenseSchema.optional()
 });
 export type OrganizationCreate = z.output<typeof OrganizationCreateSchema>;
 
@@ -109,69 +116,52 @@ export const OrganizationDeleteSchema = z.object({ confirmSlug: z.string().trim(
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-type OrgLicenseSummary = {
-  licenseId: string;
-  licenseNumber: string;
-  plan: string;
-  status: string;
-  entitlementExpiresAt: string | null;
-  seatsUsed: number;
-  maxStores: number;
-};
+type CoverageIndex = Awaited<ReturnType<typeof coverageIndex>>;
 
-/** Per organization: its organization license (with seats used), store licenses, and unlicensed stores. */
-function licensing(organizationId: string, stores: Doc[], licenses: Doc[]) {
-  const mine = licenses.filter((license) => license.organizationId === organizationId);
-  const byId = new Map(mine.map((license) => [String(license.licenseId), license]));
-  const orgLicense = mine.find((license) => license.scope === "organization" && license.status !== "cancelled") ?? null;
-  let seatsUsed = 0;
-  let unlicensed = 0;
-  for (const store of stores) {
-    const id = coveringLicenseId(store);
-    const license = id ? byId.get(id) : undefined;
-    if (!licenseCovers(license, store)) unlicensed += 1;
-    else if (orgLicense && id === orgLicense.licenseId) seatsUsed += 1;
-  }
-  const license: OrgLicenseSummary | null = orgLicense
-    ? {
-        licenseId: String(orgLicense.licenseId),
-        licenseNumber: String(orgLicense.licenseNumber),
-        plan: String(orgLicense.plan),
-        status: String(orgLicense.status),
-        entitlementExpiresAt: iso(orgLicense.entitlementExpiresAt),
-        seatsUsed,
-        maxStores: Number(orgLicense.maxStores)
-      }
-    : null;
+/** Per organization: its mode, its master license (master mode), store licenses, and unlicensed stores. */
+function licensing(index: CoverageIndex, organizationId: string, stores: Doc[]) {
+  const mode = index.mode(organizationId);
+  const master = index.master(organizationId);
   return {
-    license,
-    storeLicenseCount: mine.filter((entry) => entry.scope === "store" && entry.status !== "cancelled").length,
-    unlicensedStoreCount: unlicensed
+    licensingMode: mode,
+    /** The master license (master mode), or null. */
+    license: master
+      ? {
+          licenseId: String(master.licenseId),
+          licenseNumber: String(master.licenseNumber),
+          plan: String(master.plan),
+          status: String(master.status),
+          entitlementExpiresAt: iso(master.entitlementExpiresAt)
+        }
+      : null,
+    storeLicenseCount:
+      mode === "storeWise" ? index.licensesOf(organizationId).filter((license) => license.scope === "store").length : 0,
+    unlicensedStoreCount: stores.filter((store) => !index.licenseFor(store)).length
   };
 }
 
 export async function listOrganizations() {
   await connectDb();
   await expireLapsedLicenses();
-  const [orgs, stores, licenses, assignments] = (await Promise.all([
+  const [orgs, stores, index, assignments] = (await Promise.all([
     OrganizationModel.find({}).sort({ createdAt: -1 }).lean(),
-    TenantStoreModel.find({}).select("organizationId storeId licenseId subscriptionId").lean(),
-    LicenseModel.find({ status: { $ne: "cancelled" } }).lean(),
+    TenantStoreModel.find({}).select("organizationId storeId").lean(),
+    coverageIndex(),
     UserAssignmentModel.aggregate([
       { $match: { status: "active" } },
       { $group: { _id: { org: "$organizationId", user: "$appUserId" } } },
       { $group: { _id: "$_id.org", count: { $sum: 1 } } }
     ])
-  ])) as [Doc[], Doc[], Doc[], Array<{ _id: string; count: number }>];
+  ])) as [Doc[], Doc[], CoverageIndex, Array<{ _id: string; count: number }>];
   const userCount = new Map(assignments.map((row) => [row._id, row.count]));
   return orgs.map((org) => {
     const organizationId = String(org.organizationId);
     const orgStores = stores.filter((store) => store.organizationId === organizationId);
     return {
-      ...organizationView(org),
+      ...organizationView(org, index.mode(organizationId)),
       storeCount: orgStores.length,
       userCount: userCount.get(organizationId) ?? 0,
-      ...licensing(organizationId, orgStores, licenses)
+      ...licensing(index, organizationId, orgStores)
     };
   });
 }
@@ -179,28 +169,26 @@ export async function listOrganizations() {
 export async function getOrganizationDetail(organizationId: string) {
   const org = await requireOrganization(organizationId);
   await expireLapsedLicenses({ organizationId });
-  const [stores, users, licenses] = (await Promise.all([
-    TenantStoreModel.find({ organizationId }).select("organizationId storeId name licenseId subscriptionId").sort({ name: 1 }).lean(),
+  const [stores, users, index] = (await Promise.all([
+    TenantStoreModel.find({ organizationId }).select("organizationId storeId name").sort({ name: 1 }).lean(),
     UserAssignmentModel.distinct("appUserId", { organizationId, status: "active" }),
-    LicenseModel.find({ organizationId, status: { $ne: "cancelled" } }).lean()
-  ])) as [Doc[], string[], Doc[]];
-  const summary = licensing(organizationId, stores, licenses);
-  const orgLicense = licenses.find((license) => license.scope === "organization") ?? null;
-  const covered = orgLicense
-    ? stores
-        .filter((store) => coveringLicenseId(store) === orgLicense.licenseId)
-        .map((store) => ({ storeId: String(store.storeId), name: String(store.name) }))
-    : [];
+    coverageIndex({ organizationId })
+  ])) as [Doc[], string[], CoverageIndex];
+  const summary = licensing(index, organizationId, stores);
+  const master = index.master(organizationId);
   return {
-    organization: organizationView(org),
+    organization: organizationView(org, summary.licensingMode),
     counts: {
       stores: stores.length,
       roles: normalizeRoles(org.roles, toIsoOr(org.createdAt, "1970-01-01T00:00:00.000Z")).length,
       users: users.length,
-      licenses: licenses.length,
+      licenses: index.licenses.length,
       unlicensedStores: summary.unlicensedStoreCount
     },
-    license: orgLicense ? licenseView(orgLicense, covered) : null
+    /** The master license with every store it covers (master mode), or null. */
+    license: master
+      ? licenseView(master, stores.map((store) => ({ storeId: String(store.storeId), name: String(store.name) })))
+      : null
   };
 }
 
@@ -216,6 +204,19 @@ export async function createOrganization(
     throw new ControlPlaneError(400, "SLUG_INVALID", `slug: ${SLUG_MESSAGE}`);
   }
   await assertSlugFree(slug);
+  const mode: LicensingMode = body.licensingMode ?? (body.license ? "master" : "storeWise");
+  if (mode === "master") {
+    if (!body.license) {
+      throw new ControlPlaneError(400, "MASTER_LICENSE_REQUIRED", "license: a master-license organization starts with its master license");
+    }
+    checkNewLicense(body.license);
+  } else if (body.license) {
+    throw new ControlPlaneError(
+      400,
+      "REQUEST_INVALID",
+      "license: a store-wise organization has no organization license; issue each store its own license"
+    );
+  }
   const organizationId = publicId("org");
   const doc = await OrganizationModel.create({
     organizationId,
@@ -224,19 +225,18 @@ export async function createOrganization(
     billingEmail: body.billingEmail ?? undefined,
     status: "active",
     // The four templates, at version 1 (P9): assignments always name a real role.
-    roles: templateRoles(new Date())
+    roles: templateRoles(new Date()),
+    licensing: { mode }
   });
   await auditAdmin(admin, {
     organizationId,
     action: "organization.create",
     targetType: "organization",
     targetId: organizationId,
-    metadata: { name: body.name, slug }
+    metadata: { name: body.name, slug, licensingMode: mode }
   });
-  const license = body.license
-    ? await createLicense(admin, organizationId, { ...body.license, scope: "organization" })
-    : null;
-  return { organization: organizationView(doc.toObject() as Doc), license };
+  const license = mode === "master" ? await createLicense(admin, organizationId, { ...body.license!, scope: "organization" }) : null;
+  return { organization: organizationView(doc.toObject() as Doc, mode), license };
 }
 
 export async function updateOrganization(

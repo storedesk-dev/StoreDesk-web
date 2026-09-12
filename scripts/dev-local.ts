@@ -47,8 +47,12 @@ async function main() {
     `  Admin console   http://localhost:${port}/admin`,
     `  Staff sign-in   ${seed.admin.email}  /  ${seed.admin.password}`,
     "",
-    `  Organization    ${seed.organization.name}   org tag: ${seed.organization.slug}`,
-    ...seed.stores.map((store) => `  Store           ${store.name}   features: ${store.features}   ${store.license}`),
+    ...seed.organizations.flatMap((org) => [
+      `  Organization    ${org.name}   org tag: ${org.slug}   licensing: ${org.licensing}`,
+      ...seed.stores
+        .filter((store) => store.organization === org.name)
+        .map((store) => `    Store         ${store.name}   features: ${store.features}   ${store.license}`)
+    ]),
     "",
     "  App users (sign in at a store server, not here):",
     ...seed.users.map((user) =>
