@@ -17,7 +17,7 @@ import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { updateOrganization } from "@/lib/organizations";
 import { updateStore } from "@/lib/tenant-stores";
 import { revokeInstallationsAndNotify } from "@/lib/store-notify";
-import { SetupKeyModel, SubscriptionModel, WorkerCredentialModel, WorkerInstallationModel } from "@/models/ControlPlane";
+import { LicenseModel, SetupKeyModel, WorkerCredentialModel, WorkerInstallationModel } from "@/models/ControlPlane";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/store-notify")>();
@@ -103,9 +103,10 @@ describe("GET …/setup", () => {
   });
 
   it("says why a key can't be issued", async () => {
-    await SubscriptionModel.updateOne({ subscriptionId: seeded.subscription.subscriptionId }, { $set: { status: "suspended" } });
+    await LicenseModel.updateOne({ licenseId: seeded.license.licenseId }, { $set: { status: "suspended" } });
     const res = await call(getSetup, request("GET", "/", { token: admin.token }), params);
-    expect(res.body.keyBlockedCode).toBe("SUBSCRIPTION_INACTIVE");
+    expect(res.body.keyBlockedCode).toBe("LICENSE_INACTIVE");
+    expect(res.body.license).toMatchObject({ licenseNumber: seeded.license.licenseNumber, status: "suspended" });
     expect(res.body.keyBlockedReason).toContain("suspended");
   });
 });
@@ -164,13 +165,13 @@ describe("POST …/setup-keys", () => {
     expect((await issue(body)).status).toBe(400);
   });
 
-  it("checks the entitlement: subscription, store and organization status, and the tunnel", async () => {
-    await SubscriptionModel.updateOne({ subscriptionId: seeded.subscription.subscriptionId }, { $set: { entitlementExpiresAt: new Date(Date.now() - 1000) } });
+  it("checks the entitlement: the store's license, store and organization status, and the tunnel", async () => {
+    await LicenseModel.updateOne({ licenseId: seeded.license.licenseId }, { $set: { entitlementExpiresAt: new Date(Date.now() - 1000) } });
     const lapsed = await issue();
     expect(lapsed.status).toBe(402);
-    expect(lapsed.body.error.code).toBe("SUBSCRIPTION_INACTIVE");
-    await SubscriptionModel.updateOne(
-      { subscriptionId: seeded.subscription.subscriptionId },
+    expect(lapsed.body.error.code).toBe("LICENSE_INACTIVE");
+    await LicenseModel.updateOne(
+      { licenseId: seeded.license.licenseId },
       { $set: { status: "active", entitlementExpiresAt: new Date(Date.now() + 86_400_000) } }
     );
 

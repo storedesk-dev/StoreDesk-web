@@ -158,7 +158,7 @@ describe("what the store receives, and suspension (P12)", () => {
   }
 
   it("carries capabilities, settings and settingsVersion, and the content version follows them", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     const first = await pull(pc.token);
     expect(first.status).toBe(200);
     expect(first.body.store).toMatchObject({
@@ -176,7 +176,7 @@ describe("what the store receives, and suspension (P12)", () => {
   });
 
   it("answers 403 STORE_SUSPENDED for a suspended store or organization, and works again once reactivated", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     await updateStore(admin, params.organizationId, params.storeId, { status: "suspended" });
     const store = await pull(pc.token);
     expect(store.status).toBe(403);

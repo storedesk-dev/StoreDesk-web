@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
-import { removeStoreTunnel } from "@/lib/tunnel";
 import {
   AppUserModel,
   ClientDeviceModel,
+  LegacySubscriptionModel,
+  LicenseModel,
   OrganizationModel,
   SetupKeyModel,
-  SubscriptionModel,
   TenantStoreModel,
   UserAssignmentModel,
   WorkerCredentialModel,
@@ -17,15 +17,17 @@ import { auditAdmin } from "@/lib/audit";
 import { notFound, optionalEmail } from "@/lib/http";
 import { normalizeRoles, toIsoOr } from "@/lib/roles";
 import { templateRoles } from "@/lib/role-templates";
+import { removeStoreTunnel } from "@/lib/tunnel";
 import { revokeInstallationsAndNotify, scheduleNotify } from "@/lib/store-notify";
 import {
-  ENTITLED_STATUSES,
-  SubscriptionCreateSchema,
-  createSubscription,
-  expireLapsedSubscriptions,
-  subscriptionView,
-  type SubscriptionView
-} from "@/lib/subscriptions";
+  OrganizationLicenseSchema,
+  coveringLicenseId,
+  createLicense,
+  expireLapsedLicenses,
+  licenseCovers,
+  licenseView,
+  type LicenseView
+} from "@/lib/licenses";
 import type { InternalAdminActor } from "@/lib/admin-auth";
 
 type Doc = Record<string, unknown>;
@@ -87,8 +89,8 @@ export const OrganizationCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   slug: slugSchema.optional(),
   billingEmail: optionalEmail.optional(),
-  /** Optional: the first subscription, created in the same request. */
-  subscription: SubscriptionCreateSchema.optional()
+  /** Optional: the organization license, created in the same request. */
+  license: OrganizationLicenseSchema.optional()
 });
 export type OrganizationCreate = z.output<typeof OrganizationCreateSchema>;
 
@@ -107,64 +109,98 @@ export const OrganizationDeleteSchema = z.object({ confirmSlug: z.string().trim(
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-function currentSubscription(subscriptions: Doc[]): Doc | null {
-  const entitled = subscriptions
-    .filter((sub) => ENTITLED_STATUSES.includes(String(sub.status)))
-    .sort((a, b) => new Date(String(b.entitlementExpiresAt)).getTime() - new Date(String(a.entitlementExpiresAt)).getTime());
-  if (entitled[0]) return entitled[0];
-  return (
-    [...subscriptions].sort(
-      (a, b) => new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime()
-    )[0] ?? null
-  );
+type OrgLicenseSummary = {
+  licenseId: string;
+  licenseNumber: string;
+  plan: string;
+  status: string;
+  entitlementExpiresAt: string | null;
+  seatsUsed: number;
+  maxStores: number;
+};
+
+/** Per organization: its organization license (with seats used), store licenses, and unlicensed stores. */
+function licensing(organizationId: string, stores: Doc[], licenses: Doc[]) {
+  const mine = licenses.filter((license) => license.organizationId === organizationId);
+  const byId = new Map(mine.map((license) => [String(license.licenseId), license]));
+  const orgLicense = mine.find((license) => license.scope === "organization" && license.status !== "cancelled") ?? null;
+  let seatsUsed = 0;
+  let unlicensed = 0;
+  for (const store of stores) {
+    const id = coveringLicenseId(store);
+    const license = id ? byId.get(id) : undefined;
+    if (!licenseCovers(license, store)) unlicensed += 1;
+    else if (orgLicense && id === orgLicense.licenseId) seatsUsed += 1;
+  }
+  const license: OrgLicenseSummary | null = orgLicense
+    ? {
+        licenseId: String(orgLicense.licenseId),
+        licenseNumber: String(orgLicense.licenseNumber),
+        plan: String(orgLicense.plan),
+        status: String(orgLicense.status),
+        entitlementExpiresAt: iso(orgLicense.entitlementExpiresAt),
+        seatsUsed,
+        maxStores: Number(orgLicense.maxStores)
+      }
+    : null;
+  return {
+    license,
+    storeLicenseCount: mine.filter((entry) => entry.scope === "store" && entry.status !== "cancelled").length,
+    unlicensedStoreCount: unlicensed
+  };
 }
 
 export async function listOrganizations() {
   await connectDb();
-  await expireLapsedSubscriptions();
-  const [orgs, stores, subscriptions, assignments] = (await Promise.all([
+  await expireLapsedLicenses();
+  const [orgs, stores, licenses, assignments] = (await Promise.all([
     OrganizationModel.find({}).sort({ createdAt: -1 }).lean(),
-    TenantStoreModel.aggregate([{ $group: { _id: "$organizationId", count: { $sum: 1 } } }]),
-    SubscriptionModel.find({}).lean(),
+    TenantStoreModel.find({}).select("organizationId storeId licenseId subscriptionId").lean(),
+    LicenseModel.find({ status: { $ne: "cancelled" } }).lean(),
     UserAssignmentModel.aggregate([
       { $match: { status: "active" } },
       { $group: { _id: { org: "$organizationId", user: "$appUserId" } } },
       { $group: { _id: "$_id.org", count: { $sum: 1 } } }
     ])
-  ])) as [Doc[], Array<{ _id: string; count: number }>, Doc[], Array<{ _id: string; count: number }>];
-  const storeCount = new Map(stores.map((row) => [row._id, row.count]));
+  ])) as [Doc[], Doc[], Doc[], Array<{ _id: string; count: number }>];
   const userCount = new Map(assignments.map((row) => [row._id, row.count]));
   return orgs.map((org) => {
     const organizationId = String(org.organizationId);
-    const current = currentSubscription(subscriptions.filter((sub) => sub.organizationId === organizationId));
+    const orgStores = stores.filter((store) => store.organizationId === organizationId);
     return {
       ...organizationView(org),
-      storeCount: storeCount.get(organizationId) ?? 0,
+      storeCount: orgStores.length,
       userCount: userCount.get(organizationId) ?? 0,
-      subscriptionStatus: current ? String(current.status) : null,
-      subscriptionEndsAt: current ? iso(current.entitlementExpiresAt) : null
+      ...licensing(organizationId, orgStores, licenses)
     };
   });
 }
 
 export async function getOrganizationDetail(organizationId: string) {
   const org = await requireOrganization(organizationId);
-  await expireLapsedSubscriptions({ organizationId });
-  const [stores, users, subscriptions] = await Promise.all([
-    TenantStoreModel.countDocuments({ organizationId }),
+  await expireLapsedLicenses({ organizationId });
+  const [stores, users, licenses] = (await Promise.all([
+    TenantStoreModel.find({ organizationId }).select("organizationId storeId name licenseId subscriptionId").sort({ name: 1 }).lean(),
     UserAssignmentModel.distinct("appUserId", { organizationId, status: "active" }),
-    SubscriptionModel.find({ organizationId }).lean()
-  ]);
-  const current = currentSubscription(subscriptions as Doc[]);
+    LicenseModel.find({ organizationId, status: { $ne: "cancelled" } }).lean()
+  ])) as [Doc[], string[], Doc[]];
+  const summary = licensing(organizationId, stores, licenses);
+  const orgLicense = licenses.find((license) => license.scope === "organization") ?? null;
+  const covered = orgLicense
+    ? stores
+        .filter((store) => coveringLicenseId(store) === orgLicense.licenseId)
+        .map((store) => ({ storeId: String(store.storeId), name: String(store.name) }))
+    : [];
   return {
     organization: organizationView(org),
     counts: {
-      stores,
+      stores: stores.length,
       roles: normalizeRoles(org.roles, toIsoOr(org.createdAt, "1970-01-01T00:00:00.000Z")).length,
       users: users.length,
-      subscriptions: subscriptions.length
+      licenses: licenses.length,
+      unlicensedStores: summary.unlicensedStoreCount
     },
-    subscription: current ? subscriptionView(current) : null
+    license: orgLicense ? licenseView(orgLicense, covered) : null
   };
 }
 
@@ -173,7 +209,7 @@ export async function getOrganizationDetail(organizationId: string) {
 export async function createOrganization(
   admin: InternalAdminActor,
   body: OrganizationCreate
-): Promise<{ organization: ReturnType<typeof organizationView>; subscription: SubscriptionView | null }> {
+): Promise<{ organization: ReturnType<typeof organizationView>; license: LicenseView | null }> {
   await connectDb();
   const slug = body.slug ?? suggestSlug(body.name);
   if (!ORG_SLUG.test(slug)) {
@@ -197,10 +233,10 @@ export async function createOrganization(
     targetId: organizationId,
     metadata: { name: body.name, slug }
   });
-  const subscription = body.subscription
-    ? await createSubscription(admin, organizationId, body.subscription)
+  const license = body.license
+    ? await createLicense(admin, organizationId, { ...body.license, scope: "organization" })
     : null;
-  return { organization: organizationView(doc.toObject() as Doc), subscription };
+  return { organization: organizationView(doc.toObject() as Doc), license };
 }
 
 export async function updateOrganization(
@@ -258,15 +294,17 @@ export async function deleteOrganization(admin: InternalAdminActor, organization
     throw new ControlPlaneError(400, "CONFIRM_SLUG_MISMATCH", "Type the organization's org tag exactly to delete it");
   }
 
-  const [stores, installations, subscriptions, assignments] = (await Promise.all([
+  const [stores, installations, licenses, legacy, assignments] = (await Promise.all([
     TenantStoreModel.find({ organizationId }).select("storeId tunnelUrl tunnelLabel tunnelId tunnelDnsRecordId").lean(),
     WorkerInstallationModel.find({ organizationId }).select("workerInstallationId").lean(),
-    SubscriptionModel.find({ organizationId }).select("subscriptionId").lean(),
+    LicenseModel.find({ organizationId }).select("licenseId").lean(),
+    LegacySubscriptionModel.find({ organizationId }).select("subscriptionId").lean(),
     UserAssignmentModel.find({ organizationId }).select("assignmentId appUserId").lean()
-  ])) as [Doc[], Doc[], Doc[], Doc[]];
+  ])) as [Doc[], Doc[], Doc[], Doc[], Doc[]];
   const storeIds = stores.map((store) => String(store.storeId));
   const installationIds = installations.map((row) => String(row.workerInstallationId));
-  const subscriptionIds = subscriptions.map((row) => String(row.subscriptionId));
+  const licenseIds = licenses.map((row) => String(row.licenseId));
+  const legacyIds = legacy.map((row) => String(row.subscriptionId));
   const assignmentIds = assignments.map((row) => String(row.assignmentId));
   const memberIds = [...new Set(assignments.map((row) => String(row.appUserId)))];
   const elsewhere = new Set(
@@ -300,14 +338,15 @@ export async function deleteOrganization(admin: InternalAdminActor, organization
     ClientDeviceModel.deleteMany({ appUserId: byIds(orphanUserIds) }),
     AppUserModel.deleteMany({ appUserId: byIds(orphanUserIds) }),
     TenantStoreModel.deleteMany({ storeId: byIds(storeIds) }),
-    SubscriptionModel.deleteMany({ subscriptionId: byIds(subscriptionIds) })
+    LicenseModel.deleteMany({ licenseId: byIds(licenseIds) }),
+    LegacySubscriptionModel.deleteMany({ subscriptionId: byIds(legacyIds) })
   ]);
   await OrganizationModel.deleteOne({ organizationId });
 
   const counts = {
     stores: storeIds.length,
     installations: installationIds.length,
-    subscriptions: subscriptionIds.length,
+    licenses: licenseIds.length,
     assignments: assignmentIds.length,
     usersDeleted: Number(results[6].deletedCount ?? 0),
     usersKept: memberIds.length - orphanUserIds.length,

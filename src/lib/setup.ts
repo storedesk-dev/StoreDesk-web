@@ -2,7 +2,6 @@ import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import {
   SetupKeyModel,
-  SubscriptionModel,
   TenantStoreModel,
   WorkerCredentialModel,
   WorkerInstallationModel
@@ -14,7 +13,7 @@ import { getEmailProvider, isEmailConfigured } from "@/lib/email-provider";
 import { PLANS, SITE } from "@/lib/site";
 import { requireOrganization } from "@/lib/organizations";
 import { installationSummary, requireStore } from "@/lib/tenant-stores";
-import { entitlementProblem, expireLapsedSubscriptions, subscriptionView } from "@/lib/subscriptions";
+import { coveringLicense, expireLapsedLicenses, licenseProblem, licenseSummary } from "@/lib/licenses";
 import { cloudflareConfigured, rotateStoreTunnel, tunnelView } from "@/lib/tunnel";
 import { revokeInstallationsAndNotify } from "@/lib/store-notify";
 import type { InternalAdminActor } from "@/lib/admin-auth";
@@ -39,12 +38,12 @@ type Blocked = { status: number; code: string; message: string };
 async function loadContext(organizationId: string, storeId: string) {
   const org = await requireOrganization(organizationId);
   const store = await requireStore(organizationId, storeId);
-  await expireLapsedSubscriptions({ organizationId, subscriptionId: store.subscriptionId });
-  const [subscription, installations] = (await Promise.all([
-    SubscriptionModel.findOne({ organizationId, subscriptionId: store.subscriptionId }).lean(),
+  await expireLapsedLicenses({ organizationId });
+  const [license, installations] = (await Promise.all([
+    coveringLicense(store),
     WorkerInstallationModel.find({ organizationId, storeId }).sort({ createdAt: -1 }).lean()
   ])) as [Doc | null, Doc[]];
-  return { org, store, subscription, installations };
+  return { org, store, license, installations };
 }
 
 function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | null {
@@ -54,8 +53,9 @@ function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | nul
   if (ctx.store.status !== "active") {
     return { status: 409, code: "STORE_SUSPENDED", message: `The store is ${String(ctx.store.status)}; reactivate it first.` };
   }
-  const problem = entitlementProblem(ctx.subscription);
-  if (problem) return { status: 402, code: "SUBSCRIPTION_INACTIVE", message: problem };
+  // The store's covering license: STORE_UNLICENSED or LICENSE_INACTIVE.
+  const problem = licenseProblem(ctx.license);
+  if (problem) return { status: 402, code: problem.code, message: problem.message };
   if (ctx.store.tunnelRotationRequired === true) {
     return {
       status: 409,
@@ -72,12 +72,12 @@ function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | nul
     };
   }
   const pending = ctx.installations.find((row) => PENDING.includes(String(row.status)));
-  const max = Number(ctx.subscription?.maxWorkerInstallations ?? 1);
+  const max = Number(ctx.license?.maxPcsPerStore ?? 1);
   if (!pending && ctx.installations.length >= max) {
     return {
       status: 409,
       code: "INSTALLATION_LIMIT_REACHED",
-      message: `This store already has ${ctx.installations.length} PC${ctx.installations.length === 1 ? "" : "s"} (the subscription allows ${max}). Use "Replace this PC" to set up a new one.`
+      message: `This store already has ${ctx.installations.length} PC${ctx.installations.length === 1 ? "" : "s"} (its license allows ${max}). Use "Replace this PC" to set up a new one.`
     };
   }
   return null;
@@ -122,7 +122,7 @@ export async function getStoreSetup(organizationId: string, storeId: string) {
     installations: ctx.installations.map((row) => installationSummary(row)!),
     setupKey: keyView(latestKey as Doc | null),
     tunnel,
-    subscription: ctx.subscription ? subscriptionView(ctx.subscription) : null,
+    license: licenseSummary(ctx.license),
     keyBlockedReason: blocked?.message ?? null,
     keyBlockedCode: blocked?.code ?? null,
     emailConfigured: isEmailConfigured(),
@@ -178,7 +178,6 @@ export async function issueStoreSetupKey(
       await WorkerInstallationModel.create({
         organizationId,
         storeId,
-        subscriptionId: ctx.store.subscriptionId,
         workerInstallationId,
         workerName: `${String(ctx.store.name)} PC`,
         contactEmail: contactEmail ?? SITE.email,
@@ -213,7 +212,6 @@ export async function issueStoreSetupKey(
     organizationId,
     storeId,
     workerInstallationId,
-    subscriptionId: ctx.store.subscriptionId,
     keyId: issued.keyId,
     secretHash: await hashSecret(issued.secret),
     contactEmail: contactEmail ?? SITE.email,

@@ -16,9 +16,10 @@ export async function GET(req: Request, ctx: Ctx) {
 }
 
 /**
- * Create a store on a subscription (its `maxStores` counts that
- * subscription's stores) and try to create its tunnel. The answer says how
- * the tunnel went: `tunnel.status` ok | not_configured | failed.
+ * Create a store with its license coverage, `license: {mode: "organization" |
+ * "store" | "none", newLicense?}` (default: a seat on the organization license;
+ * 402 LICENSE_SEATS_FULL when none is free), and try to create its tunnel. The
+ * answer says how the tunnel went: `tunnel.status` ok | not_configured | failed.
  */
 export async function POST(req: Request, ctx: Ctx) {
   try {

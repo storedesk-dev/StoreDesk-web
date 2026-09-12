@@ -32,7 +32,11 @@ const store = {
   tunnelUrl: "https://store-42.example.invalid",
   cloudflareToken: "MUST_NOT_LEAK"
 };
+/** The store's covering license. */
 const subscription = {
+  licenseId: "lic_1",
+  licenseNumber: "SD-ORG-7K3Q92",
+  scope: "organization",
   status: "active",
   entitlementExpiresAt: new Date("2030-02-01T00:00:00Z"),
   offlineGraceDays: 7
@@ -114,7 +118,9 @@ describe("buildAccessSyncBody", () => {
     expect(body.subscription).toEqual({
       status: "active",
       entitlementExpiresAt: "2030-02-01T00:00:00.000Z",
-      offlineGraceDays: 7
+      offlineGraceDays: 7,
+      licenseNumber: "SD-ORG-7K3Q92",
+      scope: "organization"
     });
     expect(body.roles[0]).toMatchObject({ roleId: "org_admin", version: 1, updatedAt: "2030-01-01T00:00:00.000Z" });
     expect(body.version).toMatch(/^[0-9a-f]{64}$/);
@@ -151,8 +157,14 @@ describe("buildAccessSyncBody", () => {
     expect(JSON.stringify(rest)).not.toContain("passwordHash");
   });
 
-  it("answers status none when the installation's subscription is gone", () => {
-    expect(build({ subscription: null }).subscription.status).toBe("none");
+  it("answers status none, with no license number, when there is no covering license", () => {
+    expect(build({ subscription: null }).subscription).toEqual({
+      status: "none",
+      entitlementExpiresAt: null,
+      offlineGraceDays: 7,
+      licenseNumber: null,
+      scope: null
+    });
   });
 });
 

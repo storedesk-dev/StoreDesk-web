@@ -2,12 +2,19 @@ import mongoose, { type ClientSession } from "mongoose";
 
 const globalForMongoose = globalThis as unknown as {
   mongoosePromise?: Promise<typeof mongoose>;
+  migrationPromise?: Promise<void>;
 };
 
 export function hasMongoUri(): boolean {
   return Boolean(process.env.MONGODB_URI?.trim());
 }
 
+/**
+ * Connect once per process, then run the data migrations once (lib/migrations.ts,
+ * idempotent) before anything reads. A failed migration is logged and retried
+ * on the next connect; reads still work because older records are read
+ * through their old fields until migrated.
+ */
 export async function connectDb(): Promise<typeof mongoose | null> {
   const uri = process.env.MONGODB_URI?.trim();
   if (!uri) return null;
@@ -15,7 +22,23 @@ export async function connectDb(): Promise<typeof mongoose | null> {
   if (!globalForMongoose.mongoosePromise) {
     globalForMongoose.mongoosePromise = mongoose.connect(uri);
   }
-  return globalForMongoose.mongoosePromise;
+  const connection = await globalForMongoose.mongoosePromise;
+  if (!globalForMongoose.migrationPromise) {
+    globalForMongoose.migrationPromise = import("@/lib/migrations")
+      .then((migrations) => migrations.runMigrations())
+      .catch((error) => {
+        console.error("[db] migration failed; will retry on the next connect", error);
+        globalForMongoose.migrationPromise = undefined;
+      });
+  }
+  await globalForMongoose.migrationPromise;
+  return connection;
+}
+
+/** Forget the connection and the migration run (tests that start a fresh database). */
+export function resetDbForTests(): void {
+  globalForMongoose.mongoosePromise = undefined;
+  globalForMongoose.migrationPromise = undefined;
 }
 
 /**

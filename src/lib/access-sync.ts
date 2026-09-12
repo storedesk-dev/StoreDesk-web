@@ -2,7 +2,6 @@ import { connectDb } from "@/lib/db";
 import {
   AppUserModel,
   OrganizationModel,
-  SubscriptionModel,
   TenantStoreModel,
   UserAssignmentModel,
   WorkerInstallationModel
@@ -15,6 +14,7 @@ import {
   sha256
 } from "@/lib/control-plane-security";
 import { normalizeRoles, toIsoOr, type OrgRole } from "@/lib/roles";
+import { coveringLicense } from "@/lib/licenses";
 import {
   normalizeStoreSettings,
   readSettingsVersion,
@@ -63,7 +63,17 @@ export type AccessSyncBody = {
     settings: ReturnType<typeof syncSettingsView>;
     settingsVersion: number;
   };
-  subscription: { status: string; entitlementExpiresAt: string | null; offlineGraceDays: number };
+  /**
+   * The store's covering license (the name is the contract's): its status,
+   * end date and offline grace, plus which license it is.
+   */
+  subscription: {
+    status: string;
+    entitlementExpiresAt: string | null;
+    offlineGraceDays: number;
+    licenseNumber: string | null;
+    scope: string | null;
+  };
   roles: OrgRole[];
   users: AccessSyncUser[];
 };
@@ -187,10 +197,18 @@ export function buildAccessSyncBody(input: {
           offlineGraceDays:
             typeof subscription.offlineGraceDays === "number"
               ? subscription.offlineGraceDays
-              : DEFAULT_OFFLINE_GRACE_DAYS
+              : DEFAULT_OFFLINE_GRACE_DAYS,
+          licenseNumber: optionalText(subscription.licenseNumber),
+          scope: optionalText(subscription.scope)
         }
-      : // The installation's subscription is gone: the store refuses sign-in.
-        { status: "none", entitlementExpiresAt: null, offlineGraceDays: DEFAULT_OFFLINE_GRACE_DAYS }
+      : // No covering license: the store refuses sign-in.
+        {
+          status: "none",
+          entitlementExpiresAt: null,
+          offlineGraceDays: DEFAULT_OFFLINE_GRACE_DAYS,
+          licenseNumber: null,
+          scope: null
+        }
   });
   // Roles are already reduced to key / enabled / boolean flags by
   // normalizeRoles, so nothing in them can be a secret — and running them
@@ -239,10 +257,15 @@ export async function loadAccessSync(worker: {
     throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Resource not found");
   }
 
-  const subscriptionId = text(installation.subscriptionId) || text(store.subscriptionId);
-  const subscription = subscriptionId
-    ? ((await SubscriptionModel.findOne({ organizationId, subscriptionId }).lean()) as Doc | null)
-    : null;
+  // The store's covering license. An unlicensed store is refused like a
+  // revoked one (403): the store server turns sign-in off at once, instead of
+  // treating the answer as a transient error and running on offline grace.
+  // A license that has lapsed or is suspended still answers 200 with its
+  // status, so the store applies the offline grace.
+  const subscription = await coveringLicense(store);
+  if (!subscription) {
+    throw new ControlPlaneError(403, "STORE_UNLICENSED", "This store has no license. Ask StoreDesk to license it.");
+  }
 
   const unset = { $in: [null, ""] };
   const assignments = (await UserAssignmentModel.find({

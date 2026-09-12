@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll } from "vitest";
 import mongoose from "mongoose";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
-import { connectDb } from "@/lib/db";
+import { connectDb, resetDbForTests } from "@/lib/db";
 import { resetRateLimitsForTests } from "@/lib/control-plane-security";
 import "@/models/ControlPlane";
 
@@ -17,7 +17,7 @@ export function setupMemoryMongo(): void {
   beforeAll(async () => {
     replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
     process.env.MONGODB_URI = replSet.getUri("storedesk_test");
-    (globalThis as { mongoosePromise?: unknown }).mongoosePromise = undefined;
+    resetDbForTests();
     await connectDb();
     await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
   }, 180_000);
@@ -32,7 +32,7 @@ export function setupMemoryMongo(): void {
 
   afterAll(async () => {
     await mongoose.disconnect();
-    (globalThis as { mongoosePromise?: unknown }).mongoosePromise = undefined;
+    resetDbForTests();
     await replSet?.stop();
   }, 60_000);
 }

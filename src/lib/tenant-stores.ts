@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import {
+  LicenseModel,
   SetupKeyModel,
-  SubscriptionModel,
   TenantStoreModel,
   UserAssignmentModel,
   WorkerCredentialModel,
@@ -24,11 +24,18 @@ import {
   type StoreSettingsUpdate
 } from "@/lib/store-settings";
 import {
-  ENTITLED_STATUSES,
-  entitlementProblem,
-  expireLapsedSubscriptions,
-  subscriptionView
-} from "@/lib/subscriptions";
+  CoverageSchema,
+  coveringLicense,
+  coveringLicenseId,
+  coveringLicenses,
+  expireLapsedLicenses,
+  giveStoreOwnLicense,
+  licenseSummary,
+  prepareNewStoreCoverage,
+  seatsFull,
+  seatsUsed,
+  seatsWithinLimit
+} from "@/lib/licenses";
 import {
   freeTunnelLabel,
   provisionStoreTunnel,
@@ -98,14 +105,14 @@ export function installationSummary(installation: Doc | null | undefined) {
   };
 }
 
-export function storeView(store: Doc, installation?: Doc | null) {
+/** `license` is the store's covering license (already checked to cover it), or null: Unlicensed. */
+export function storeView(store: Doc, installation?: Doc | null, license?: Doc | null) {
   const settings = normalizeStoreSettings(store.settings);
   const tunnel = tunnelView(store);
   const register = readRegisterConfig(store.configJson);
   return {
     storeId: String(store.storeId),
     organizationId: String(store.organizationId),
-    subscriptionId: String(store.subscriptionId),
     name: String(store.name),
     storeNumber: textOrNull(store.storeNumber),
     address: textOrNull(store.address),
@@ -114,6 +121,9 @@ export function storeView(store: Doc, installation?: Doc | null) {
     timeZone: settings.timeZone,
     capabilities: settings.capabilities,
     settingsVersion: readSettingsVersion(store),
+    /** The covering license, or null: Unlicensed (the PC can't activate and sign-in is refused). */
+    licenseId: license ? String(license.licenseId) : null,
+    license: licenseSummary(license),
     tunnel,
     /** Same as tunnel.url; kept for pages written before `tunnel`. */
     tunnelUrl: tunnel.url,
@@ -123,6 +133,7 @@ export function storeView(store: Doc, installation?: Doc | null) {
     updatedAt: iso(store.updatedAt)
   };
 }
+export type StoreView = ReturnType<typeof storeView>;
 
 /** The store's current PC: the most recently created installation. */
 async function primaryInstallations(storeIds: string[]): Promise<Map<string, Doc>> {
@@ -147,21 +158,24 @@ export async function requireStore(organizationId: string, storeId: string): Pro
 
 export async function listStores(organizationId: string) {
   await requireOrganization(organizationId);
+  await expireLapsedLicenses({ organizationId });
   const stores = (await TenantStoreModel.find({ organizationId }).sort({ name: 1 }).lean()) as Doc[];
-  const installations = await primaryInstallations(stores.map((store) => String(store.storeId)));
-  return stores.map((store) => storeView(store, installations.get(String(store.storeId)) ?? null));
+  const [installations, licenses] = await Promise.all([
+    primaryInstallations(stores.map((store) => String(store.storeId))),
+    coveringLicenses(stores)
+  ]);
+  return stores.map((store) =>
+    storeView(store, installations.get(String(store.storeId)) ?? null, licenses.get(String(store.storeId)) ?? null)
+  );
 }
 
 export async function getStoreDetail(organizationId: string, storeId: string) {
+  await expireLapsedLicenses({ organizationId });
   const store = await requireStore(organizationId, storeId);
-  await expireLapsedSubscriptions({ organizationId, subscriptionId: store.subscriptionId });
-  const [installations, subscription] = await Promise.all([
-    primaryInstallations([storeId]),
-    SubscriptionModel.findOne({ organizationId, subscriptionId: store.subscriptionId }).lean()
-  ]);
+  const [installations, license] = await Promise.all([primaryInstallations([storeId]), coveringLicense(store)]);
   return {
-    store: storeView(store, installations.get(storeId) ?? null),
-    subscription: subscription ? subscriptionView(subscription as Doc) : null
+    store: storeView(store, installations.get(storeId) ?? null, license),
+    license: licenseSummary(license)
   };
 }
 
@@ -173,12 +187,16 @@ const timeZoneSchema = z
   .refine(isValidTimeZone, "Unknown time zone; use an IANA name such as America/New_York");
 
 export const StoreCreateSchema = z.object({
-  subscriptionId: z.string().trim().min(1).max(80).optional(),
   name: z.string().trim().min(1).max(120),
   storeNumber: optionalText(40).optional(),
   address: optionalText(300).optional(),
   contactEmail: optionalEmail.optional(),
   timeZone: timeZoneSchema.nullish(),
+  /**
+   * Coverage: `organization` (a seat on the organization license — the
+   * default), `store` with `newLicense` (its own license), or `none`.
+   */
+  license: CoverageSchema.optional(),
   /** The tunnel hostname label; defaults to `<org tag>-<store name>`. `slug` is the older name. */
   tunnelLabel: z.string().trim().max(63).optional(),
   slug: z.string().trim().max(63).optional()
@@ -207,35 +225,13 @@ export async function createStore(
   admin: InternalAdminActor,
   organizationId: string,
   body: StoreCreate
-): Promise<{ store: ReturnType<typeof storeView>; tunnel: TunnelOutcome }> {
+): Promise<{ store: StoreView; tunnel: TunnelOutcome }> {
   const org = await requireOrganization(organizationId);
   if (org.status === "suspended") {
     throw new ControlPlaneError(409, "ORGANIZATION_SUSPENDED", "The organization is suspended; reactivate it first");
   }
-  await expireLapsedSubscriptions({ organizationId });
-  const subscription = (
-    body.subscriptionId
-      ? await SubscriptionModel.findOne({ organizationId, subscriptionId: body.subscriptionId }).lean()
-      : await SubscriptionModel.findOne({ organizationId, status: { $in: ENTITLED_STATUSES } })
-          .sort({ entitlementExpiresAt: -1 })
-          .lean()
-  ) as Doc | null;
-  if (!subscription) {
-    throw body.subscriptionId
-      ? new ControlPlaneError(400, "SUBSCRIPTION_UNKNOWN", "subscriptionId: not a subscription of this organization")
-      : new ControlPlaneError(402, "SUBSCRIPTION_INACTIVE", "This organization has no active subscription; add one first");
-  }
-  const problem = entitlementProblem(subscription);
-  if (problem) throw new ControlPlaneError(402, "SUBSCRIPTION_INACTIVE", problem);
-  const subscriptionId = String(subscription.subscriptionId);
-  const onSubscription = await TenantStoreModel.countDocuments({ organizationId, subscriptionId });
-  if (onSubscription >= Number(subscription.maxStores)) {
-    throw new ControlPlaneError(
-      402,
-      "STORE_LIMIT_REACHED",
-      `This subscription allows ${String(subscription.maxStores)} stores and has ${onSubscription}; raise the limit first`
-    );
-  }
+  await expireLapsedLicenses({ organizationId });
+  const coverage = await prepareNewStoreCoverage(organizationId, body.license);
 
   const storeId = publicId("store");
   // A label the operator chose must be free; a derived one gets -2, -3, … .
@@ -253,7 +249,6 @@ export async function createStore(
   await TenantStoreModel.create({
     organizationId,
     storeId,
-    subscriptionId,
     name: body.name,
     storeNumber: body.storeNumber ?? undefined,
     address: body.address ?? undefined,
@@ -261,17 +256,29 @@ export async function createStore(
     status: "active",
     settings,
     settingsVersion: 1,
+    licenseId: coverage.license ? String(coverage.license.licenseId) : null,
     // The tunnel label is saved only once a tunnel exists under it.
     configJson: registerConfigJson({})
   });
+  if (coverage.license && !(await seatsWithinLimit(coverage.license))) {
+    // A concurrent change took the last seat.
+    await TenantStoreModel.deleteOne({ storeId });
+    throw seatsFull(coverage.license, await seatsUsed(String(coverage.license.licenseId)));
+  }
   await auditAdmin(admin, {
     organizationId,
     storeId,
     action: "store.create",
     targetType: "store",
     targetId: storeId,
-    metadata: { name: body.name, subscriptionId }
+    metadata: {
+      name: body.name,
+      licenseMode: coverage.mode,
+      ...(coverage.license ? { licenseId: coverage.license.licenseId, licenseNumber: coverage.license.licenseNumber } : {})
+    }
   });
+  if (coverage.newLicense) await giveStoreOwnLicense(admin, organizationId, storeId, coverage.newLicense, null);
+
   const tunnel = await provisionStoreTunnel(storeId, label);
   await auditAdmin(admin, {
     organizationId,
@@ -282,7 +289,7 @@ export async function createStore(
     metadata: { status: tunnel.status, label, ...(tunnel.status === "failed" ? { error: tunnel.message } : {}) }
   });
   const store = await requireStore(organizationId, storeId);
-  return { store: storeView(store, null), tunnel };
+  return { store: storeView(store, null, await coveringLicense(store)), tunnel };
 }
 
 export async function updateStore(admin: InternalAdminActor, organizationId: string, storeId: string, body: StorePatch) {
@@ -312,8 +319,8 @@ export async function updateStore(admin: InternalAdminActor, organizationId: str
   // Name, number and status are in the store's access sync; a suspension
   // makes its next pull answer 403 STORE_SUSPENDED.
   if (changed.length) scheduleNotify({ organizationId, storeId, reason: "store.update" });
-  const installations = await primaryInstallations([storeId]);
-  return storeView(after, installations.get(storeId) ?? null);
+  const [installations, license] = await Promise.all([primaryInstallations([storeId]), coveringLicense(after)]);
+  return storeView(after, installations.get(storeId) ?? null, license);
 }
 
 export async function deleteStore(admin: InternalAdminActor, organizationId: string, storeId: string) {
@@ -323,6 +330,7 @@ export async function deleteStore(admin: InternalAdminActor, organizationId: str
     .lean()) as Doc[];
   const installationIds = installations.map((row) => String(row.workerInstallationId));
   const assignments = (await UserAssignmentModel.find({ organizationId, storeId }).select("assignmentId").lean()) as Doc[];
+  const ownLicenses = (await LicenseModel.find({ organizationId, scope: "store", storeId }).select("licenseId licenseNumber").lean()) as Doc[];
 
   // Revoke first: the store's credentials are revoked and its server told,
   // before the tunnel the notify travels through is deleted. A failed revoke
@@ -336,7 +344,10 @@ export async function deleteStore(admin: InternalAdminActor, organizationId: str
     SetupKeyModel.deleteMany({ storeId }),
     WorkerCredentialModel.deleteMany({ workerInstallationId: { $in: installationIds } }),
     WorkerInstallationModel.deleteMany({ workerInstallationId: { $in: installationIds } }),
-    UserAssignmentModel.deleteMany({ assignmentId: { $in: assignments.map((row) => String(row.assignmentId)) } })
+    UserAssignmentModel.deleteMany({ assignmentId: { $in: assignments.map((row) => String(row.assignmentId)) } }),
+    // A store license covers nothing without its store. An organization-license
+    // seat frees itself: seats are counted from the stores.
+    LicenseModel.deleteMany({ licenseId: { $in: ownLicenses.map((row) => String(row.licenseId)) } })
   ]);
   await TenantStoreModel.deleteOne({ organizationId, storeId });
   await auditAdmin(admin, {
@@ -349,6 +360,8 @@ export async function deleteStore(admin: InternalAdminActor, organizationId: str
       name: store.name,
       installations: installationIds.length,
       assignments: assignments.length,
+      licenseId: coveringLicenseId(store),
+      storeLicensesDeleted: ownLicenses.map((row) => row.licenseNumber),
       tunnelDeleted: tunnel.tunnelDeleted,
       ...(tunnel.manualCleanup ? { tunnelNeedsManualCleanup: tunnel.manualCleanup } : {})
     }

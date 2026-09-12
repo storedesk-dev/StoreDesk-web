@@ -10,8 +10,8 @@ import { deleteCloudflareTunnel } from "@/lib/cloudflare";
 import {
   AppUserModel,
   AuditEventModel,
+  LicenseModel,
   OrganizationModel,
-  SubscriptionModel,
   TenantStoreModel,
   UserAssignmentModel,
   WorkerCredentialModel,
@@ -64,7 +64,7 @@ describe("POST /organizations", () => {
     );
     expect(res.status).toBe(201);
     expect(res.body.organization).toMatchObject({ name: "Example Retail", slug: "example-retail", billingEmail: "billing@example.invalid", status: "active" });
-    expect(res.body.subscription).toBeNull();
+    expect(res.body.license).toBeNull();
     const org = await OrganizationModel.findOne({ slug: "example-retail" }).lean();
     const roles = org?.roles as Array<{ roleId: string; version: number }>;
     expect(roles.map((role) => role.roleId)).toEqual(["org_admin", "store_manager", "cashier", "viewer"]);
@@ -79,7 +79,7 @@ describe("POST /organizations", () => {
     expect(res.body.organization.slug).toBe("cafe-expres-1");
   });
 
-  it("creates the first subscription in the same request", async () => {
+  it("creates the organization license in the same request", async () => {
     const res = await call(
       create,
       request("POST", ORGS, {
@@ -87,13 +87,14 @@ describe("POST /organizations", () => {
         body: {
           name: "Trial Co",
           slug: "trial-co",
-          subscription: { plan: "trial", entitlementDays: 30, maxStores: 2, maxWorkerInstallations: 1, offlineGraceDays: 7 }
+          license: { plan: "trial", entitlementDays: 30, maxStores: 2, maxPcsPerStore: 1, offlineGraceDays: 7 }
         }
       })
     );
     expect(res.status).toBe(201);
-    expect(res.body.subscription).toMatchObject({ plan: "trial", status: "trialing", maxStores: 2, maxWorkerInstallations: 1 });
-    expect(await lastAudit("subscription.create")).toBeTruthy();
+    expect(res.body.license).toMatchObject({ scope: "organization", plan: "trial", status: "trialing", maxStores: 2, maxPcsPerStore: 1 });
+    expect(res.body.license.licenseNumber).toMatch(/^SD-ORG-/);
+    expect(await lastAudit("license.create")).toBeTruthy();
   });
 
   it.each(["-bad", "bad-", "bad tag", "a".repeat(41), "under_score", "dots.here"])(
@@ -119,8 +120,8 @@ describe("POST /organizations", () => {
 });
 
 describe("GET /organizations and /organizations/{org}", () => {
-  it("lists organizations with their counts and current subscription", async () => {
-    const { organization } = await seedOrganization(admin);
+  it("lists organizations with their counts and organization license", async () => {
+    const { organization, license } = await seedOrganization(admin);
     const res = await call(list, request("GET", ORGS, { token: admin.token }));
     expect(res.status).toBe(200);
     expect(res.body.organizations).toHaveLength(1);
@@ -128,17 +129,19 @@ describe("GET /organizations and /organizations/{org}", () => {
       organizationId: organization.organizationId,
       storeCount: 1,
       userCount: 0,
-      subscriptionStatus: "active"
+      storeLicenseCount: 0,
+      unlicensedStoreCount: 0,
+      license: { licenseNumber: license.licenseNumber, status: "active", seatsUsed: 1, maxStores: 5 }
     });
-    expect(res.body.organizations[0].subscriptionEndsAt).toMatch(/^\d{4}-/);
+    expect(res.body.organizations[0].license.entitlementExpiresAt).toMatch(/^\d{4}-/);
   });
 
   it("shows one organization with counts, or 404", async () => {
     const { organization } = await seedOrganization(admin);
     const res = await call(detail, request("GET", "/", { token: admin.token }), { organizationId: organization.organizationId });
     expect(res.status).toBe(200);
-    expect(res.body.counts).toEqual({ stores: 1, roles: 4, users: 0, subscriptions: 1 });
-    expect(res.body.subscription.status).toBe("active");
+    expect(res.body.counts).toEqual({ stores: 1, roles: 4, users: 0, licenses: 1, unlicensedStores: 0 });
+    expect(res.body.license).toMatchObject({ status: "active", seatsUsed: 1, coveredStores: [expect.objectContaining({ name: "Store 42" })] });
     const missing = await call(detail, request("GET", "/", { token: admin.token }), { organizationId: "org_nope" });
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe("RESOURCE_NOT_FOUND");
@@ -213,7 +216,7 @@ describe("DELETE /organizations/{org}", () => {
         assignments: [{ storeId: org.store.storeId, role: "cashier" }]
       });
     }
-    const pc = await activatePc(a.organization.organizationId, a.store.storeId, a.subscription.subscriptionId);
+    const pc = await activatePc(a.organization.organizationId, a.store.storeId);
     return { a, b, pc };
   }
 
@@ -242,7 +245,7 @@ describe("DELETE /organizations/{org}", () => {
     // No tunnel was created (Cloudflare is off); deletion is by stored id only, never by name.
     expect(deleteCloudflareTunnel).not.toHaveBeenCalled();
 
-    for (const model of [TenantStoreModel, SubscriptionModel, WorkerInstallationModel, WorkerCredentialModel, UserAssignmentModel]) {
+    for (const model of [TenantStoreModel, LicenseModel, WorkerInstallationModel, WorkerCredentialModel, UserAssignmentModel]) {
       expect(await model.countDocuments({ organizationId })).toBe(0);
     }
     expect(await OrganizationModel.countDocuments({ organizationId })).toBe(0);

@@ -4,9 +4,9 @@ import {
   AppUserModel,
   AuditEventModel,
   InternalAdminModel,
+  LicenseModel,
   OrganizationModel,
   SetupKeyModel,
-  SubscriptionModel,
   TenantStoreModel,
   UserAssignmentModel,
   WorkerInstallationModel
@@ -17,7 +17,7 @@ import { normalizeRoles, toIsoOr, type OrgRole } from "@/lib/roles";
 import { normalizeStoreSettings } from "@/lib/store-settings";
 import { requireOrganization } from "@/lib/organizations";
 import { requireStore } from "@/lib/tenant-stores";
-import { ENTITLED_STATUSES, expireLapsedSubscriptions } from "@/lib/subscriptions";
+import { ENTITLED_STATUSES, coveringLicenseId, expireLapsedLicenses, licenseCovers } from "@/lib/licenses";
 import { tunnelView } from "@/lib/tunnel";
 
 type Doc = Record<string, unknown>;
@@ -92,27 +92,32 @@ async function labelEvents(events: Doc[]) {
   const storeIds = new Set<string>();
   const userIds = new Set<string>();
   const orgIds = new Set<string>();
+  const licenseIds = new Set<string>();
   for (const event of events) {
     if (event.actorType === "internal_admin") adminIds.add(String(event.actorId));
     if (event.storeId) storeIds.add(String(event.storeId));
     if (event.targetType === "store") storeIds.add(String(event.targetId));
     if (event.targetType === "app_user") userIds.add(String(event.targetId));
+    if (event.targetType === "license") licenseIds.add(String(event.targetId));
     orgIds.add(String(event.organizationId));
   }
-  const [admins, stores, users, orgs] = (await Promise.all([
+  const [admins, stores, users, orgs, licenses] = (await Promise.all([
     InternalAdminModel.find({ adminId: { $in: [...adminIds] } }).select("adminId email").lean(),
     TenantStoreModel.find({ storeId: { $in: [...storeIds] } }).select("storeId name").lean(),
     AppUserModel.find({ appUserId: { $in: [...userIds] } }).select("appUserId email").lean(),
-    OrganizationModel.find({ organizationId: { $in: [...orgIds] } }).select("organizationId name").lean()
-  ])) as [Doc[], Doc[], Doc[], Doc[]];
+    OrganizationModel.find({ organizationId: { $in: [...orgIds] } }).select("organizationId name").lean(),
+    LicenseModel.find({ licenseId: { $in: [...licenseIds] } }).select("licenseId licenseNumber").lean()
+  ])) as [Doc[], Doc[], Doc[], Doc[], Doc[]];
   const adminEmail = new Map(admins.map((row) => [String(row.adminId), String(row.email)]));
   const storeName = new Map(stores.map((row) => [String(row.storeId), String(row.name)]));
   const userEmail = new Map(users.map((row) => [String(row.appUserId), String(row.email)]));
   const orgName = new Map(orgs.map((row) => [String(row.organizationId), String(row.name)]));
+  const licenseNumber = new Map(licenses.map((row) => [String(row.licenseId), String(row.licenseNumber)]));
   return events.map((event) => {
     const actorId = String(event.actorId);
     const targetId = String(event.targetId);
     const storeId = event.storeId ? String(event.storeId) : null;
+    const metadata = (event.metadata as Doc) ?? {};
     const actorLabel =
       event.actorType === "internal_admin"
         ? (adminEmail.get(actorId) ?? actorId)
@@ -126,7 +131,9 @@ async function labelEvents(events: Doc[]) {
           ? (userEmail.get(targetId) ?? null)
           : event.targetType === "organization"
             ? (orgName.get(targetId) ?? null)
-            : null;
+            : event.targetType === "license"
+              ? (licenseNumber.get(targetId) ?? (typeof metadata.licenseNumber === "string" ? metadata.licenseNumber : null))
+              : null;
     return {
       auditEventId: String(event.auditEventId),
       occurredAt: iso(event.occurredAt),
@@ -142,7 +149,7 @@ async function labelEvents(events: Doc[]) {
       targetId,
       targetLabel,
       reason: event.reason ? String(event.reason) : null,
-      metadata: (event.metadata as Doc) ?? {}
+      metadata
     };
   });
 }
@@ -184,14 +191,16 @@ const PENDING_INSTALL = ["not_installed", "installed", "awaiting_activation"];
 const LIVE_INSTALL = ["active", "degraded", "updating", "rollback"];
 const ONLINE_WINDOW_MS = 10 * 60_000;
 const OFFLINE_AFTER_MS = 24 * 60 * 60_000;
+const ENDING_WINDOW_MS = 30 * DAY_MS;
 
 export type AttentionItem = {
-  kind: "pc_not_activated" | "subscription_ending" | "tunnel_failed" | "store_offline";
+  kind: "pc_not_activated" | "license_ending" | "store_unlicensed" | "tunnel_failed" | "store_offline";
   organizationId: string;
   organizationName: string;
   storeId: string | null;
   storeName: string | null;
-  subscriptionId: string | null;
+  licenseId: string | null;
+  licenseNumber: string | null;
   at: string | null;
   message: string;
 };
@@ -203,29 +212,40 @@ function daysAgo(date: Date, now: number): string {
 
 export async function dashboard() {
   await connectDb();
-  await expireLapsedSubscriptions();
+  await expireLapsedLicenses();
   const now = Date.now();
-  const [orgs, stores, installations, subscriptions] = (await Promise.all([
+  const [orgs, stores, installations, licenses] = (await Promise.all([
     OrganizationModel.find({}).select("organizationId name status").lean(),
     TenantStoreModel.find({}).lean(),
     WorkerInstallationModel.find({}).lean(),
-    SubscriptionModel.find({}).lean()
+    LicenseModel.find({ status: { $ne: "cancelled" } }).lean()
   ])) as [Doc[], Doc[], Doc[], Doc[]];
   const orgById = new Map(orgs.map((org) => [String(org.organizationId), org]));
   const storeById = new Map(stores.map((store) => [String(store.storeId), store]));
+  const licenseById = new Map(licenses.map((license) => [String(license.licenseId), license]));
   const live = installations.filter((row) => LIVE_INSTALL.includes(String(row.status)));
   const online = live.filter((row) => row.lastSeenAt && now - new Date(String(row.lastSeenAt)).getTime() <= ONLINE_WINDOW_MS);
-  const soon = subscriptions.filter((sub) => {
-    const ends = new Date(String(sub.entitlementExpiresAt)).getTime();
-    return ENTITLED_STATUSES.includes(String(sub.status)) && ends - now <= 30 * DAY_MS;
-  });
 
   const activeOrg = (organizationId: string) => orgById.get(organizationId)?.status !== "suspended";
-  const item = (partial: Omit<AttentionItem, "organizationName">): AttentionItem => ({
+  const item = (partial: Omit<AttentionItem, "organizationName" | "licenseId" | "licenseNumber"> & Partial<AttentionItem>): AttentionItem => ({
+    licenseId: null,
+    licenseNumber: null,
     ...partial,
     organizationName: String(orgById.get(partial.organizationId)?.name ?? partial.organizationId)
   });
   const attention: AttentionItem[] = [];
+
+  // Stores each license covers, and stores with none.
+  const coveredCount = new Map<string, number>();
+  const unlicensed: Doc[] = [];
+  for (const store of stores) {
+    const license = licenseById.get(coveringLicenseId(store) ?? "");
+    if (licenseCovers(license, store)) {
+      coveredCount.set(String(license!.licenseId), (coveredCount.get(String(license!.licenseId)) ?? 0) + 1);
+    } else if (store.status === "active" && activeOrg(String(store.organizationId))) {
+      unlicensed.push(store);
+    }
+  }
 
   const pending = installations.filter(
     (row) => PENDING_INSTALL.includes(String(row.status)) && activeOrg(String(row.organizationId))
@@ -244,7 +264,6 @@ export async function dashboard() {
         organizationId: String(installation.organizationId),
         storeId: String(installation.storeId),
         storeName: store ? String(store.name) : null,
-        subscriptionId: null,
         at: issued ? issued.toISOString() : iso(installation.createdAt),
         message: !key
           ? "PC not activated (no setup key issued)"
@@ -257,17 +276,44 @@ export async function dashboard() {
     );
   }
 
-  for (const sub of soon) {
-    const ends = new Date(String(sub.entitlementExpiresAt));
+  // Licenses in force ending within 30 days, and lapsed ones still covering stores.
+  const ending = licenses.filter((license) => {
+    const ends = new Date(String(license.entitlementExpiresAt)).getTime();
+    return ENTITLED_STATUSES.includes(String(license.status)) && ends - now <= ENDING_WINDOW_MS;
+  });
+  const lapsed = licenses.filter((license) => license.status === "expired" && (coveredCount.get(String(license.licenseId)) ?? 0) > 0);
+  for (const license of [...ending, ...lapsed]) {
+    if (!activeOrg(String(license.organizationId))) continue;
+    const ends = new Date(String(license.entitlementExpiresAt));
+    const store = license.storeId ? storeById.get(String(license.storeId)) : undefined;
+    const number = String(license.licenseNumber);
+    const covered = coveredCount.get(String(license.licenseId)) ?? 0;
     attention.push(
       item({
-        kind: "subscription_ending",
-        organizationId: String(sub.organizationId),
-        storeId: null,
-        storeName: null,
-        subscriptionId: String(sub.subscriptionId),
+        kind: "license_ending",
+        organizationId: String(license.organizationId),
+        storeId: license.storeId ? String(license.storeId) : null,
+        storeName: store ? String(store.name) : null,
+        licenseId: String(license.licenseId),
+        licenseNumber: number,
         at: ends.toISOString(),
-        message: `Subscription ends ${ends.toISOString().slice(0, 10)}`
+        message:
+          ends.getTime() > now
+            ? `License ${number} ends ${ends.toISOString().slice(0, 10)}${license.scope === "organization" ? ` (${covered} store${covered === 1 ? "" : "s"})` : ""}`
+            : `License ${number} ended ${ends.toISOString().slice(0, 10)}`
+      })
+    );
+  }
+
+  for (const store of unlicensed) {
+    attention.push(
+      item({
+        kind: "store_unlicensed",
+        organizationId: String(store.organizationId),
+        storeId: String(store.storeId),
+        storeName: String(store.name),
+        at: null,
+        message: "Unlicensed — the PC can't activate and sign-in is refused"
       })
     );
   }
@@ -282,7 +328,6 @@ export async function dashboard() {
           organizationId: String(store.organizationId),
           storeId: String(store.storeId),
           storeName: String(store.name),
-          subscriptionId: null,
           at: tunnel.updatedAt,
           message: tunnel.status === "failed" ? `Tunnel failed: ${tunnel.message}` : "No tunnel"
         })
@@ -301,7 +346,6 @@ export async function dashboard() {
           organizationId: String(installation.organizationId),
           storeId: String(installation.storeId),
           storeName: String(store.name),
-          subscriptionId: null,
           at: seen ? seen.toISOString() : null,
           message: seen ? `PC last seen ${daysAgo(seen, now)}` : "PC has not checked in since activation"
         })
@@ -320,7 +364,8 @@ export async function dashboard() {
       stores: stores.length,
       pcsOnline: online.length,
       pcsTotal: live.length,
-      subscriptionsEndingSoon: soon.length
+      licensesEndingSoon: ending.length,
+      unlicensedStores: unlicensed.length
     },
     attention: attention.slice(0, 100),
     recentActivity: await labelEvents(recent)

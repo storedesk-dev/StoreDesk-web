@@ -48,7 +48,7 @@ async function main() {
     `  Staff sign-in   ${seed.admin.email}  /  ${seed.admin.password}`,
     "",
     `  Organization    ${seed.organization.name}   org tag: ${seed.organization.slug}`,
-    ...seed.stores.map((store) => `  Store           ${store.name}   features: ${store.features}`),
+    ...seed.stores.map((store) => `  Store           ${store.name}   features: ${store.features}   ${store.license}`),
     "",
     "  App users (sign in at a store server, not here):",
     ...seed.users.map((user) =>

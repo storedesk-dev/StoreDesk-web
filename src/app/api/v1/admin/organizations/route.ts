@@ -3,7 +3,7 @@ import { requireInternalAdmin } from "@/lib/admin-auth";
 import { jsonError, parseBody } from "@/lib/http";
 import { OrganizationCreateSchema, createOrganization, listOrganizations } from "@/lib/organizations";
 
-/** Every organization with its store and user counts and current subscription. */
+/** Every organization with its store and user counts, its organization license and unlicensed stores. */
 export async function GET(req: Request) {
   try {
     await requireInternalAdmin(req);
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 
 /**
  * Create an organization (org-tag rule, 409 SLUG_TAKEN on a duplicate) with
- * the four role templates, and optionally its first subscription.
+ * the four role templates, and optionally its organization license.
  */
 export async function POST(req: Request) {
   try {

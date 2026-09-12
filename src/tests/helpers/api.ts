@@ -61,18 +61,18 @@ export async function lastAudit(action: string) {
   return AuditEventModel.findOne({ action }).sort({ _id: -1 }).lean();
 }
 
-/** An organization with a standard subscription (5 stores, 1 PC per store) and one store. */
+/** An organization with a standard organization license (5 seats, 1 PC per store) and one store on it. */
 export async function seedOrganization(
   admin: InternalAdminActor,
-  options: { slug?: string; name?: string; maxStores?: number; maxWorkerInstallations?: number; storeName?: string } = {}
+  options: { slug?: string; name?: string; maxStores?: number; maxPcsPerStore?: number; maxWorkerInstallations?: number; storeName?: string } = {}
 ) {
-  const { organization, subscription } = await createOrganization(admin, {
+  const { organization, license } = await createOrganization(admin, {
     name: options.name ?? "Example Retail",
     slug: options.slug ?? "example-retail",
-    subscription: {
+    license: {
       plan: "standard",
       maxStores: options.maxStores ?? 5,
-      maxWorkerInstallations: options.maxWorkerInstallations ?? 1
+      maxPcsPerStore: options.maxPcsPerStore ?? options.maxWorkerInstallations ?? 1
     }
   });
   const { store } = await createStore(admin, organization.organizationId, {
@@ -80,17 +80,16 @@ export async function seedOrganization(
     storeNumber: "42",
     contactEmail: "store42@example.invalid"
   });
-  return { organization, subscription: subscription!, store };
+  return { organization, license: license!, store };
 }
 
 /** An activated store PC with a worker credential, as if its setup key had been redeemed. */
-export async function activatePc(organizationId: string, storeId: string, subscriptionId: string) {
+export async function activatePc(organizationId: string, storeId: string) {
   const workerInstallationId = publicId("winst");
   const credential = issueWorkerCredential();
   await WorkerInstallationModel.create({
     organizationId,
     storeId,
-    subscriptionId,
     workerInstallationId,
     workerName: "Back office PC",
     contactEmail: "store42@example.invalid",

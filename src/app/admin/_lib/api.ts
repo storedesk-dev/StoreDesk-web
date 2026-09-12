@@ -12,8 +12,11 @@ import type { StoreCapability } from "@/config/pages";
 // ── Shared shapes ────────────────────────────────────────────────────────────
 
 export type OrgStatus = "active" | "suspended" | "pending";
-export type SubscriptionStatus = "trialing" | "active" | "suspended" | "cancelled" | "expired";
-export type SubscriptionPlan = "trial" | "standard" | "custom";
+export type LicenseStatus = "trialing" | "active" | "suspended" | "cancelled" | "expired";
+export type LicensePlan = "trial" | "standard" | "custom";
+export type LicenseScope = "organization" | "store";
+/** How a store is covered: a seat on the organization license, its own store license, or none. */
+export type CoverageMode = "organization" | "store" | "none";
 export type StoreStatus = "pending" | "active" | "suspended" | "closed";
 export type InstallationStatus =
   | "not_installed"
@@ -40,32 +43,94 @@ export interface Organization {
   updatedAt?: string;
 }
 
-/** A row of `GET /organizations`: the organization plus its counts. */
+/** The organization license as the organizations list shows it. */
+export interface OrgLicenseSummary {
+  licenseId: string;
+  licenseNumber: string;
+  plan: LicensePlan;
+  status: LicenseStatus;
+  entitlementExpiresAt: string | null;
+  seatsUsed: number;
+  maxStores: number;
+}
+
+/** A row of `GET /organizations`: the organization plus its counts and licensing. */
 export interface OrganizationSummary extends Organization {
   storeCount: number;
-  subscriptionStatus?: SubscriptionStatus | null;
-  subscriptionEndsAt?: string | null;
+  userCount?: number;
+  license: OrgLicenseSummary | null;
+  storeLicenseCount: number;
+  unlicensedStoreCount: number;
 }
 
 export interface OrganizationDetail {
   organization: Organization;
-  counts?: { stores: number; roles: number; users: number };
+  counts?: { stores: number; roles: number; users: number; licenses: number; unlicensedStores: number };
+  /** The organization license, with the stores it covers. */
+  license?: License | null;
 }
 
-export interface Subscription {
-  subscriptionId: string;
+export interface License {
+  licenseId: string;
+  /** Readable: SD-ORG-XXXXXX or SD-STR-XXXXXX. */
+  licenseNumber: string;
   organizationId: string;
-  plan: SubscriptionPlan;
-  status: SubscriptionStatus;
-  startsAt?: string;
-  entitlementExpiresAt: string;
+  scope: LicenseScope;
+  storeId: string | null;
+  storeName: string | null;
+  plan: LicensePlan;
+  status: LicenseStatus;
+  startsAt: string | null;
+  entitlementExpiresAt: string | null;
+  daysRemaining: number | null;
   offlineGraceDays: number;
-  /** Stores allowed on this subscription. */
+  /** Seats; always 1 for a store license. */
   maxStores: number;
-  /** PCs allowed per store. */
-  maxWorkerInstallations: number;
-  /** Stores currently on this subscription. */
-  storeCount?: number;
+  maxPcsPerStore: number;
+  notes: string | null;
+  seatsUsed: number;
+  coveredStores: Array<{ storeId: string; name: string }>;
+}
+
+/** What a store shows about the license covering it. */
+export interface StoreLicenseSummary {
+  licenseId: string;
+  licenseNumber: string;
+  scope: LicenseScope;
+  plan: LicensePlan;
+  status: LicenseStatus;
+  entitlementExpiresAt: string | null;
+  maxPcsPerStore: number;
+}
+
+export interface NewLicenseInput {
+  plan: LicensePlan;
+  entitlementDays?: number;
+  maxPcsPerStore?: number;
+  offlineGraceDays?: number;
+  notes?: string;
+}
+
+export interface LicenseCreateInput extends NewLicenseInput {
+  scope: LicenseScope;
+  storeId?: string;
+  maxStores?: number;
+}
+
+export type LicensePatch = Partial<{
+  plan: LicensePlan;
+  status: LicenseStatus;
+  renewDays: number;
+  entitlementExpiresAt: string;
+  maxStores: number;
+  maxPcsPerStore: number;
+  offlineGraceDays: number;
+  notes: string | null;
+}>;
+
+export interface Coverage {
+  mode: CoverageMode;
+  newLicense?: NewLicenseInput;
 }
 
 export interface StoreInstallationSummary {
@@ -86,13 +151,15 @@ export interface StoreTunnel {
 export interface Store {
   storeId: string;
   organizationId: string;
-  subscriptionId: string;
   name: string;
   storeNumber?: string | null;
   address?: string | null;
   contactEmail?: string | null;
   status: StoreStatus;
   timeZone?: string | null;
+  /** The covering license, or null: Unlicensed. */
+  licenseId: string | null;
+  license: StoreLicenseSummary | null;
   installation?: StoreInstallationSummary | null;
   tunnel?: StoreTunnel | null;
   createdAt?: string;
@@ -150,8 +217,10 @@ export interface StoreSetup {
   organizationSlug: string;
   contactEmail?: string | null;
   tunnel: StoreTunnel;
-  /** Why a key cannot be issued right now (no tunnel, subscription ended, …), or null. */
+  license?: StoreLicenseSummary | null;
+  /** Why a key cannot be issued right now (unlicensed, license ended, no tunnel, …), or null. */
   keyBlockedReason?: string | null;
+  keyBlockedCode?: string | null;
 }
 
 export interface IssuedSetupKey {
@@ -257,7 +326,7 @@ export interface AuditEvent {
   action: string;
   targetType: string;
   targetId: string;
-  /** e.g. the store or user name, when the server resolves it. */
+  /** e.g. the store or user name or license number, when the server resolves it. */
   targetLabel?: string | null;
   organizationId?: string;
   organizationName?: string | null;
@@ -273,7 +342,8 @@ export interface AuditPage {
 
 export type AttentionKind =
   | "pc_not_activated"
-  | "subscription_ending"
+  | "license_ending"
+  | "store_unlicensed"
   | "tunnel_failed"
   | "store_offline";
 
@@ -283,8 +353,9 @@ export interface AttentionItem {
   organizationName: string;
   storeId?: string | null;
   storeName?: string | null;
-  subscriptionId?: string | null;
-  /** Key issued / entitlement end / last seen, depending on the kind. */
+  licenseId?: string | null;
+  licenseNumber?: string | null;
+  /** Key issued / license end / last seen, depending on the kind. */
   at?: string | null;
   message?: string | null;
 }
@@ -295,7 +366,8 @@ export interface Dashboard {
     stores: number;
     pcsOnline: number;
     pcsTotal: number;
-    subscriptionsEndingSoon: number;
+    licensesEndingSoon: number;
+    unlicensedStores: number;
   };
   attention: AttentionItem[];
   recentActivity: AuditEvent[];
@@ -407,19 +479,10 @@ export const api = {
     name: string;
     slug: string;
     billingEmail?: string;
-    subscription?: {
-      plan: SubscriptionPlan;
-      entitlementDays: number;
-      maxStores: number;
-      maxWorkerInstallations: number;
-      offlineGraceDays: number;
-    };
+    /** The organization license, created with it. */
+    license?: NewLicenseInput & { maxStores: number };
   }) =>
-    request<{ organization: Organization; subscription?: Subscription | null }>(
-      "POST",
-      `${ADMIN}/organizations`,
-      input
-    ),
+    request<{ organization: Organization; license?: License | null }>("POST", `${ADMIN}/organizations`, input),
   getOrganization: (orgId: string) => request<OrganizationDetail>("GET", org(orgId)),
   updateOrganization: (
     orgId: string,
@@ -428,36 +491,12 @@ export const api = {
   deleteOrganization: (orgId: string, confirmSlug: string) =>
     request<{ deleted: string }>("DELETE", org(orgId), { confirmSlug }),
 
-  // Subscriptions
-  listSubscriptions: (orgId: string) =>
-    request<{ subscriptions: Subscription[] }>("GET", `${org(orgId)}/subscriptions`),
-  createSubscription: (
-    orgId: string,
-    input: {
-      plan: SubscriptionPlan;
-      entitlementDays: number;
-      maxStores: number;
-      maxWorkerInstallations: number;
-      offlineGraceDays: number;
-    }
-  ) => request<{ subscription: Subscription }>("POST", `${org(orgId)}/subscriptions`, input),
-  updateSubscription: (
-    orgId: string,
-    subscriptionId: string,
-    patch: Partial<{
-      plan: SubscriptionPlan;
-      status: SubscriptionStatus;
-      maxStores: number;
-      maxWorkerInstallations: number;
-      offlineGraceDays: number;
-      renewDays: number;
-    }>
-  ) =>
-    request<{ subscription: Subscription }>(
-      "PATCH",
-      `${org(orgId)}/subscriptions/${enc(subscriptionId)}`,
-      patch
-    ),
+  // Licenses
+  listLicenses: (orgId: string) => request<{ licenses: License[] }>("GET", `${org(orgId)}/licenses`),
+  createLicense: (orgId: string, input: LicenseCreateInput) =>
+    request<{ license: License }>("POST", `${org(orgId)}/licenses`, input),
+  updateLicense: (orgId: string, licenseId: string, patch: LicensePatch) =>
+    request<{ license: License }>("PATCH", `${org(orgId)}/licenses/${enc(licenseId)}`, patch),
 
   // Stores
   listStores: (orgId: string) => request<{ stores: Store[] }>("GET", `${org(orgId)}/stores`),
@@ -469,10 +508,11 @@ export const api = {
       address?: string;
       contactEmail?: string;
       timeZone?: string;
-      subscriptionId: string;
+      license: Coverage;
     }
   ) => request<{ store: Store }>("POST", `${org(orgId)}/stores`, input),
-  getStore: (orgId: string, storeId: string) => request<{ store: Store }>("GET", store(orgId, storeId)),
+  getStore: (orgId: string, storeId: string) =>
+    request<{ store: Store; license: StoreLicenseSummary | null }>("GET", store(orgId, storeId)),
   updateStore: (
     orgId: string,
     storeId: string,
@@ -486,6 +526,12 @@ export const api = {
   ) => request<{ store: Store }>("PATCH", store(orgId, storeId), patch),
   deleteStore: (orgId: string, storeId: string) =>
     request<{ deleted: string }>("DELETE", store(orgId, storeId)),
+  setStoreLicense: (orgId: string, storeId: string, coverage: Coverage) =>
+    request<{ store: Store; license: StoreLicenseSummary | null; changed: boolean }>(
+      "PUT",
+      `${store(orgId, storeId)}/license`,
+      coverage
+    ),
 
   // Store settings (features, integrations, time zone)
   getStoreSettings: (orgId: string, storeId: string) =>
@@ -583,14 +629,15 @@ export const ADMIN_ROUTES = [
   "GET    /api/v1/admin/organizations/{org}",
   "PATCH  /api/v1/admin/organizations/{org}",
   "DELETE /api/v1/admin/organizations/{org}",
-  "GET    /api/v1/admin/organizations/{org}/subscriptions",
-  "POST   /api/v1/admin/organizations/{org}/subscriptions",
-  "PATCH  /api/v1/admin/organizations/{org}/subscriptions/{sub}",
+  "GET    /api/v1/admin/organizations/{org}/licenses",
+  "POST   /api/v1/admin/organizations/{org}/licenses",
+  "PATCH  /api/v1/admin/organizations/{org}/licenses/{licenseId}",
   "GET    /api/v1/admin/organizations/{org}/stores",
   "POST   /api/v1/admin/organizations/{org}/stores",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}",
   "PATCH  /api/v1/admin/organizations/{org}/stores/{store}",
   "DELETE /api/v1/admin/organizations/{org}/stores/{store}",
+  "PUT    /api/v1/admin/organizations/{org}/stores/{store}/license",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/settings",
   "PUT    /api/v1/admin/organizations/{org}/stores/{store}/settings",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/settings/google-sheets/check",

@@ -2,7 +2,7 @@
  * Facts about the product, in one place.
  *
  * Everything here is checked against the code it describes. Plan limits come
- * from `createSubscription`, the session length from `CLIENT_SESSION_TTL_SECONDS`,
+ * from `lib/licenses.ts` (license defaults), the session length from `CLIENT_SESSION_TTL_SECONDS`,
  * the setup-key window from `issueSetupKeyEmail`. If one of those changes, this
  * changes with it — marketing copy that drifts from the product is worse than
  * no copy.
@@ -39,8 +39,10 @@ export const CAPABILITIES = {
 export const PLANS = {
   trialDays: 30,
   standardDays: 365,
+  /** An organization license's default seats. */
   defaultMaxStores: 5,
-  defaultMaxWorkers: 5,
+  /** A license's default PCs per store. */
+  defaultMaxWorkers: 1,
   /** CLIENT_SESSION_TTL_SECONDS — one retail shift. */
   offlineSessionHours: 12,
   /** issueSetupKeyEmail */

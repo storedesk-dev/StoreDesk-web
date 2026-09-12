@@ -8,13 +8,11 @@ import * as tunnelRoute from "@/app/api/v1/admin/organizations/[organizationId]/
 import { POST as retryTunnel } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/tunnel/route";
 import { GET as preview } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/access-preview/route";
 import { createOrganization, updateOrganization } from "@/lib/organizations";
-import { createSubscription } from "@/lib/subscriptions";
 import { updateStoreSettings } from "@/lib/tenant-stores";
 import { addUser } from "@/lib/users";
 import { deleteCloudflareTunnel, provisionCloudflareTunnel, rotateCloudflareTunnel } from "@/lib/cloudflare";
 import { revokeInstallationsAndNotify, scheduleNotify } from "@/lib/store-notify";
 import {
-  SubscriptionModel,
   TenantStoreModel,
   UserAssignmentModel,
   WorkerCredentialModel,
@@ -36,7 +34,7 @@ vi.mock("@/lib/cloudflare", () => ({
   rotateCloudflareTunnel: vi.fn(async () => ({ cloudflareToken: "rotated" }))
 }));
 
-/** Stores: create against a subscription's limit, the tunnel outcome (P6), details, delete, access preview. */
+/** Stores: create on a license seat, the tunnel outcome (P6), details, delete, access preview. */
 
 setupMemoryMongo();
 
@@ -56,13 +54,13 @@ afterEach(() => {
   delete process.env.CLOUDFLARE_ACCOUNT_ID;
 });
 
-async function orgWithSubscription(maxStores = 5) {
-  const { organization, subscription } = await createOrganization(admin, {
+async function orgWithLicense(maxStores = 5) {
+  const { organization, license } = await createOrganization(admin, {
     name: "Example Retail",
     slug: "example-retail",
-    subscription: { plan: "standard", maxStores, maxWorkerInstallations: 1 }
+    license: { plan: "standard", maxStores, maxPcsPerStore: 1 }
   });
-  return { organizationId: organization.organizationId, subscriptionId: subscription!.subscriptionId };
+  return { organizationId: organization.organizationId, licenseId: license!.licenseId };
 }
 
 function createStoreCall(organizationId: string, body: unknown) {
@@ -71,7 +69,7 @@ function createStoreCall(organizationId: string, body: unknown) {
 
 describe("POST …/stores", () => {
   it("creates a store and reports the tunnel as not configured when Cloudflare is off", async () => {
-    const { organizationId } = await orgWithSubscription();
+    const { organizationId } = await orgWithLicense();
     const res = await createStoreCall(organizationId, {
       name: "Store 42",
       storeNumber: "42",
@@ -104,7 +102,7 @@ describe("POST …/stores", () => {
       tunnelId: "cf-tunnel-1",
       dnsRecordId: "dns-1"
     });
-    const { organizationId } = await orgWithSubscription();
+    const { organizationId } = await orgWithLicense();
     const res = await createStoreCall(organizationId, { name: "Store 42" });
     expect(res.status).toBe(201);
     expect(res.body.tunnel).toEqual({ status: "ok", url: "https://example-retail-store-42.tunnels.example", message: null });
@@ -119,7 +117,7 @@ describe("POST …/stores", () => {
     useCloudflare();
     vi.mocked(provisionCloudflareTunnel).mockRejectedValueOnce(new Error("tunnel name already taken"));
     const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const { organizationId } = await orgWithSubscription();
+    const { organizationId } = await orgWithLicense();
     const res = await createStoreCall(organizationId, { name: "Store 42" });
     quiet.mockRestore();
     expect(res.status).toBe(201);
@@ -146,7 +144,7 @@ describe("POST …/stores", () => {
   });
 
   it("answers a tunnel retry with 503 when Cloudflare is off and 502 when it refuses", async () => {
-    const { organizationId } = await orgWithSubscription();
+    const { organizationId } = await orgWithLicense();
     const { body } = await createStoreCall(organizationId, { name: "Store 42" });
     const storeId = body.store.storeId;
     const off = await call(retryTunnel, request("POST", "/", { token: admin.token }), { organizationId, storeId });
@@ -164,28 +162,30 @@ describe("POST …/stores", () => {
     expect(refused.body.tunnel).toMatchObject({ status: "failed", message: "quota" });
   });
 
-  it("counts the stores on the chosen subscription against its limit", async () => {
-    const { organizationId } = await orgWithSubscription(1);
-    expect((await createStoreCall(organizationId, { name: "One" })).status).toBe(201);
+  it("puts a store on a seat of the organization license, or gives it its own license when the seats are used", async () => {
+    const { organizationId, licenseId } = await orgWithLicense(1);
+    const first = await createStoreCall(organizationId, { name: "One" });
+    expect(first.status).toBe(201);
+    expect(first.body.store.license).toMatchObject({ licenseId, scope: "organization" });
     const full = await createStoreCall(organizationId, { name: "Two" });
     expect(full.status).toBe(402);
-    expect(full.body.error.code).toBe("STORE_LIMIT_REACHED");
-    const second = await createSubscription(admin, organizationId, { plan: "standard", maxStores: 1 });
-    expect((await createStoreCall(organizationId, { name: "Two", subscriptionId: second.subscriptionId })).status).toBe(201);
+    expect(full.body.error.code).toBe("LICENSE_SEATS_FULL");
+    const own = await createStoreCall(organizationId, { name: "Two", license: { mode: "store", newLicense: { plan: "trial" } } });
+    expect(own.status).toBe(201);
+    expect(own.body.store.license).toMatchObject({ scope: "store", plan: "trial" });
   });
 
-  it("refuses without an entitled subscription, for an unknown one, and for a suspended organization", async () => {
-    const { organization } = await createOrganization(admin, { name: "No Sub", slug: "no-sub" });
+  it("refuses without an organization license unless another coverage is chosen, and for a suspended organization", async () => {
+    const { organization } = await createOrganization(admin, { name: "No License", slug: "no-license" });
     const none = await createStoreCall(organization.organizationId, { name: "S" });
-    expect(none.status).toBe(402);
-    expect(none.body.error.code).toBe("SUBSCRIPTION_INACTIVE");
+    expect(none.status).toBe(409);
+    expect(none.body.error.code).toBe("NO_ORGANIZATION_LICENSE");
+    const unlicensed = await createStoreCall(organization.organizationId, { name: "S", license: { mode: "none" } });
+    expect(unlicensed.status).toBe(201);
+    expect(unlicensed.body.store).toMatchObject({ licenseId: null, license: null });
+    expect((await createStoreCall(organization.organizationId, { name: "S", license: { mode: "everyone" } })).status).toBe(400);
 
-    const { organizationId, subscriptionId } = await orgWithSubscription();
-    expect((await createStoreCall(organizationId, { name: "S", subscriptionId: "sub_nope" })).body.error.code).toBe("SUBSCRIPTION_UNKNOWN");
-    await SubscriptionModel.updateOne({ subscriptionId }, { $set: { status: "suspended" } });
-    expect((await createStoreCall(organizationId, { name: "S", subscriptionId })).status).toBe(402);
-
-    await SubscriptionModel.updateOne({ subscriptionId }, { $set: { status: "active" } });
+    const { organizationId } = await orgWithLicense();
     await updateOrganization(admin, organizationId, { status: "suspended" });
     const suspended = await createStoreCall(organizationId, { name: "S" });
     expect(suspended.status).toBe(409);
@@ -197,7 +197,7 @@ describe("POST …/stores", () => {
     ["an unknown time zone", { name: "S", timeZone: "Mars/Olympus" }],
     ["a bad contact e-mail", { name: "S", contactEmail: "not an email" }]
   ])("answers 400 for %s", async (_label, body) => {
-    const { organizationId } = await orgWithSubscription();
+    const { organizationId } = await orgWithLicense();
     expect((await createStoreCall(organizationId, body)).status).toBe(400);
   });
 
@@ -209,8 +209,8 @@ describe("POST …/stores", () => {
 
 describe("GET, PATCH, PUT and DELETE …/stores/{store}", () => {
   it("lists and shows stores with their PC, tunnel and time zone", async () => {
-    const { organization, subscription, store } = await seedOrganization(admin);
-    await activatePc(organization.organizationId, store.storeId, subscription.subscriptionId);
+    const { organization, license, store } = await seedOrganization(admin);
+    await activatePc(organization.organizationId, store.storeId);
     const listed = await call(list, request("GET", "/", { token: admin.token }), { organizationId: organization.organizationId });
     expect(listed.status).toBe(200);
     expect(listed.body.stores[0].installation).toMatchObject({ status: "active" });
@@ -219,7 +219,8 @@ describe("GET, PATCH, PUT and DELETE …/stores/{store}", () => {
       organizationId: organization.organizationId,
       storeId: store.storeId
     });
-    expect(shown.body.subscription.subscriptionId).toBe(subscription.subscriptionId);
+    expect(shown.body.license).toMatchObject({ licenseId: license.licenseId, scope: "organization" });
+    expect(listed.body.stores[0].license.licenseNumber).toBe(license.licenseNumber);
     expect((await call(detail, request("GET", "/", { token: admin.token }), { organizationId: organization.organizationId, storeId: "store_nope" })).status).toBe(404);
   });
 
@@ -242,9 +243,9 @@ describe("GET, PATCH, PUT and DELETE …/stores/{store}", () => {
   });
 
   it("deletes a store after revoking its PC, with its PC, keys, credentials and assignments", async () => {
-    const { organization, subscription, store } = await seedOrganization(admin);
+    const { organization, store } = await seedOrganization(admin);
     const organizationId = organization.organizationId;
-    const pc = await activatePc(organizationId, store.storeId, subscription.subscriptionId);
+    const pc = await activatePc(organizationId, store.storeId);
     await addUser(admin, organizationId, {
       mode: "managed",
       email: "clerk@example.invalid",

@@ -233,7 +233,7 @@ describe("the store server's sheet proxy", () => {
     request(body === undefined ? "GET" : "POST", path, { body, headers: { Authorization: `Bearer ${token}` } });
 
   it("reads the store's own sheet: meta and values, audited with counts only", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     await enableSheet();
     const meta = await call(sheetMeta, edge(pc.token, "/api/v1/edge/google/sheets/meta"));
     expect(meta.status).toBe(200);
@@ -257,7 +257,7 @@ describe("the store server's sheet proxy", () => {
   });
 
   it("never reaches another spreadsheet, whatever the request names", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     await enableSheet();
     await call(sheetMeta, edge(pc.token, `/api/v1/edge/google/sheets/meta?spreadsheetId=${OTHER_ID}`));
     await call(sheetValues, edge(pc.token, `/api/v1/edge/google/sheets/values?range=Daily!A1&spreadsheetId=${OTHER_ID}`));
@@ -273,7 +273,7 @@ describe("the store server's sheet proxy", () => {
   });
 
   it("bounds an open range at 5,000 rows and refuses a larger one", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     await enableSheet();
     await call(sheetValues, edge(pc.token, "/api/v1/edge/google/sheets/values?range=Daily!A:D"));
     expect(sheetsCalls()[0].url).toContain(encodeURIComponent("'Daily'!A1:D5000"));
@@ -286,7 +286,7 @@ describe("the store server's sheet proxy", () => {
   });
 
   it("appends rows as typed text (RAW), audited with counts only", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     await enableSheet();
     const rows = [["2026-09-12", 1234.56, "=HYPERLINK(\"x\")"], ["2026-09-13", 99, null]];
     const res = await call(sheetAppend, edge(pc.token, "/api/v1/edge/google/sheets/append", { range: "Daily!A1", values: rows }));
@@ -310,7 +310,7 @@ describe("the store server's sheet proxy", () => {
     ["a cell that is an object", { range: "Daily", values: [[{ formula: "=1" }]] }],
     ["a range across tabs", { range: "Daily!A1,Weekly!A1", values: [["x"]] }]
   ])("refuses an append of %s with 400", async (_label, body) => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     await enableSheet();
     const res = await call(sheetAppend, edge(pc.token, "/api/v1/edge/google/sheets/append", body));
     expect(res.status).toBe(400);
@@ -318,7 +318,7 @@ describe("the store server's sheet proxy", () => {
   });
 
   it("answers 422 when the sheet is not shared for writing", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     await enableSheet();
     sheetStatus = 403;
     const res = await call(sheetAppend, edge(pc.token, "/api/v1/edge/google/sheets/append", { range: "Daily", values: [["x"]] }));
@@ -328,7 +328,7 @@ describe("the store server's sheet proxy", () => {
   });
 
   it("refuses a store without Google Sheets (409), a deployment without the key (503) and no credential (401)", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     const disabled = await call(sheetMeta, edge(pc.token, "/api/v1/edge/google/sheets/meta"));
     expect(disabled.status).toBe(409);
     expect(disabled.body.error.code).toBe("GOOGLE_SHEETS_NOT_ENABLED");
@@ -341,7 +341,7 @@ describe("the store server's sheet proxy", () => {
   });
 
   it("rate-limits one installation to 60 calls a minute across the three routes", async () => {
-    const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+    const pc = await activatePc(params.organizationId, params.storeId);
     await enableSheet();
     for (let i = 0; i < 60; i += 1) expect((await call(sheetMeta, edge(pc.token, "/api/v1/edge/google/sheets/meta"))).status).toBe(200);
     const limited = await call(sheetValues, edge(pc.token, "/api/v1/edge/google/sheets/values?range=Daily"));

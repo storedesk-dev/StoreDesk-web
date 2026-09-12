@@ -6,7 +6,6 @@ import {
   EulaAcceptanceModel,
   OrganizationModel,
   SetupKeyModel,
-  SubscriptionModel,
   TenantStoreModel,
   UserAssignmentModel,
   WorkerCredentialModel,
@@ -29,11 +28,12 @@ import { DEFAULT_ORG_ROLES } from "@/lib/roles";
 import { scheduleAppUserNotify } from "@/lib/store-notify";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
+import { coveringLicense, licenseProblem } from "@/lib/licenses";
 
 /**
  * The store-facing half of the control plane: activation (setup-key redeem),
  * bootstrap, enrollment, and the phone's org-tag lookup. The admin half lives
- * in organizations / subscriptions / tenant-stores / setup / users.
+ * in organizations / licenses / tenant-stores / setup / users.
  */
 
 export { DEFAULT_ORG_ROLES };
@@ -108,14 +108,6 @@ export async function redeemSetupKey(body: RedeemBody) {
 
   const ack = body.acknowledgements;
 
-  const sub = await SubscriptionModel.findOne({
-    organizationId: key.organizationId,
-    subscriptionId: key.subscriptionId,
-    status: { $in: ["trialing", "active"] },
-    entitlementExpiresAt: { $gt: new Date() }
-  }).lean();
-  if (!sub) throw new ControlPlaneError(402, "SUBSCRIPTION_INACTIVE", "Subscription inactive");
-
   const [org, store] = (await Promise.all([
     OrganizationModel.findOne({ organizationId: key.organizationId }).lean(),
     TenantStoreModel.findOne({ organizationId: key.organizationId, storeId: key.storeId })
@@ -126,6 +118,12 @@ export async function redeemSetupKey(body: RedeemBody) {
   // 423, the status the store server already maps on this route (P12).
   if (org.status === "suspended" || store.status === "suspended" || store.status === "closed") {
     throw new ControlPlaneError(423, "STORE_SUSPENDED", "This organization or store is suspended");
+  }
+  // The store's covering license decides, not the one the key was issued under.
+  const problem = licenseProblem(await coveringLicense(store));
+  if (problem) {
+    // SUBSCRIPTION_INACTIVE is the code the store server already maps here.
+    throw new ControlPlaneError(402, problem.code === "STORE_UNLICENSED" ? "STORE_UNLICENSED" : "SUBSCRIPTION_INACTIVE", problem.message);
   }
 
   const installation = await WorkerInstallationModel.findOne({
@@ -290,10 +288,8 @@ export async function getBootstrap(
     workerInstallationId
   }).lean();
   if (!installation) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Not found");
-  const sub = await SubscriptionModel.findOne({
-    organizationId,
-    subscriptionId: installation.subscriptionId
-  }).lean();
+  const store = (await TenantStoreModel.findOne({ organizationId, storeId }).lean()) as Record<string, unknown> | null;
+  const sub = store ? await coveringLicense(store) : null;
   return safeJson({
     contractVersion: CONTRACT_VERSION,
     organizationId,
@@ -308,7 +304,9 @@ export async function getBootstrap(
       ? {
           status: sub.status,
           entitlementExpiresAt: sub.entitlementExpiresAt,
-          offlineGraceDays: sub.offlineGraceDays
+          offlineGraceDays: sub.offlineGraceDays,
+          licenseNumber: sub.licenseNumber,
+          scope: sub.scope
         }
       : null,
     protocolRange: { min: 1, max: 1 },

@@ -2,19 +2,20 @@
 
 import type {
   InstallationStatus,
+  LicenseStatus,
   OrgStatus,
   StoreInstallationSummary,
+  StoreLicenseSummary,
   StoreStatus,
-  StoreTunnel,
-  SubscriptionStatus
+  StoreTunnel
 } from "../_lib/api";
-import { relativeTime } from "../_lib/format";
+import { daysUntil, formatDate, relativeTime } from "../_lib/format";
 import { Chip, type Tone } from "./ui";
 
 /** A PC counts as online when it checked in within this window. */
 export const ONLINE_WINDOW_MS = 15 * 60 * 1000;
 
-const SUB: Record<SubscriptionStatus, { label: string; tone: Tone }> = {
+const LICENSE_STATUS: Record<LicenseStatus, { label: string; tone: Tone }> = {
   active: { label: "Active", tone: "green" },
   trialing: { label: "Trialing", tone: "blue" },
   suspended: { label: "Suspended", tone: "amber" },
@@ -22,12 +23,37 @@ const SUB: Record<SubscriptionStatus, { label: string; tone: Tone }> = {
   expired: { label: "Expired", tone: "red" }
 };
 
-export function SubscriptionChip({ status }: { status: SubscriptionStatus | null | undefined }) {
-  if (!status) return <Chip tone="gray">No subscription</Chip>;
-  const s = SUB[status] ?? { label: status, tone: "gray" as Tone };
+export function LicenseStatusChip({ status }: { status: LicenseStatus | null | undefined }) {
+  if (!status) return <Chip tone="gray">No license</Chip>;
+  const s = LICENSE_STATUS[status] ?? { label: status, tone: "gray" as Tone };
   return (
     <Chip tone={s.tone} dot>
       {s.label}
+    </Chip>
+  );
+}
+
+/**
+ * How a store is licensed, in one chip: "Org license · ends 2027-09-12",
+ * "Own license · trial ends 2026-10-12", or "Unlicensed".
+ */
+export function StoreLicenseChip({ license }: { license: StoreLicenseSummary | null | undefined }) {
+  if (!license) {
+    return (
+      <Chip tone="red" dot title="The PC can't activate and sign-in is refused">
+        Unlicensed
+      </Chip>
+    );
+  }
+  const who = license.scope === "organization" ? "Org license" : "Own license";
+  const inForce = license.status === "active" || license.status === "trialing";
+  const ends = formatDate(license.entitlementExpiresAt);
+  const days = daysUntil(license.entitlementExpiresAt);
+  const what = !inForce ? LICENSE_STATUS[license.status]?.label.toLowerCase() ?? license.status : `${license.plan === "trial" ? "trial ends" : "ends"} ${ends}`;
+  const tone: Tone = !inForce ? "red" : days !== null && days <= 30 ? "amber" : license.scope === "organization" ? "blue" : "green";
+  return (
+    <Chip tone={tone} dot title={license.licenseNumber}>
+      {who} · {what}
     </Chip>
   );
 }

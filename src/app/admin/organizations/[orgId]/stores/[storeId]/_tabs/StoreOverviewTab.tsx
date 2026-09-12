@@ -18,7 +18,7 @@ import {
   Select,
   Spinner
 } from "../../../../../_components/ui";
-import { StoreStatusChip } from "../../../../../_components/status";
+import { StoreLicenseChip, StoreStatusChip } from "../../../../../_components/status";
 import { useStoreSettings, type StoreTabProps } from "./shared";
 
 export function StoreOverviewTab({ orgId, storeId, store, refreshStore }: StoreTabProps) {
@@ -52,7 +52,15 @@ export function StoreOverviewTab({ orgId, storeId, store, refreshStore }: StoreT
             { label: "Address", value: store.address || <span className="text-slate-400">—</span> },
             { label: "Contact e-mail", value: store.contactEmail || <span className="text-slate-400">—</span> },
             { label: "Status", value: <StoreStatusChip status={store.status} /> },
-            { label: "Subscription", value: <span className="font-mono text-[12px]">{store.subscriptionId}</span> },
+            {
+              label: "License",
+              value: (
+                <span className="flex flex-wrap items-center gap-2">
+                  <StoreLicenseChip license={store.license} />
+                  {store.license ? <span className="font-mono text-[12px] text-slate-500">{store.license.licenseNumber}</span> : null}
+                </span>
+              )
+            },
             { label: "Created", value: formatDate(store.createdAt) },
             { label: "Store id", value: <span className="font-mono text-[12px]">{store.storeId}</span> }
           ]}

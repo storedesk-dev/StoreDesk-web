@@ -5,7 +5,7 @@ import { GET as dashboard } from "@/app/api/v1/admin/dashboard/route";
 import { GET as audit } from "@/app/api/v1/admin/organizations/[organizationId]/audit/route";
 import { issueStoreSetupKey } from "@/lib/setup";
 import { writeAudit } from "@/lib/audit";
-import { SubscriptionModel, TenantStoreModel, WorkerInstallationModel } from "@/models/ControlPlane";
+import { LicenseModel, TenantStoreModel, WorkerInstallationModel } from "@/models/ControlPlane";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/store-notify")>()),
@@ -35,18 +35,18 @@ afterEach(() => {
 
 describe("GET /api/v1/admin/dashboard", () => {
   it("counts, lists what needs attention, and shows recent activity by admin e-mail", async () => {
-    const { organization, subscription, store } = await seedOrganization(admin);
+    const { organization, license, store } = await seedOrganization(admin);
     await issueStoreSetupKey(admin, organization.organizationId, store.storeId, { deliver: "show" });
-    await SubscriptionModel.updateOne(
-      { subscriptionId: subscription.subscriptionId },
+    await LicenseModel.updateOne(
+      { licenseId: license.licenseId },
       { $set: { entitlementExpiresAt: new Date(Date.now() + 10 * DAY) } }
     );
     const res = await call(dashboard, request("GET", "/", { token: admin.token }));
     expect(res.status).toBe(200);
-    expect(res.body.counts).toEqual({ organizations: 1, stores: 1, pcsOnline: 0, pcsTotal: 0, subscriptionsEndingSoon: 1 });
+    expect(res.body.counts).toEqual({ organizations: 1, stores: 1, pcsOnline: 0, pcsTotal: 0, licensesEndingSoon: 1, unlicensedStores: 0 });
     const kinds = res.body.attention.map((item: { kind: string }) => item.kind);
     expect(kinds).toContain("pc_not_activated");
-    expect(kinds).toContain("subscription_ending");
+    expect(kinds).toContain("license_ending");
     expect(res.body.attention.find((item: { kind: string }) => item.kind === "pc_not_activated")).toMatchObject({
       organizationName: "Example Retail",
       storeName: "Store 42",
@@ -57,9 +57,9 @@ describe("GET /api/v1/admin/dashboard", () => {
   });
 
   it("counts PCs online and flags a PC not seen for a day and a failed tunnel", async () => {
-    const { organization, subscription, store } = await seedOrganization(admin, { maxWorkerInstallations: 2 });
-    const online = await activatePc(organization.organizationId, store.storeId, subscription.subscriptionId);
-    const quiet = await activatePc(organization.organizationId, store.storeId, subscription.subscriptionId);
+    const { organization, store } = await seedOrganization(admin, { maxPcsPerStore: 2 });
+    const online = await activatePc(organization.organizationId, store.storeId);
+    const quiet = await activatePc(organization.organizationId, store.storeId);
     await WorkerInstallationModel.updateOne({ workerInstallationId: online.workerInstallationId }, { $set: { lastSeenAt: new Date() } });
     await WorkerInstallationModel.updateOne({ workerInstallationId: quiet.workerInstallationId }, { $set: { lastSeenAt: new Date(Date.now() - 2 * DAY) } });
     process.env.CLOUDFLARE_API_TOKEN = "cf";
@@ -92,7 +92,7 @@ describe("GET /api/v1/admin/organizations/{org}/audit", () => {
 
     const rest = await call(audit, request("GET", `/?limit=50&cursor=${first.body.nextCursor}`, { token: admin.token }), params);
     const all = [...first.body.events, ...rest.body.events].map((event: { action: string }) => event.action);
-    expect(all).toEqual(["store.tunnel.provision", "store.create", "subscription.create", "organization.create"]);
+    expect(all).toEqual(["store.tunnel.provision", "store.create", "license.create", "organization.create"]);
     expect(rest.body.nextCursor).toBeNull();
 
     const pulls = await call(audit, request("GET", `/?action=edge.access_sync`, { token: admin.token }), params);

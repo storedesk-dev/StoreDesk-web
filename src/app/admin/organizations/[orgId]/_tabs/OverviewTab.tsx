@@ -3,23 +3,24 @@
 import Link from "next/link";
 import { CheckCircle2, Circle } from "lucide-react";
 import { api } from "../../../_lib/api";
-import { daysLeftLabel, formatDate, plural } from "../../../_lib/format";
+import { formatDate, plural } from "../../../_lib/format";
 import { Card, CopyButton, DefinitionList, ErrorBanner, Spinner, useLoad } from "../../../_components/ui";
-import { OrgStatusChip, PcChip, SubscriptionChip, pcState } from "../../../_components/status";
+import { LicenseStatusChip, OrgStatusChip, PcChip, StoreLicenseChip, pcState } from "../../../_components/status";
+import { LicenseEnds, PLAN_LABEL, inForce } from "../../../_components/license";
 import type { OrgTabProps } from "./types";
 
-type Goto = (tab: "subscription" | "stores" | "roles" | "users" | "activity") => void;
+type Goto = (tab: "licenses" | "stores" | "roles" | "users" | "activity") => void;
 
 export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) {
   const { data, error, loading, reload } = useLoad(
     async () => {
-      const [subs, stores, roles, users] = await Promise.all([
-        api.listSubscriptions(orgId),
+      const [licenses, stores, roles, users] = await Promise.all([
+        api.listLicenses(orgId),
         api.listStores(orgId),
         api.listRoles(orgId).catch(() => ({ roles: [] })),
         api.listUsers(orgId).catch(() => ({ users: [] }))
       ]);
-      return { subscriptions: subs.subscriptions, stores: stores.stores, roles: roles.roles, users: users.users };
+      return { licenses: licenses.licenses, stores: stores.stores, roles: roles.roles, users: users.users };
     },
     [orgId]
   );
@@ -28,12 +29,18 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
   if (loading && !data) return <Spinner />;
   if (!data) return null;
 
-  const current =
-    data.subscriptions.find((s) => s.status === "active" || s.status === "trialing") ?? data.subscriptions[0] ?? null;
+  const orgLicense = data.licenses.find((l) => l.scope === "organization" && l.status !== "cancelled") ?? null;
+  const storeLicenses = data.licenses.filter((l) => l.scope === "store" && l.status !== "cancelled");
+  const unlicensed = data.stores.filter((s) => !s.license);
+  const licensedInForce = data.stores.filter((s) => inForce(s.license)).length;
   const activePcs = data.stores.filter((s) => ["online", "offline"].includes(pcState(s.installation))).length;
 
   const steps = [
-    { done: Boolean(current && (current.status === "active" || current.status === "trialing")), label: "Subscription in force", tab: "subscription" as const },
+    {
+      done: data.stores.length > 0 && licensedInForce === data.stores.length,
+      label: data.stores.length ? `${licensedInForce} of ${plural(data.stores.length, "store")} licensed` : "License the stores",
+      tab: "licenses" as const
+    },
     { done: data.stores.length > 0, label: data.stores.length ? `${plural(data.stores.length, "store")}` : "Add the first store", tab: "stores" as const },
     { done: data.roles.length > 0, label: data.roles.length ? `${plural(data.roles.length, "role")}` : "Set up roles", tab: "roles" as const },
     { done: data.users.length > 0, label: data.users.length ? `${plural(data.users.length, "user")}` : "Add users", tab: "users" as const },
@@ -63,53 +70,49 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
       </Card>
 
       <Card
-        title="Subscription"
+        title="Licenses"
         actions={
-          <button type="button" onClick={() => goTo("subscription")} className="text-[13px] font-semibold text-[#0E43D8] hover:underline">
+          <button type="button" onClick={() => goTo("licenses")} className="text-[13px] font-semibold text-[#0E43D8] hover:underline">
             Manage
           </button>
         }
       >
-        {current ? (
-          <DefinitionList
-            rows={[
-              {
-                label: "Plan",
-                value: (
-                  <span className="flex items-center gap-2">
-                    <span className="capitalize">{current.plan}</span>
-                    <SubscriptionChip status={current.status} />
-                  </span>
-                )
-              },
-              {
-                label: "Entitlement ends",
-                value: (
-                  <span className="sd-num">
-                    {formatDate(current.entitlementExpiresAt)}{" "}
-                    <span className="text-xs text-slate-500">({daysLeftLabel(current.entitlementExpiresAt)})</span>
-                  </span>
-                )
-              },
-              {
-                label: "Stores",
-                value: (
-                  <span className="sd-num">
-                    {current.storeCount ?? data.stores.filter((s) => s.subscriptionId === current.subscriptionId).length} of {current.maxStores}
-                  </span>
-                )
-              },
-              { label: "PCs per store", value: <span className="sd-num">{current.maxWorkerInstallations}</span> }
-            ]}
-          />
-        ) : (
-          <p className="py-2 text-sm text-slate-600">
-            No subscription yet. Stores can&apos;t be added until there is one.{" "}
-            <button type="button" onClick={() => goTo("subscription")} className="font-semibold text-[#0E43D8] hover:underline">
-              Add a subscription
-            </button>
-          </p>
-        )}
+        <DefinitionList
+          rows={[
+            {
+              label: "Organization license",
+              value: orgLicense ? (
+                <span className="flex flex-wrap items-center gap-2">
+                  <code className="font-mono text-[12.5px]">{orgLicense.licenseNumber}</code>
+                  <span>{PLAN_LABEL[orgLicense.plan] ?? orgLicense.plan}</span>
+                  <LicenseStatusChip status={orgLicense.status} />
+                </span>
+              ) : (
+                <span className="text-slate-500">None</span>
+              )
+            },
+            ...(orgLicense
+              ? [
+                  { label: "Ends", value: <LicenseEnds license={orgLicense} /> },
+                  {
+                    label: "Seats",
+                    value: (
+                      <span className="sd-num">
+                        {orgLicense.seatsUsed} of {orgLicense.maxStores} used
+                      </span>
+                    )
+                  }
+                ]
+              : []),
+            { label: "Store licenses", value: <span className="sd-num">{storeLicenses.length}</span> },
+            {
+              label: "Unlicensed stores",
+              value: (
+                <span className={`sd-num ${unlicensed.length ? "font-semibold text-red-700" : ""}`}>{unlicensed.length}</span>
+              )
+            }
+          ]}
+        />
       </Card>
 
       <Card title="Setup progress">
@@ -143,7 +146,10 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
                   {s.name}
                   {s.storeNumber ? <span className="font-normal text-slate-500"> · #{s.storeNumber}</span> : null}
                 </Link>
-                <PcChip installation={s.installation} />
+                <span className="flex items-center gap-1.5">
+                  <StoreLicenseChip license={s.license} />
+                  <PcChip installation={s.installation} />
+                </span>
               </li>
             ))}
           </ul>

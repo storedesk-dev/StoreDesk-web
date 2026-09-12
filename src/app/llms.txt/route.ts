@@ -23,7 +23,7 @@ ${SITE.name} is back-office software for independent convenience stores and gas 
 - Data location: the price book, supplier costs and sales reports stay on the store PC. The ${SITE.name} account holds only the organisation, its stores, licensing and which PCs are connected.
 - Offline: staff who are already signed in keep working for ${PLANS.offlineSessionHours} hours with no internet connection.
 - Setup: a setup key is emailed when a store is created; it is valid for ${PLANS.setupKeyHours} hours and works once.
-- Plans: a ${PLANS.trialDays}-day trial, then a ${PLANS.standardDays}-day standard plan. An organisation can run up to ${PLANS.defaultMaxStores} stores and ${PLANS.defaultMaxWorkers} store PCs by default. Pricing is by enquiry.
+- Plans: a ${PLANS.trialDays}-day trial, then a ${PLANS.standardDays}-day standard plan. An organisation license covers up to ${PLANS.defaultMaxStores} stores with ${PLANS.defaultMaxWorkers} store PC each by default, and a single store can also have its own license. Pricing is by enquiry.
 - Contact: ${SITE.email}
 
 ## Features

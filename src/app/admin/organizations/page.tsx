@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
-import { ApiError, api, type SubscriptionPlan } from "../_lib/api";
+import { ApiError, api, type LicensePlan } from "../_lib/api";
 import { daysLeftLabel, daysUntil, formatDate, orgTagProblem, suggestOrgTag } from "../_lib/format";
 import {
   Button,
@@ -21,7 +21,7 @@ import {
   table,
   useLoad
 } from "../_components/ui";
-import { OrgStatusChip, SubscriptionChip } from "../_components/status";
+import { LicenseStatusChip, OrgStatusChip } from "../_components/status";
 
 export default function OrganizationsPage() {
   return (
@@ -53,7 +53,7 @@ function OrganizationsList() {
     <div>
       <PageHeader
         title="Organizations"
-        subtitle="Every customer, their subscription and their stores."
+        subtitle="Every customer, their licenses and their stores."
         actions={
           <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>
             New organization
@@ -89,7 +89,7 @@ function OrganizationsList() {
             </Button>
           }
         >
-          An organization is one customer. It holds the subscription, the stores, the roles and the users.
+          An organization is one customer. It holds the licenses, the stores, the roles and the users.
         </EmptyState>
       ) : rows.length === 0 ? (
         <EmptyState title={`No organization matches “${query.trim()}”`} />
@@ -102,14 +102,14 @@ function OrganizationsList() {
                 <th scope="col" className={table.th}>Name</th>
                 <th scope="col" className={table.th}>Org tag</th>
                 <th scope="col" className={table.th}>Status</th>
-                <th scope="col" className={table.th}>Subscription</th>
+                <th scope="col" className={table.th}>Organization license</th>
                 <th scope="col" className={`${table.th} text-right`}>Stores</th>
-                <th scope="col" className={table.th}>Subscription ends</th>
+                <th scope="col" className={table.th}>License ends</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((org) => {
-                const days = daysUntil(org.subscriptionEndsAt);
+                const days = daysUntil(org.license?.entitlementExpiresAt);
                 return (
                   <tr key={org.organizationId} className={table.tr}>
                     <td className={table.td}>
@@ -125,15 +125,32 @@ function OrganizationsList() {
                       <OrgStatusChip status={org.status} />
                     </td>
                     <td className={table.td}>
-                      <SubscriptionChip status={org.subscriptionStatus} />
+                      {org.license ? (
+                        <span className="flex flex-wrap items-center gap-2">
+                          <LicenseStatusChip status={org.license.status} />
+                          <span className="text-xs text-slate-500 sd-num">
+                            {org.license.seatsUsed}/{org.license.maxStores} seats
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-sm text-slate-400">None</span>
+                      )}
+                      {org.storeLicenseCount ? (
+                        <div className="mt-0.5 text-[11.5px] text-slate-500">+ {org.storeLicenseCount} store license{org.storeLicenseCount === 1 ? "" : "s"}</div>
+                      ) : null}
                     </td>
-                    <td className={`${table.td} text-right`}>{org.storeCount ?? 0}</td>
+                    <td className={`${table.td} text-right`}>
+                      {org.storeCount ?? 0}
+                      {org.unlicensedStoreCount ? (
+                        <div className="text-[11.5px] font-semibold text-red-700">{org.unlicensedStoreCount} unlicensed</div>
+                      ) : null}
+                    </td>
                     <td className={`${table.td} whitespace-nowrap`}>
-                      {org.subscriptionEndsAt ? (
+                      {org.license?.entitlementExpiresAt ? (
                         <>
-                          {formatDate(org.subscriptionEndsAt)}{" "}
+                          {formatDate(org.license.entitlementExpiresAt)}{" "}
                           <span className={`text-xs ${days !== null && days <= 30 ? "font-semibold text-amber-700" : "text-slate-500"}`}>
-                            ({daysLeftLabel(org.subscriptionEndsAt)})
+                            ({daysLeftLabel(org.license.entitlementExpiresAt)})
                           </span>
                         </>
                       ) : (
@@ -160,7 +177,7 @@ function OrganizationsList() {
   );
 }
 
-const PLAN_DEFAULT_DAYS: Record<SubscriptionPlan, number> = { trial: 30, standard: 365, custom: 365 };
+const PLAN_DEFAULT_DAYS: Record<LicensePlan, number> = { trial: 30, standard: 365, custom: 365 };
 
 function NewOrganizationDialog({
   open,
@@ -177,7 +194,7 @@ function NewOrganizationDialog({
   const [tagEdited, setTagEdited] = useState(false);
   const [billingEmail, setBillingEmail] = useState("");
   const [withSub, setWithSub] = useState(true);
-  const [plan, setPlan] = useState<SubscriptionPlan>("standard");
+  const [plan, setPlan] = useState<LicensePlan>("standard");
   const [days, setDays] = useState("365");
   const [maxStores, setMaxStores] = useState("1");
   const [pcsPerStore, setPcsPerStore] = useState("1");
@@ -226,12 +243,12 @@ function NewOrganizationDialog({
         name: name.trim(),
         slug: effectiveTag,
         billingEmail: billingEmail.trim() || undefined,
-        subscription: withSub
+        license: withSub
           ? {
               plan,
               entitlementDays: Number(days),
               maxStores: Number(maxStores),
-              maxWorkerInstallations: Number(pcsPerStore),
+              maxPcsPerStore: Number(pcsPerStore),
               offlineGraceDays: Number(grace)
             }
           : undefined
@@ -313,7 +330,7 @@ function NewOrganizationDialog({
         </Field>
 
         <fieldset className="rounded-md border border-slate-200 p-3">
-          <legend className="px-1 text-[13px] font-semibold text-slate-700">First subscription</legend>
+          <legend className="px-1 text-[13px] font-semibold text-slate-700">Organization license</legend>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className="h-4 w-4 accent-[#1A63F4]" checked={withSub} onChange={(e) => setWithSub(e.target.checked)} />
             Create it now
@@ -326,7 +343,7 @@ function NewOrganizationDialog({
                     {...p}
                     value={plan}
                     onChange={(e) => {
-                      const next = e.target.value as SubscriptionPlan;
+                      const next = e.target.value as LicensePlan;
                       setPlan(next);
                       setDays(String(PLAN_DEFAULT_DAYS[next]));
                     }}
@@ -340,7 +357,7 @@ function NewOrganizationDialog({
               <Field label="Length (days)">
                 {(p) => <Input {...p} type="number" min={1} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} />}
               </Field>
-              <Field label="Stores allowed">
+              <Field label="Seats" hint="Stores it can cover.">
                 {(p) => <Input {...p} type="number" min={1} inputMode="numeric" value={maxStores} onChange={(e) => setMaxStores(e.target.value)} />}
               </Field>
               <Field label="PCs per store">
@@ -351,7 +368,9 @@ function NewOrganizationDialog({
               </Field>
             </div>
           ) : (
-            <p className="mt-2 text-xs text-slate-500">You can add one from the Subscription tab. Stores can&apos;t be added until there is one.</p>
+            <p className="mt-2 text-xs text-slate-500">
+              You can add one from the Licenses tab. Stores can still have their own license, or none for now.
+            </p>
           )}
         </fieldset>
         {error ? <Notice tone="red">{error}</Notice> : null}

@@ -24,7 +24,7 @@ import {
 } from "../../_components/ui";
 import { OrgStatusChip } from "../../_components/status";
 import { OverviewTab } from "./_tabs/OverviewTab";
-import { SubscriptionTab } from "./_tabs/SubscriptionTab";
+import { LicensesTab } from "./_tabs/LicensesTab";
 import { StoresTab } from "./_tabs/StoresTab";
 import { RolesTab } from "./_tabs/RolesTab";
 import { UsersTab } from "./_tabs/UsersTab";
@@ -32,8 +32,8 @@ import { ActivityTab } from "./_tabs/ActivityTab";
 
 import type { OrgTabProps } from "./_tabs/types";
 
-type TabKey = "overview" | "subscription" | "stores" | "roles" | "users" | "activity";
-const TAB_KEYS: TabKey[] = ["overview", "subscription", "stores", "roles", "users", "activity"];
+type TabKey = "overview" | "licenses" | "stores" | "roles" | "users" | "activity";
+const TAB_KEYS: TabKey[] = ["overview", "licenses", "stores", "roles", "users", "activity"];
 
 export default function OrganizationPage() {
   return (
@@ -51,7 +51,9 @@ function OrganizationDetail() {
   const { toast } = useToast();
   const detail = useLoad(() => api.getOrganization(orgId), [orgId]);
 
-  const requested = search.get("tab") as TabKey | null;
+  // `?tab=subscription` links from before licenses land on Licenses.
+  const rawTab = search.get("tab");
+  const requested = (rawTab === "subscription" ? "licenses" : rawTab) as TabKey | null;
   const tab: TabKey = requested && TAB_KEYS.includes(requested) ? requested : "overview";
   const setTab = (key: TabKey) => router.replace(`${pathname}?tab=${key}`, { scroll: false });
 
@@ -120,7 +122,7 @@ function OrganizationDetail() {
         onChange={setTab}
         tabs={[
           { key: "overview", label: "Overview" },
-          { key: "subscription", label: "Subscription" },
+          { key: "licenses", label: "Licenses", count: counts?.licenses },
           { key: "stores", label: "Stores", count: counts?.stores },
           { key: "roles", label: "Roles", count: counts?.roles },
           { key: "users", label: "Users", count: counts?.users },
@@ -129,7 +131,7 @@ function OrganizationDetail() {
       />
       <TabPanel id={tab}>
         {tab === "overview" ? <OverviewTab {...tabProps} goTo={setTab} /> : null}
-        {tab === "subscription" ? <SubscriptionTab {...tabProps} /> : null}
+        {tab === "licenses" ? <LicensesTab {...tabProps} /> : null}
         {tab === "stores" ? <StoresTab {...tabProps} /> : null}
         {tab === "roles" ? <RolesTab {...tabProps} /> : null}
         {tab === "users" ? <UsersTab {...tabProps} /> : null}
@@ -182,7 +184,7 @@ function OrganizationDetail() {
         }}
       >
         <p>
-          This permanently deletes the organization with its subscriptions, stores, roles and access. Store PCs are
+          This permanently deletes the organization with its licenses, stores, roles and access. Store PCs are
           revoked first and stop working. Users keep their logins but lose access to this organization.
         </p>
         <p className="font-semibold text-red-700">This can&apos;t be undone.</p>

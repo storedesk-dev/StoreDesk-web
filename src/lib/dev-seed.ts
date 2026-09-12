@@ -9,11 +9,12 @@ import { issueStoreSetupKey } from "@/lib/setup";
 
 /**
  * Sample data for `npm run dev:local` (a throwaway in-memory database): one
- * internal admin, one organization with a subscription, two stores (one with
- * fuel and lottery, one without), the four template roles, and users of both
- * kinds. Built through the same library calls the admin routes use, so the
- * data is exactly what the admin UI would have made. No tunnel is created
- * unless Cloudflare is configured.
+ * internal admin, one organization with an organization license, four
+ * stores showing every way a store is licensed — two on the organization
+ * license (one with fuel and lottery, one without), one with its own trial
+ * license, one unlicensed — the four template roles, and users of both kinds.
+ * Built through the same library calls the admin routes use. No tunnel is
+ * created unless Cloudflare is configured.
  */
 
 export type SeedOptions = {
@@ -25,7 +26,7 @@ export type SeedOptions = {
 export type SeedResult = {
   admin: { email: string; password: string };
   organization: { organizationId: string; name: string; slug: string };
-  stores: Array<{ storeId: string; name: string; features: string }>;
+  stores: Array<{ storeId: string; name: string; features: string; license: string }>;
   users: Array<{ email: string; kind: "managed" | "invite"; role: string; where: string; password?: string; invitationCode?: string }>;
   setupKey: { store: string; key: string; expiresAt: string } | null;
 };
@@ -50,20 +51,22 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
   });
   const admin: InternalAdminActor = { adminId, email: adminEmail };
 
-  const { organization } = await createOrganization(admin, {
+  const { organization, license } = await createOrganization(admin, {
     name: "Example Retail",
     slug: "example-retail",
     billingEmail: "billing@example-retail.test",
-    subscription: { plan: "standard", maxStores: 5, maxWorkerInstallations: 1, offlineGraceDays: 7 }
+    license: { plan: "standard", maxStores: 5, maxPcsPerStore: 1, offlineGraceDays: 7 }
   });
   const organizationId = organization.organizationId;
+  const orgNumber = license!.licenseNumber;
 
   const { store: main } = await createStore(admin, organizationId, {
     name: "Store 42 · Main St",
     storeNumber: "42",
     address: "42 Main St, Atlanta, GA 30303",
     contactEmail: "store42@example-retail.test",
-    timeZone: "America/New_York"
+    timeZone: "America/New_York",
+    license: { mode: "organization" }
   });
   await updateStoreSettings(
     admin,
@@ -87,8 +90,24 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
     storeNumber: "17",
     address: "17 Elm Ave, Decatur, GA 30030",
     contactEmail: "store17@example-retail.test",
-    timeZone: "America/New_York"
+    timeZone: "America/New_York",
+    license: { mode: "organization" }
   });
+  const { store: hwy } = await createStore(admin, organizationId, {
+    name: "Store 88 · Hwy 9",
+    storeNumber: "88",
+    address: "8800 Hwy 9, Alpharetta, GA 30004",
+    timeZone: "America/New_York",
+    license: { mode: "store", newLicense: { plan: "trial", entitlementDays: 30 } }
+  });
+  const { store: pine } = await createStore(admin, organizationId, {
+    name: "Store 90 · Pine Rd",
+    storeNumber: "90",
+    address: "90 Pine Rd, Marietta, GA 30060",
+    timeZone: "America/New_York",
+    license: { mode: "none" }
+  });
+  const hwyNumber = hwy.license?.licenseNumber ?? "";
 
   const owner = "owner@example-retail.test";
   const manager = "rakesh@storedesk.com";
@@ -121,8 +140,10 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
     admin: { email: adminEmail, password: adminPassword },
     organization: { organizationId, name: organization.name, slug: organization.slug },
     stores: [
-      { storeId: main.storeId, name: main.name, features: "fuel, lottery" },
-      { storeId: elm.storeId, name: elm.name, features: "none" }
+      { storeId: main.storeId, name: main.name, features: "fuel, lottery", license: `organization license ${orgNumber}` },
+      { storeId: elm.storeId, name: elm.name, features: "none", license: `organization license ${orgNumber}` },
+      { storeId: hwy.storeId, name: hwy.name, features: "none", license: `own trial license ${hwyNumber}` },
+      { storeId: pine.storeId, name: pine.name, features: "none", license: "unlicensed" }
     ],
     users: [
       { email: owner, kind: "managed", role: "Organization Admin", where: "every store", password: userPassword },

@@ -7,7 +7,7 @@ import { ChevronLeft } from "lucide-react";
 import { api } from "../../../../_lib/api";
 import { relativeTime } from "../../../../_lib/format";
 import { ErrorBanner, Spinner, TabPanel, Tabs, useLoad } from "../../../../_components/ui";
-import { PcChip, StoreStatusChip, pcState } from "../../../../_components/status";
+import { PcChip, StoreLicenseChip, StoreStatusChip, pcState } from "../../../../_components/status";
 import type { StoreTabProps } from "./_tabs/shared";
 import { StoreOverviewTab } from "./_tabs/StoreOverviewTab";
 import { FeaturesTab } from "./_tabs/FeaturesTab";
@@ -15,9 +15,10 @@ import { IntegrationsTab } from "./_tabs/IntegrationsTab";
 import { RegisterTab } from "./_tabs/RegisterTab";
 import { PcPhonesTab } from "./_tabs/PcPhonesTab";
 import { AccessPreviewTab } from "./_tabs/AccessPreviewTab";
+import { LicenseTab } from "./_tabs/LicenseTab";
 
-type TabKey = "overview" | "features" | "integrations" | "register" | "pc" | "access";
-const TAB_KEYS: TabKey[] = ["overview", "features", "integrations", "register", "pc", "access"];
+type TabKey = "overview" | "license" | "features" | "integrations" | "register" | "pc" | "access";
+const TAB_KEYS: TabKey[] = ["overview", "license", "features", "integrations", "register", "pc", "access"];
 
 export default function StorePage() {
   return (
@@ -81,6 +82,7 @@ function StoreDetail() {
               {store.name}
             </h1>
             <StoreStatusChip status={store.status} />
+            <StoreLicenseChip license={store.license} />
           </div>
           {store.address ? <p className="mt-1 text-sm text-slate-600">{store.address}</p> : null}
         </div>
@@ -99,6 +101,7 @@ function StoreDetail() {
         onChange={setTab}
         tabs={[
           { key: "overview", label: "Overview" },
+          { key: "license", label: "License" },
           { key: "features", label: "Features" },
           { key: "integrations", label: "Integrations" },
           { key: "register", label: "Register" },
@@ -108,6 +111,7 @@ function StoreDetail() {
       />
       <TabPanel id={tab}>
         {tab === "overview" ? <StoreOverviewTab {...props} /> : null}
+        {tab === "license" ? <LicenseTab {...props} /> : null}
         {tab === "features" ? <FeaturesTab {...props} /> : null}
         {tab === "integrations" ? <IntegrationsTab {...props} /> : null}
         {tab === "register" ? <RegisterTab {...props} /> : null}

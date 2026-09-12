@@ -19,12 +19,13 @@ function attentionText(item: AttentionItem): string {
   switch (item.kind) {
     case "pc_not_activated":
       return item.at ? `PC not activated (key issued ${relativeTime(item.at)})` : "PC not activated";
-    case "subscription_ending": {
+    case "license_ending": {
       const days = daysUntil(item.at);
-      return days !== null && days < 0
-        ? `Subscription ended ${formatDate(item.at)}`
-        : `Subscription ends ${formatDate(item.at)}`;
+      const which = item.licenseNumber ? `License ${item.licenseNumber}` : "License";
+      return days !== null && days < 0 ? `${which} ended ${formatDate(item.at)}` : `${which} ends ${formatDate(item.at)}`;
     }
+    case "store_unlicensed":
+      return "Unlicensed — the PC can't activate and sign-in is refused";
     case "tunnel_failed":
       return "Tunnel failed — phones can't reach this store";
     case "store_offline":
@@ -67,7 +68,8 @@ export default function DashboardPage() {
         </>
       ) : undefined
     },
-    { label: "Subscriptions ending in 30 d", value: counts?.subscriptionsEndingSoon, warn: (counts?.subscriptionsEndingSoon ?? 0) > 0 }
+    { label: "Licenses ending in 30 d", value: counts?.licensesEndingSoon, warn: (counts?.licensesEndingSoon ?? 0) > 0 },
+    { label: "Unlicensed stores", value: counts?.unlicensedStores, warn: (counts?.unlicensedStores ?? 0) > 0 }
   ];
 
   return (
@@ -78,7 +80,7 @@ export default function DashboardPage() {
         <ErrorBanner error={error} onRetry={reload} />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             {stats.map((s) => (
               <div key={s.label} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <div className="text-[12.5px] font-semibold text-slate-500">{s.label}</div>
@@ -90,7 +92,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_1fr]">
-            <Card title="Needs attention" description="PCs not activated, subscriptions ending within 30 days, failed tunnels and offline stores." bodyClassName="p-0">
+            <Card title="Needs attention" description="PCs not activated, licenses ending within 30 days, unlicensed stores, failed tunnels and offline stores." bodyClassName="p-0">
               {loading && !data ? (
                 <Spinner />
               ) : !data?.attention.length ? (
@@ -98,9 +100,9 @@ export default function DashboardPage() {
               ) : (
                 <ul className="divide-y divide-slate-100">
                   {data.attention.map((item, i) => (
-                    <li key={`${item.kind}-${item.storeId ?? item.subscriptionId ?? item.organizationId}-${i}`} className="flex items-center gap-3 px-4 py-2.5">
+                    <li key={`${item.kind}-${item.storeId ?? item.licenseId ?? item.organizationId}-${i}`} className="flex items-center gap-3 px-4 py-2.5">
                       <AlertTriangle
-                        className={`h-4 w-4 shrink-0 ${item.kind === "tunnel_failed" || item.kind === "store_offline" ? "text-red-500" : "text-amber-500"}`}
+                        className={`h-4 w-4 shrink-0 ${item.kind === "tunnel_failed" || item.kind === "store_offline" || item.kind === "store_unlicensed" ? "text-red-500" : "text-amber-500"}`}
                         aria-hidden
                       />
                       <div className="min-w-0 flex-1">
@@ -112,9 +114,19 @@ export default function DashboardPage() {
                         </div>
                         <div className="truncate text-[13px] text-slate-600">{attentionText(item)}</div>
                       </div>
-                      {item.kind === "subscription_ending" ? (
-                        <Link href={orgHref(item.organizationId, "subscription")} className="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold hover:bg-slate-50">
+                      {item.kind === "license_ending" ? (
+                        <Link
+                          href={item.storeId ? storeHref(item.organizationId, item.storeId, "license") : orgHref(item.organizationId, "licenses")}
+                          className="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
+                        >
                           Renew
+                        </Link>
+                      ) : item.kind === "store_unlicensed" && item.storeId ? (
+                        <Link
+                          href={storeHref(item.organizationId, item.storeId, "license")}
+                          className="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
+                        >
+                          License
                         </Link>
                       ) : item.kind === "tunnel_failed" && item.storeId ? (
                         <Button size="sm" busy={retrying === item.storeId} onClick={() => retryTunnel(item)}>
@@ -193,7 +205,7 @@ export default function DashboardPage() {
                   </Link>
                 }
               >
-                Start with an organization: its name, the org tag phones will type, and its first subscription.
+                Start with an organization: its name, the org tag phones will type, and its organization license.
               </EmptyState>
             </div>
           ) : null}

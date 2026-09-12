@@ -1,7 +1,7 @@
 # StoreDesk Web
 
 The public site (storedesk.net) and the **control plane**: the admin console where StoreDesk staff create
-organizations, subscriptions, stores, roles and users, and the API store servers call to activate and to
+organizations, licenses, stores, roles and users, and the API store servers call to activate and to
 pull who may sign in. No store data lives here — catalog, price book and register history stay on the
 store PC.
 
@@ -21,9 +21,10 @@ npm run dev:local     # throwaway database with sample data — no .env.local ne
 ```
 
 `dev:local` starts an in-memory MongoDB replica set, seeds one staff login, the organization
-**Example Retail** (org tag `example-retail`) with a subscription, two stores (Store 42 with fuel and
-lottery, Store 17 without), the four template roles, a managed login, an invited user and a waiting setup
-key, prints the logins, and runs `next dev`. Open `http://localhost:3000/admin`. Cloudflare and e-mail are
+**Example Retail** (org tag `example-retail`) with an organization license (5 seats) and four stores, one
+per licensing case: Store 42 (fuel and lottery) and Store 17 on the organization license, Store 88 with its
+own trial license, Store 90 unlicensed. It also seeds the four template roles, a managed login, an invited
+user and a waiting setup key, prints the logins and each store's license, and runs `next dev`. Open `http://localhost:3000/admin`. Cloudflare and e-mail are
 turned off for the run (stores show the tunnel as *not configured*); the data is gone when you stop it.
 Set `DEV_ADMIN_EMAIL`, `DEV_ADMIN_PASSWORD`, `DEV_USER_PASSWORD` or `PORT` to choose them. The first run
 downloads a MongoDB binary once (to `~/.cache/mongodb-binaries`).
@@ -64,10 +65,11 @@ See `.env.example` for the full list with notes.
 - `src/app/api/v1/edge/**`, `src/app/api/v1/setup-keys/redeem`, `…/worker-installations/*/bootstrap*` —
   store-server API (worker credential, or the setup key).
 - `src/app/api/v1/app-auth/organizations/{slug}` — the phone's public org-tag lookup.
-- `src/lib/` — one module per area: `organizations`, `subscriptions`, `tenant-stores` (stores and
-  settings), `setup` (setup keys, Replace PC), `users`, `roles`, `role-templates`, `admin-views`
-  (dashboard, audit, access preview), `access-sync`, `store-notify`, `google`, `tunnel`, `http` (errors
-  and body parsing), `audit`.
+- `src/lib/` — one module per area: `organizations`, `licenses` (organization and store licenses, seats,
+  store coverage), `migrations` (old subscriptions → licenses, run once per process on connect),
+  `tenant-stores` (stores and settings), `setup` (setup keys, Replace PC), `users`, `roles`,
+  `role-templates`, `admin-views` (dashboard, audit, access preview), `access-sync`, `store-notify`,
+  `google`, `tunnel`, `http` (errors and body parsing), `audit`.
 - `src/config/pages.ts` — generated page registry; never edit it (regenerate from the parent repo).
 
 Errors are always `{error: {code, message, correlationId, retryable}}`. Secrets never appear in a response:

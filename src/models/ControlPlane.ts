@@ -70,6 +70,51 @@ const SubscriptionSchema = new Schema(
 );
 
 /**
+ * Licenses (docs/design/control-plane-admin.md, "Licenses"). An organization
+ * license covers any of the organization's stores up to `maxStores` seats; a
+ * store license covers exactly its one store. A store's covering license is
+ * `TenantStore.licenseId`.
+ */
+const LicenseSchema = new Schema(
+  {
+    ...tenant,
+    licenseId: { ...id, unique: true },
+    /** Readable, shown on screens and in the audit: SD-ORG-XXXXXX / SD-STR-XXXXXX. */
+    licenseNumber: { type: String, required: true, unique: true },
+    scope: { type: String, enum: ["organization", "store"], required: true },
+    /** Required when scope is "store". */
+    storeId: { type: String, index: true },
+    plan: { type: String, enum: ["trial", "standard", "custom"], required: true },
+    /** `expired` is written by a check on read once `entitlementExpiresAt` has passed. */
+    status: {
+      type: String,
+      enum: ["trialing", "active", "suspended", "cancelled", "expired"],
+      required: true
+    },
+    startsAt: { type: Date, required: true },
+    entitlementExpiresAt: { type: Date, required: true },
+    offlineGraceDays: { type: Number, min: 0, max: 30, default: 7 },
+    /** Seats: stores it may cover. Always 1 for a store license. */
+    maxStores: { type: Number, min: 1, required: true },
+    maxPcsPerStore: { type: Number, min: 1, default: 1 },
+    notes: { type: String, trim: true, maxlength: 1000 },
+    /**
+     * `org:<organizationId>` or `store:<storeId>` while the license is not
+     * cancelled, unset once it is. Its unique index is what allows at most one
+     * non-cancelled organization license per organization and one
+     * non-cancelled store license per store.
+     */
+    coverageKey: { type: String },
+    migratedFromSubscription: { type: Boolean }
+  },
+  timestamps
+);
+LicenseSchema.index(
+  { coverageKey: 1 },
+  { unique: true, partialFilterExpression: { coverageKey: { $type: "string" } } }
+);
+
+/**
  * Structured store settings (docs/design/control-plane-admin.md). Older
  * records have none of these paths; lib/store-settings.ts reads a missing
  * value as its default.
@@ -106,7 +151,14 @@ const TenantStoreSchema = new Schema(
   {
     ...tenant,
     storeId: { ...id, unique: true },
-    subscriptionId: id,
+    /**
+     * The covering license (lib/licenses.ts): the store's own store license,
+     * the organization license, or null ("Unlicensed"). Missing only on records
+     * the license migration has not reached, which read `subscriptionId`.
+     */
+    licenseId: { type: String, index: true },
+    /** Written by older builds; read only until the license migration has linked the store. */
+    subscriptionId: { type: String, index: true },
     name: { type: String, required: true, trim: true },
     storeNumber: { type: String, trim: true },
     address: { type: String, trim: true },
@@ -154,7 +206,8 @@ const WorkerInstallationSchema = new Schema(
     ...tenant,
     workerInstallationId: { ...id, unique: true },
     storeId: { type: String, index: true },
-    subscriptionId: id,
+    /** Older builds only; entitlement comes from the store's covering license. */
+    subscriptionId: { type: String },
     workerName: { type: String, required: true, trim: true },
     contactEmail: { type: String, required: true, lowercase: true, trim: true },
     storeNumberSnapshot: String,
@@ -195,7 +248,8 @@ const SetupKeySchema = new Schema(
     secretHash: { type: String, required: true, select: false },
     storeId: { type: String, index: true },
     workerInstallationId: { type: String, index: true },
-    subscriptionId: id,
+    /** Older builds only; redeem checks the store's covering license. */
+    subscriptionId: { type: String },
     contactEmail: { type: String, required: true, lowercase: true, trim: true },
     /**
      * `shown`: handed to the admin once, on screen. `sent` / `delivery_failed`:
@@ -397,8 +451,13 @@ export const AdminSessionModel =
   models.AdminSession || model("AdminSession", AdminSessionSchema);
 export const OrganizationModel =
   models.ControlPlaneOrganization || model("ControlPlaneOrganization", OrganizationSchema);
-export const SubscriptionModel =
+/**
+ * Subscriptions from older builds. Read only by the license migration
+ * (lib/migrations.ts), which turns each into a license with the same id.
+ */
+export const LegacySubscriptionModel =
   models.ControlPlaneSubscription || model("ControlPlaneSubscription", SubscriptionSchema);
+export const LicenseModel = models.ControlPlaneLicense || model("ControlPlaneLicense", LicenseSchema);
 export const TenantStoreModel = models.ControlPlaneStore || model("ControlPlaneStore", TenantStoreSchema);
 export const WorkerInstallationModel =
   models.WorkerInstallation || model("WorkerInstallation", WorkerInstallationSchema);

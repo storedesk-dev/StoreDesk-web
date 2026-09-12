@@ -75,7 +75,7 @@ async function giveStoreTunnel(extra: Record<string, unknown> = { tunnelId: "cf-
 const post = (handler: Parameters<typeof call>[0], body?: unknown) => call(handler, request("POST", "/", { token: admin.token, body }), params);
 
 async function activeStorePc() {
-  const pc = await activatePc(params.organizationId, params.storeId, seeded.subscription.subscriptionId);
+  const pc = await activatePc(params.organizationId, params.storeId);
   return pc;
 }
 

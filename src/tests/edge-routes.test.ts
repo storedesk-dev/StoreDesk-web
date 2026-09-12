@@ -55,15 +55,23 @@ vi.mock("@/models/ControlPlane", () => {
     },
     TenantStoreModel: {
       findOne: () =>
-        h.query(() => ({ storeId: "store_1", name: "Store 42", status: "active", subscriptionId: "sub_1", tunnelUrl: "https://s.example.invalid" }))
+        h.query(() => ({ organizationId: "org_1", storeId: "store_1", name: "Store 42", status: "active", licenseId: "lic_1", tunnelUrl: "https://s.example.invalid" }))
     },
     WorkerInstallationModel: {
       findOne: () => h.query(() => ({ workerInstallationId: "winst_1", subscriptionId: "sub_1" })),
       find: many
     },
-    SubscriptionModel: {
+    LicenseModel: {
       findOne: () =>
-        h.query(() => ({ status: "trialing", entitlementExpiresAt: new Date("2030-02-01T00:00:00Z"), offlineGraceDays: 5 }))
+        h.query(() => ({
+          licenseId: "lic_1",
+          licenseNumber: "SD-ORG-7K3Q92",
+          organizationId: "org_1",
+          scope: "organization",
+          status: "trialing",
+          entitlementExpiresAt: new Date("2030-02-01T00:00:00Z"),
+          offlineGraceDays: 5
+        }))
     },
     UserAssignmentModel: {
       find: (filter: unknown) => {
@@ -158,7 +166,14 @@ describe("GET /api/v1/edge/sync/access", () => {
     expect(JSON.stringify(h.state.assignmentFilter)).toContain("org_1");
     expect(JSON.stringify(h.state.assignmentFilter)).toContain("winst_1");
 
-    expect(body.subscription).toEqual({ status: "trialing", entitlementExpiresAt: "2030-02-01T00:00:00.000Z", offlineGraceDays: 5 });
+    // The store's covering license, under the contract's name.
+    expect(body.subscription).toEqual({
+      status: "trialing",
+      entitlementExpiresAt: "2030-02-01T00:00:00.000Z",
+      offlineGraceDays: 5,
+      licenseNumber: "SD-ORG-7K3Q92",
+      scope: "organization"
+    });
     expect(body.users).toHaveLength(2);
     expect(body.users[0]).toMatchObject({ appUserId: "appu_1", passwordHash: h.HASH, assignment: { assignmentId: "asg_1", role: "org_admin" } });
     expect(body.users[1]).not.toHaveProperty("passwordHash");

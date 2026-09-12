@@ -7,9 +7,9 @@ import { POST as enroll } from "@/app/api/v1/app-auth/enroll/route";
 import { normalizeStoreSettings } from "@/lib/store-settings";
 import {
   AppUserModel,
+  LicenseModel,
   OrganizationModel,
   SetupKeyModel,
-  SubscriptionModel,
   TenantStoreModel,
   UserAssignmentModel
 } from "@/models/ControlPlane";
@@ -25,7 +25,7 @@ vi.mock("@/lib/store-notify", async (importOriginal) => ({
 setupMemoryMongo();
 
 describe("seedDevData", () => {
-  it("seeds an admin who can sign in, an organization, two stores, four roles and both kinds of user", async () => {
+  it("seeds an admin, an organization license, stores licensed every way, four roles and both kinds of user", async () => {
     delete process.env.CLOUDFLARE_API_TOKEN;
     const seed = await seedDevData({ adminPassword: "local-admin-pass", userPassword: "local-user-pass" });
     expect(seed.admin).toEqual({ email: "admin@storedesk.local", password: "local-admin-pass" });
@@ -43,13 +43,31 @@ describe("seedDevData", () => {
       "cashier",
       "viewer"
     ]);
-    expect(await SubscriptionModel.countDocuments({ status: "active" })).toBe(1);
 
-    const stores = await TenantStoreModel.find({}).sort({ storeNumber: -1 }).lean();
-    expect(stores).toHaveLength(2);
-    expect(normalizeStoreSettings(stores[0].settings).capabilities).toEqual({ fuel: true, lottery: true, coam: false });
-    expect(normalizeStoreSettings(stores[1].settings).capabilities).toEqual({ fuel: false, lottery: false, coam: false });
-    expect(stores.every((store) => store.tunnelStatus === "not_configured" && !store.tunnelUrl)).toBe(true);
+    const orgLicense = await LicenseModel.findOne({ scope: "organization" }).lean();
+    const storeLicense = await LicenseModel.findOne({ scope: "store" }).lean();
+    expect(orgLicense).toMatchObject({ status: "active", maxStores: 5 });
+    expect(storeLicense).toMatchObject({ status: "trialing", plan: "trial" });
+
+    const byName = async (prefix: string) => (await TenantStoreModel.findOne({ name: new RegExp(`^${prefix}`) }).lean())!;
+    const main = await byName("Store 42");
+    const elm = await byName("Store 17");
+    const hwy = await byName("Store 88");
+    const pine = await byName("Store 90");
+    expect(main.licenseId).toBe(orgLicense?.licenseId);
+    expect(elm.licenseId).toBe(orgLicense?.licenseId);
+    expect(hwy.licenseId).toBe(storeLicense?.licenseId);
+    expect(storeLicense?.storeId).toBe(hwy.storeId);
+    expect(pine.licenseId).toBeNull();
+    expect(seed.stores.map((store) => store.license)).toEqual([
+      `organization license ${orgLicense?.licenseNumber}`,
+      `organization license ${orgLicense?.licenseNumber}`,
+      `own trial license ${storeLicense?.licenseNumber}`,
+      "unlicensed"
+    ]);
+    expect(normalizeStoreSettings(main.settings).capabilities).toEqual({ fuel: true, lottery: true, coam: false });
+    expect(normalizeStoreSettings(elm.settings).capabilities).toEqual({ fuel: false, lottery: false, coam: false });
+    expect((await TenantStoreModel.find({}).lean()).every((store) => store.tunnelStatus === "not_configured" && !store.tunnelUrl)).toBe(true);
 
     const users = await AppUserModel.find({}).lean();
     expect(users.map((user) => user.status).sort()).toEqual(["active", "active", "pending_enrollment"]);
