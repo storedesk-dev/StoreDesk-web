@@ -37,7 +37,9 @@ Run locally with `npm run dev:local` (in-memory MongoDB, sample data, logins pri
 set — `setupMemoryMongo()` from `src/tests/helpers/mongo.ts`, request helpers in `src/tests/helpers/api.ts`.
 Mock `@/lib/store-notify` (to assert notifies) and `@/lib/cloudflare`.
 
-**Release rule:** Update `LATEST_RELEASE_TAG` in `src/app/download/DownloadClient.tsx` before every release tag.
+**Release rule:** Update `LATEST_RELEASE_TAG` in `src/lib/release.ts` before every release tag. The installer is
+unsigned; the download page shows its SHA-256 read from the `StoreDesk Windows Setup.exe.sha256` file the tag build
+publishes beside it (never hard-coded).
 
 **Task discipline:** read `docs/` and this file before grepping; reuse existing helpers; plan → approve →
 implement → verify → commit.
