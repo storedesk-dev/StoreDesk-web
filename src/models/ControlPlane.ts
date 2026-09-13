@@ -452,6 +452,32 @@ const LoginThrottleSchema = new Schema(
 );
 LoginThrottleSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+/**
+ * Support codes (lib/support-codes.ts): StoreDesk staff issue one for a store;
+ * that store's PC redeems it once, within 30 minutes, to unlock troubleshooting
+ * at a stuck sign-in. Only the SHA-256 of the code is stored.
+ */
+const SupportCodeSchema = new Schema(
+  {
+    ...tenant,
+    supportCodeId: { ...id, unique: true },
+    storeId: id,
+    codeHash: { type: String, required: true, unique: true, select: false },
+    /** `expired` is not stored: it is `active` past `expiresAt`. */
+    status: { type: String, enum: ["active", "used", "revoked"], default: "active" },
+    expiresAt: { type: Date, required: true },
+    issuedByAdminId: id,
+    /** The staff member's name (or e-mail), as the store PC is told. */
+    issuedBy: { type: String, required: true },
+    usedAt: Date,
+    usedByInstallationId: String,
+    revokedAt: Date,
+    revokedByAdminId: String
+  },
+  timestamps
+);
+
+export const SupportCodeModel = models.SupportCode || model("SupportCode", SupportCodeSchema);
 export const LoginThrottleModel = models.LoginThrottle || model("LoginThrottle", LoginThrottleSchema);
 export const InternalAdminModel =
   models.InternalAdmin || model("InternalAdmin", InternalAdminSchema);

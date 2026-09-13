@@ -261,6 +261,19 @@ export interface IssuedSetupKey {
   sentTo?: string | null;
 }
 
+export type SupportCodeStatus = "active" | "used" | "revoked" | "expired";
+
+/** A support code as the admin sees it; the code itself is only in the issue answer. */
+export interface SupportCode {
+  supportCodeId: string;
+  status: SupportCodeStatus;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  issuedBy: string;
+  usedAt: string | null;
+  revokedAt: string | null;
+}
+
 export interface PreviewPage {
   key: string;
   /** The capability the store lacks, when the role grants the page but the store hides it. */
@@ -596,6 +609,14 @@ export const api = {
   retryTunnel: (orgId: string, storeId: string) =>
     request<{ tunnel: StoreTunnel }>("POST", `${store(orgId, storeId)}/tunnel`),
 
+  // Support codes
+  listSupportCodes: (orgId: string, storeId: string) =>
+    request<{ supportCodes: SupportCode[] }>("GET", `${store(orgId, storeId)}/support-codes`),
+  issueSupportCode: (orgId: string, storeId: string) =>
+    request<{ code: string; supportCode: SupportCode }>("POST", `${store(orgId, storeId)}/support-codes`),
+  revokeSupportCode: (orgId: string, storeId: string, supportCodeId: string) =>
+    request<{ supportCode: SupportCode }>("DELETE", `${store(orgId, storeId)}/support-codes/${enc(supportCodeId)}`),
+
   // Access preview
   accessPreview: (orgId: string, storeId: string) =>
     request<AccessPreview>("GET", `${store(orgId, storeId)}/access-preview`),
@@ -678,6 +699,9 @@ export const ADMIN_ROUTES = [
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/setup-keys",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/replace-pc",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/tunnel",
+  "GET    /api/v1/admin/organizations/{org}/stores/{store}/support-codes",
+  "POST   /api/v1/admin/organizations/{org}/stores/{store}/support-codes",
+  "DELETE /api/v1/admin/organizations/{org}/stores/{store}/support-codes/{supportCodeId}",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/access-preview",
   "GET    /api/v1/admin/organizations/{org}/roles",
   "POST   /api/v1/admin/organizations/{org}/roles",
