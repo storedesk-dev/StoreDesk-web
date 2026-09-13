@@ -224,6 +224,59 @@ describe("activation, Replace PC, and the PC limit", () => {
     expect(await WorkerInstallationModel.countDocuments({ storeId: params.storeId })).toBe(1);
   });
 
+  it("safe re-redeem: the same key for the same installation within 15 minutes gets a fresh credential; the first is revoked", async () => {
+    const { body } = await issue();
+    const first = await redeemKey(body.setupKey);
+    expect(first.status).toBe(201);
+    const again = await redeemKey(body.setupKey, "198.51.100.11");
+    expect(again.status).toBe(201);
+    expect(Object.keys(again.body).sort()).toEqual(Object.keys(first.body).sort());
+    expect(again.body.workerInstallationId).toBe(first.body.workerInstallationId);
+    expect(again.body.workerCredentialId).not.toBe(first.body.workerCredentialId);
+    expect(again.body.workerCredential).not.toBe(first.body.workerCredential);
+    expect(again.body.relayKey).not.toBe(first.body.relayKey);
+    expect(await WorkerCredentialModel.findOne({ credentialId: first.body.workerCredentialId }).lean()).toMatchObject({ status: "revoked" });
+    expect(await WorkerCredentialModel.countDocuments({ workerInstallationId: first.body.workerInstallationId, status: "active" })).toBe(1);
+    expect(await lastAudit("setup_key.re_redeem")).toMatchObject({
+      targetId: first.body.workerInstallationId,
+      metadata: expect.objectContaining({ previousCredentialId: first.body.workerCredentialId, workerCredentialId: again.body.workerCredentialId })
+    });
+    // Naming its own installation is fine too.
+    const named = await redeemKey(body.setupKey, "198.51.100.12", { workerInstallationId: first.body.workerInstallationId });
+    expect(named.status).toBe(201);
+  });
+
+  it("re-redeem: 409 SETUP_KEY_CONSUMED after 15 minutes or after Replace PC; 409 INSTALLATION_ALREADY_BOUND for another installation", async () => {
+    const { body } = await issue();
+    const first = await redeemKey(body.setupKey);
+    const other = await redeemKey(body.setupKey, "198.51.100.13", { workerInstallationId: "winst_someone_else" });
+    expect(other.status).toBe(409);
+    expect(other.body.error.code).toBe("INSTALLATION_ALREADY_BOUND");
+
+    // Bound since by a credential another key issued.
+    const original = await WorkerCredentialModel.findOne({ credentialId: first.body.workerCredentialId }).lean();
+    await WorkerCredentialModel.updateOne({ credentialId: first.body.workerCredentialId }, { $set: { keyId: "set_another" } });
+    const rebound = await redeemKey(body.setupKey, "198.51.100.13");
+    expect(rebound.status).toBe(409);
+    expect(rebound.body.error.code).toBe("INSTALLATION_ALREADY_BOUND");
+    await WorkerCredentialModel.updateOne({ credentialId: first.body.workerCredentialId }, { $set: { keyId: original?.keyId } });
+
+    await SetupKeyModel.updateOne({ status: "consumed" }, { $set: { consumedAt: new Date(Date.now() - 16 * 60_000) } });
+    const late = await redeemKey(body.setupKey, "198.51.100.14");
+    expect(late.status).toBe(409);
+    expect(late.body.error.code).toBe("SETUP_KEY_CONSUMED");
+  });
+
+  it("re-redeem: the old key can't come back after Replace PC", async () => {
+    const { body } = await issue();
+    expect((await redeemKey(body.setupKey)).status).toBe(201);
+    expect((await call(replacePc, request("POST", "/", { token: admin.token }), params)).status).toBe(200);
+    const res = await redeemKey(body.setupKey, "198.51.100.15");
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("SETUP_KEY_CONSUMED");
+    expect(await WorkerCredentialModel.countDocuments({ status: "active" })).toBe(0);
+  });
+
   it("answers 409 NO_PC_TO_REPLACE when there is no activated PC", async () => {
     const res = await call(replacePc, request("POST", "/", { token: admin.token }), params);
     expect(res.status).toBe(409);

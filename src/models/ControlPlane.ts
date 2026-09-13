@@ -182,6 +182,8 @@ const TenantStoreSchema = new Schema(
     /** The PC was replaced and the tunnel secret is not rotated yet: no setup key until it is. */
     tunnelRotationRequired: { type: Boolean },
     tunnelRotatedAt: Date,
+    /** Set when the store's tunnel was deleted; the config sync then answers `tunnel.state: "deleted"`. */
+    tunnelDeletedAt: Date,
     /**
      * Last observed remote reachability (lib/remote-status.ts) and since when,
      * for a `since` when Cloudflare gives no timestamp. Unknown is not stored.

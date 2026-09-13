@@ -7,6 +7,7 @@ import { TenantStoreModel } from "@/models/ControlPlane";
 import { ControlPlaneError } from "@/lib/control-plane-security";
 import { isStoreSecretConfigured, openStoreSecret, sealStoreSecret } from "@/lib/store-secrets";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
+import { edgeTunnelState } from "@/lib/tunnel";
 import { z } from "zod";
 
 /**
@@ -100,11 +101,17 @@ export async function GET(req: Request) {
       .lean();
     if (!store) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Store not found");
 
+    // `tunnel.state`: active | deleted (clear the token, stop the tunnel) |
+    // none (never had one, or it could not be provisioned). The token and URL
+    // are sent only while active, so a dead token is never kept.
+    const state = edgeTunnelState(store as Record<string, unknown>);
+    const active = state === "active";
     return NextResponse.json(
       {
         configJson: buildEdgeConfigJson(store),
-        cloudflareToken: store.cloudflareToken ? String(store.cloudflareToken) : null,
-        tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null,
+        tunnel: { state, url: active ? String(store.tunnelUrl) : null },
+        cloudflareToken: active ? String(store.cloudflareToken) : null,
+        tunnelUrl: active ? String(store.tunnelUrl) : null,
         // Delivered here and nowhere else: the caller is this store's own
         // server, proven by its credential.
         posPassword: openStoreSecret(store.posPasswordCipher)

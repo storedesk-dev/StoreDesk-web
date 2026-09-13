@@ -55,6 +55,14 @@ const REDEEMABLE = ["queued", "shown", "sent", "delivery_failed"];
  * sends it, is accepted and ignored — never a reason to refuse. The desktop's
  * single consent (license, privacy, background service) sends all three
  * acknowledgements as `true`. Other unknown fields are ignored.
+ *
+ * Safe re-redeem: the same key may be redeemed again within 15 minutes of its
+ * first redeem, for the installation it bound, while that installation's live
+ * credential is the one this key issued — a PC that crashed or lost the answer
+ * after the control plane committed. The first credential is revoked and a
+ * fresh credential and relay key are issued (same answer shape), audited
+ * `setup_key.re_redeem`. `workerInstallationId`, when sent, must be that
+ * installation.
  */
 export const RedeemSchema = z.object({
   setupKey: z.string().trim().min(1).max(200),
@@ -81,7 +89,9 @@ export const RedeemSchema = z.object({
     workerVersion: z.string().trim().min(1).max(40),
     electronVersion: z.string().trim().min(1).max(40),
     type: z.string().trim().max(40).optional()
-  })
+  }),
+  /** Optional: a PC that knows its installation (a re-redeem) names it. */
+  workerInstallationId: z.string().trim().max(80).optional()
 });
 export type RedeemBody = z.output<typeof RedeemSchema>;
 
@@ -93,6 +103,11 @@ const STORE_MESSAGES = {
 } as const;
 
 const invalidKey = () => new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup key is invalid");
+const keyConsumed = () => new ControlPlaneError(409, "SETUP_KEY_CONSUMED", "Setup key has been consumed");
+const alreadyBound = () => new ControlPlaneError(409, "INSTALLATION_ALREADY_BOUND", "Installation already bound");
+
+/** How long after its first redeem the same key may be redeemed again (safe re-redeem). */
+export const RE_REDEEM_WINDOW_MS = 15 * 60_000;
 
 export async function redeemSetupKey(body: RedeemBody) {
   await connectDb();
@@ -110,10 +125,13 @@ export async function redeemSetupKey(body: RedeemBody) {
   if (!key || !(await verifySecret(String(key.secretHash), parsed.secret))) {
     throw invalidKey();
   }
-  if (key.status === "consumed") {
-    throw new ControlPlaneError(409, "SETUP_KEY_CONSUMED", "Setup key has been consumed");
-  }
-  if (
+  // A consumed key may come back within the window (safe re-redeem); the
+  // installation checks below decide whether this is that case.
+  const reRedeem = key.status === "consumed";
+  if (reRedeem) {
+    const consumedAt = key.consumedAt ? new Date(key.consumedAt).getTime() : 0;
+    if (!consumedAt || Date.now() - consumedAt > RE_REDEEM_WINDOW_MS) throw keyConsumed();
+  } else if (
     key.status === "revoked" ||
     key.status === "expired" ||
     new Date(key.expiresAt).getTime() <= Date.now()
@@ -155,8 +173,24 @@ export async function redeemSetupKey(body: RedeemBody) {
   if (installation.status === "suspended") {
     throw new ControlPlaneError(423, "STORE_SUSPENDED", STORE_MESSAGES.STORE_SUSPENDED);
   }
-  if (installation.workerCredentialId && installation.status === "active") {
-    throw new ControlPlaneError(409, "INSTALLATION_ALREADY_BOUND", "Installation already bound");
+  let previousCredentialId: string | null = null;
+  if (reRedeem) {
+    // Only the installation this key bound, while the credential this key
+    // issued is still its live one.
+    if (body.workerInstallationId && body.workerInstallationId !== key.workerInstallationId) throw alreadyBound();
+    const current = installation.workerCredentialId
+      ? ((await WorkerCredentialModel.findOne({ credentialId: installation.workerCredentialId }).lean()) as Doc | null)
+      : null;
+    const liveFromThisKey = installation.status === "active" && current?.status === "active" && current.keyId === key.keyId;
+    if (!liveFromThisKey) {
+      // Bound since by another key: as for any bound installation. Superseded
+      // (Replace PC revoked it): the key is simply used.
+      if (installation.status === "active" && current?.status === "active") throw alreadyBound();
+      throw keyConsumed();
+    }
+    previousCredentialId = String(current!.credentialId);
+  } else if (installation.workerCredentialId && installation.status === "active") {
+    throw alreadyBound();
   }
 
   // ── Atomic activation ────────────────────────────────────────────────────
@@ -170,14 +204,18 @@ export async function redeemSetupKey(body: RedeemBody) {
   const eulaAcceptanceId = publicId("eula");
 
   try {
-    const consume = await SetupKeyModel.findOneAndUpdate(
-      { keyId: key.keyId, status: { $in: REDEEMABLE } },
-      { status: "consumed", consumedAt: new Date(), $inc: { attempts: 1 } },
-      { returnDocument: "after", ...withSession(session) }
-    );
-    if (!consume) {
-      throw new ControlPlaneError(409, "SETUP_KEY_CONSUMED", "Setup key has been consumed");
-    }
+    const consume = reRedeem
+      ? await SetupKeyModel.findOneAndUpdate(
+          { keyId: key.keyId, status: "consumed", consumedAt: { $gte: new Date(Date.now() - RE_REDEEM_WINDOW_MS) } },
+          { $inc: { attempts: 1 } },
+          { returnDocument: "after", ...withSession(session) }
+        )
+      : await SetupKeyModel.findOneAndUpdate(
+          { keyId: key.keyId, status: { $in: REDEEMABLE } },
+          { status: "consumed", consumedAt: new Date(), $inc: { attempts: 1 } },
+          { returnDocument: "after", ...withSession(session) }
+        );
+    if (!consume) throw keyConsumed();
 
     await EulaAcceptanceModel.create(
       [
@@ -227,13 +265,14 @@ export async function redeemSetupKey(body: RedeemBody) {
       withSession(session)
     );
 
-    await WorkerInstallationModel.updateOne(
-      { workerInstallationId: key.workerInstallationId },
+    const bound = await WorkerInstallationModel.updateOne(
+      // A re-redeem replaces exactly the credential it found, so two at once can't both win.
+      { workerInstallationId: key.workerInstallationId, ...(reRedeem ? { workerCredentialId: previousCredentialId } : {}) },
       {
         workerCredentialId: credential.credentialId,
         eulaAcceptanceId,
         status: "active",
-        activatedAt: new Date(),
+        ...(reRedeem ? {} : { activatedAt: new Date() }),
         lastSeenAt: new Date(),
         platform: body.installation.platform,
         workerVersion: body.installation.workerVersion,
@@ -241,6 +280,7 @@ export async function redeemSetupKey(body: RedeemBody) {
       },
       withSession(session)
     );
+    if (!bound.matchedCount) throw keyConsumed();
 
     await commitTransaction(session);
   } catch (error) {
@@ -256,13 +296,14 @@ export async function redeemSetupKey(body: RedeemBody) {
     workerInstallationId: key.workerInstallationId,
     actorType: "system",
     actorId: "setup_flow",
-    action: "setup_key.redeem",
+    action: reRedeem ? "setup_key.re_redeem" : "setup_key.redeem",
     targetType: "worker_installation",
     targetId: key.workerInstallationId,
     correlationId,
     metadata: {
       setupKeyId: key.keyId,
       workerCredentialId: credential.credentialId,
+      ...(reRedeem ? { previousCredentialId } : {}),
       contactEmail: key.contactEmail
     }
   });

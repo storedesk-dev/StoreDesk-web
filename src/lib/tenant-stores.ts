@@ -422,7 +422,8 @@ export async function retryStoreTunnel(
       tunnel
     });
   }
-  scheduleNotify({ organizationId, storeId, reason: "store.update" });
+  // The store's tunnel token changed (rotated, or a new tunnel): it syncs its config at once.
+  scheduleNotify({ organizationId, storeId, reason: "tunnel.rotate" });
   return tunnel;
 }
 

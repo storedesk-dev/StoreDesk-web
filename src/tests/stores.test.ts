@@ -134,7 +134,7 @@ describe("POST …/stores", () => {
     const retried = await call(retryTunnel, request("POST", "/", { token: admin.token }), { organizationId, storeId });
     expect(retried.status).toBe(200);
     expect(retried.body.tunnel).toMatchObject({ status: "ok", url: "https://s42.tunnels.example" });
-    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, storeId, reason: "store.update" });
+    expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, storeId, reason: "tunnel.rotate" });
     expect((await lastAudit("store.tunnel.provision"))?.metadata).toMatchObject({ status: "ok", retry: true });
 
     const again = await call(retryTunnel, request("POST", "/", { token: admin.token }), { organizationId, storeId });

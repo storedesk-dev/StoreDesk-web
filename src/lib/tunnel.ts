@@ -1,6 +1,7 @@
 import { connectDb } from "@/lib/db";
 import { deleteCloudflareTunnel, provisionCloudflareTunnel, rotateCloudflareTunnel } from "@/lib/cloudflare";
 import { TenantStoreModel } from "@/models/ControlPlane";
+import { scheduleNotify } from "@/lib/store-notify";
 
 /**
  * A store's Cloudflare tunnel: how phones reach the store server. The outcome
@@ -81,6 +82,21 @@ export function tunnelView(store: Record<string, unknown>): TunnelView {
   };
 }
 
+export type EdgeTunnelState = "active" | "deleted" | "none";
+
+/**
+ * What the store server is told about its tunnel in the config sync
+ * (`tunnel.state`): `active` — it has a token and URL; `deleted` — it had a
+ * tunnel and it is gone, so clear the token and stop the tunnel; `none` —
+ * never had one, or it could not be provisioned. Only `active` carries the
+ * token and URL.
+ */
+export function edgeTunnelState(store: Record<string, unknown>): EdgeTunnelState {
+  if (str(store.tunnelUrl) && str(store.cloudflareToken)) return "active";
+  if (store.tunnelDeletedAt || str(store.tunnelId) || store.tunnelRotatedAt) return "deleted";
+  return "none";
+}
+
 /** Whether another store already holds this hostname label. */
 export async function tunnelLabelInUse(label: string, exceptStoreId: string): Promise<boolean> {
   await connectDb();
@@ -111,6 +127,19 @@ export async function removeStoreTunnel(
   const tunnelId = str(store.tunnelId);
   if (tunnelId) {
     const result = await deleteCloudflareTunnel({ tunnelId, dnsRecordId: str(store.tunnelDnsRecordId) });
+    const storeId = str(store.storeId);
+    if (result.tunnelDeleted && storeId) {
+      // The store (if it remains) is told plainly: its tunnel is gone.
+      await TenantStoreModel.updateOne(
+        { storeId },
+        {
+          $set: { tunnelDeletedAt: new Date(), tunnelUpdatedAt: new Date() },
+          $unset: { tunnelUrl: 1, cloudflareToken: 1, tunnelId: 1, tunnelDnsRecordId: 1, tunnelRotationRequired: 1 }
+        }
+      );
+      const organizationId = str(store.organizationId);
+      if (organizationId) scheduleNotify({ organizationId, storeId, reason: "tunnel.delete" });
+    }
     return { tunnelDeleted: result.tunnelDeleted, manualCleanup: result.tunnelDeleted ? null : (str(store.tunnelLabel) ?? tunnelId) };
   }
   const url = str(store.tunnelUrl);

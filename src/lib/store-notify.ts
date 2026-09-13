@@ -36,6 +36,10 @@ export type NotifyReason =
   | "store.license.change"
   | "store.update"
   | "store.settings.update"
+  /** The store's tunnel token changed (rotated, or a new tunnel): sync the config at once. */
+  | "tunnel.rotate"
+  /** The store's tunnel was deleted: sync the config at once and clear the token. */
+  | "tunnel.delete"
   | "store.delete"
   | "organization.update"
   | "organization.delete"
