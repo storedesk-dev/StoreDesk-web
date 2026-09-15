@@ -27,6 +27,8 @@ export interface PageDefinition {
   defaultEnabled: boolean;
   alwaysEnabled?: boolean;
   requiresCapability?: StoreCapability;
+  /** The screen is gone but stored roles may still name the key: kept valid, never offered. */
+  retired?: boolean;
   knownFeatureFlags: Record<string, PageFeatureFlagDef>;
 }
 
@@ -168,11 +170,12 @@ export const ALL_PAGES: PageDefinition[] = [
   },
   {
     key: "mobilePos",
-    label: "POS Workspace",
-    description: "Mobile point-of-sale — scan items, accept payment, print receipt.",
+    label: "POS Workspace (retired)",
+    description: "Retired — the phone no longer has a POS Workspace screen. Kept so roles that still name it stay valid.",
     app: "mobile",
     filePath: "lib/features/pos/pos_workspace_screen.dart",
-    defaultEnabled: true,
+    defaultEnabled: false,
+    retired: true,
     knownFeatureFlags: {
       enableManualEntry: { label: "Manual Entry", description: "Allow manual item entry without scanning.", default: true },
       enableQuickSale: { label: "Quick Sale", description: "One-tap quick sale for common items.", default: false }

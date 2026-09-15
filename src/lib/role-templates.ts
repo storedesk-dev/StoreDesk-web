@@ -46,7 +46,6 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       "settings"
     ],
     mobile: [
-      "mobilePos",
       "mobileDashboard",
       "mobileScanner",
       "mobileProductSearch",
@@ -65,12 +64,11 @@ const DEFINITIONS: Record<string, TemplateDef> = {
     roleName: "Cashier",
     description: "Rings up sales and looks items up. No refunds, discounts or voids.",
     electron: ["pos", "dashboard", "products", "transactions", "settings"],
-    mobile: ["mobilePos", "mobileDashboard", "mobileScanner", "mobileProductSearch", "mobileSettings"],
+    mobile: ["mobileDashboard", "mobileScanner", "mobileProductSearch", "mobileSettings"],
     flags: {
       pos: { enableRefunds: false, enableDiscounts: false, enableVoidTransaction: false, enableCashDrawer: true },
       products: { enableBulkImport: false, enableBarcodeGeneration: false },
-      transactions: { enableExport: false, enableRefundView: false },
-      mobilePos: { enableQuickSale: true }
+      transactions: { enableExport: false, enableRefundView: false }
     }
   },
   viewer: {
@@ -96,8 +94,9 @@ const DEFINITIONS: Record<string, TemplateDef> = {
   }
 };
 
+/** Retired pages (the screen is gone, the key stays valid) are in no template. */
 function build(app: App, def: TemplateDef | null): RolePage[] {
-  return ALL_PAGES.filter((page) => page.app === app).map((page) => {
+  return ALL_PAGES.filter((page) => page.app === app && !page.retired).map((page) => {
     const on = def?.[app];
     const enabled = page.alwaysEnabled === true || on === "*" || (Array.isArray(on) && on.includes(page.key));
     const featureFlags: Record<string, boolean> = {};

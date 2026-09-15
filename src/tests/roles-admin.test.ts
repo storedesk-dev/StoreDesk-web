@@ -50,12 +50,13 @@ describe("GET …/roles", () => {
     expect((await call(list, request("GET", "/"), { organizationId })).status).toBe(401);
   });
 
-  it("every template lists every registry page of each app and no other", async () => {
+  it("every template lists every registry page of each app except retired ones, and no other", async () => {
     const res = await call(list, request("GET", "/", { token: admin.token }), { organizationId });
     for (const role of res.body.roles) {
       for (const app of ["electron", "mobile"] as const) {
         const keys = role.accessKeys[app].pages.map((page: { key: string }) => page.key).sort();
-        expect(keys).toEqual(ALL_PAGES.filter((page) => page.app === app).map((page) => page.key).sort());
+        expect(keys).toEqual(ALL_PAGES.filter((page) => page.app === app && !page.retired).map((page) => page.key).sort());
+        expect(keys).not.toContain("mobilePos");
       }
     }
   });
@@ -130,6 +131,18 @@ describe("PUT …/roles/{roleId}", () => {
     const res = await call(save, request("PUT", "/", { token: admin.token, body: { baseVersion: 1, roleName: "Cashier", accessKeys } }), { organizationId, roleId: "cashier" });
     expect(res.status).toBe(200);
     expect(res.body.warnings).toEqual({ unknownPageKeys: ["electron.oldPage"] });
+  });
+
+  it("keeps a retired page a stored role still has, without a warning", async () => {
+    const retired = { key: "mobilePos", enabled: true, featureFlags: { enableManualEntry: false, enableQuickSale: true } };
+    const accessKeys = { ...cashier().accessKeys, mobile: { pages: [...cashier().accessKeys.mobile.pages, retired] } };
+    const res = await call(save, request("PUT", "/", { token: admin.token, body: { baseVersion: 1, roleName: "Cashier", accessKeys } }), { organizationId, roleId: "cashier" });
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty("warnings");
+    expect(res.body.role.accessKeys.mobile.pages).toContainEqual(retired);
+    const listed = await call(list, request("GET", "/", { token: admin.token }), { organizationId });
+    const stored = listed.body.roles.find((role: { roleId: string }) => role.roleId === "cashier");
+    expect(stored.accessKeys.mobile.pages).toContainEqual(retired);
   });
 });
 

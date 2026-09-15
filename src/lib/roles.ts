@@ -37,7 +37,6 @@ export const DEFAULT_ORG_ROLES = [
       },
       mobile: {
         pages: [
-          { key: "mobilePos",           enabled: true, featureFlags: { enableManualEntry: true, enableQuickSale: true } },
           { key: "mobileDashboard",      enabled: true, featureFlags: {} },
           { key: "mobileScanner",        enabled: true, featureFlags: { enableCameraFlash: true, enableManualEntry: true } },
           { key: "mobileProductSearch",  enabled: true, featureFlags: {} },

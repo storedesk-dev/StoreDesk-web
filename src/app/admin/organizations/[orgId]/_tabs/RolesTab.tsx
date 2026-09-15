@@ -12,6 +12,7 @@ import {
   ROLE_TEMPLATES,
   countEnabled,
   editorAccessKeys,
+  isRetired,
   roleFingerprint,
   templateAccessKeys
 } from "../../../_lib/registry";
@@ -266,6 +267,8 @@ function AppColumn({
 }) {
   const set = (key: string, patch: Partial<RolePage>) =>
     onChange(pages.map((p) => (p.key === key ? { ...p, ...patch } : p)));
+  // A retired page stays in `pages` (saved as stored) but has no toggle.
+  const shown = pages.filter((page) => !isRetired(app, page.key));
 
   return (
     <fieldset className="min-w-0 px-4 py-3">
@@ -273,11 +276,11 @@ function AppColumn({
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="text-sm font-bold">{label}</h3>
         <span className="text-xs text-slate-500 sd-num">
-          {enabledCount} of {pages.length} on
+          {enabledCount} of {shown.length} on
         </span>
       </div>
       <ul className="divide-y divide-slate-100">
-        {pages.map((page) => {
+        {shown.map((page) => {
           const def = getPage(page.key);
           const unknown = !def || def.app !== app;
           const locked = Boolean(def?.alwaysEnabled);

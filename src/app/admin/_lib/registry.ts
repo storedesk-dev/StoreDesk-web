@@ -23,8 +23,18 @@ export const CAPABILITY_LABEL: Record<StoreCapability, string> = {
   prepaidGift: "prepaid and gift cards"
 };
 
+/** The pages an editor or template offers for an app: every registry page except retired ones. */
 export function pagesFor(app: App): PageDefinition[] {
-  return ALL_PAGES.filter((page) => page.app === app);
+  return ALL_PAGES.filter((page) => page.app === app && !page.retired);
+}
+
+/**
+ * A retired page of this app: the screen is gone but stored roles may still name
+ * the key. The editor hides it and a save keeps it as stored.
+ */
+export function isRetired(app: App, key: string): boolean {
+  const def = getPage(key);
+  return Boolean(def?.retired && def.app === app);
 }
 
 export function pageLabel(key: string): string {
@@ -38,8 +48,8 @@ export function defaultFlags(page: PageDefinition): Record<string, boolean> {
 /**
  * The editor's view of one app: one entry per registry page, in registry order,
  * merged with what the role has stored. `alwaysEnabled` pages read as on.
- * Stored pages the registry no longer knows are kept at the end, untouched, so a
- * save never silently drops them.
+ * Stored pages the registry no longer knows, and stored retired pages, are kept at
+ * the end, untouched, so a save never silently drops them.
  */
 export function editorPages(app: App, stored: RolePage[]): RolePage[] {
   const byKey = new Map(stored.map((page) => [page.key, page]));
@@ -100,7 +110,6 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       "settings"
     ],
     mobile: [
-      "mobilePos",
       "mobileDashboard",
       "mobileScanner",
       "mobileProductSearch",
@@ -119,12 +128,11 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
     label: "Cashier",
     description: "Rings up sales and looks items up. No refunds, discounts or voids.",
     electron: ["pos", "dashboard", "products", "transactions", "settings"],
-    mobile: ["mobilePos", "mobileDashboard", "mobileScanner", "mobileProductSearch", "mobileSettings"],
+    mobile: ["mobileDashboard", "mobileScanner", "mobileProductSearch", "mobileSettings"],
     flags: {
       pos: { enableRefunds: false, enableDiscounts: false, enableVoidTransaction: false, enableCashDrawer: true },
       products: { enableBulkImport: false, enableBarcodeGeneration: false },
-      transactions: { enableExport: false, enableRefundView: false },
-      mobilePos: { enableQuickSale: true }
+      transactions: { enableExport: false, enableRefundView: false }
     }
   },
   viewer: {
@@ -168,8 +176,9 @@ export function templateAccessKeys(template: RoleTemplate): RoleAccessKeys {
   return { electron: { pages: build("electron") }, mobile: { pages: build("mobile") } };
 }
 
+/** Enabled pages the editor shows (a stored retired page is not counted). */
 export function countEnabled(accessKeys: RoleAccessKeys, app: App): number {
-  return accessKeys[app].pages.filter((page) => page.enabled).length;
+  return accessKeys[app].pages.filter((page) => page.enabled && !isRetired(app, page.key)).length;
 }
 
 /** Canonical string for dirty-checking an edited role. */
