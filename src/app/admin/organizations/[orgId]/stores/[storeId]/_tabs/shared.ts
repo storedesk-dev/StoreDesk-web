@@ -20,7 +20,10 @@ export function withDefaults(s: Partial<StoreSettings> | null | undefined): Stor
     capabilities: {
       fuel: Boolean(s?.capabilities?.fuel),
       lottery: Boolean(s?.capabilities?.lottery),
-      coam: Boolean(s?.capabilities?.coam)
+      coam: Boolean(s?.capabilities?.coam),
+      ebt: Boolean(s?.capabilities?.ebt),
+      moneyOrder: Boolean(s?.capabilities?.moneyOrder),
+      prepaidGift: Boolean(s?.capabilities?.prepaidGift)
     },
     lottery: { setupMode: null },
     integrations: {

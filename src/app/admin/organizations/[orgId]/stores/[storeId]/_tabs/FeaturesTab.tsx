@@ -15,7 +15,10 @@ import { useStoreSettings, type StoreTabProps } from "./shared";
 const FEATURES: Array<{ key: StoreCapability; label: string; description: string }> = [
   { key: "fuel", label: "Has fuel", description: "Fuel prices, fuel totals, gas in daily numbers." },
   { key: "lottery", label: "Has lottery", description: "Lottery sales and payouts." },
-  { key: "coam", label: "Has COAM", description: "Coin-operated amusement machine revenue." }
+  { key: "coam", label: "Has COAM", description: "Coin-operated amusement machine revenue." },
+  { key: "ebt", label: "Takes EBT", description: "Food-stamp tenders on the register; an EBT line in daily numbers." },
+  { key: "moneyOrder", label: "Sells money orders", description: "Money-order sales and fees, entered from the form, the sheet or a report." },
+  { key: "prepaidGift", label: "Sells prepaid and gift cards", description: "One bucket for phone cards, prepaid cards and gift cards." }
 ];
 
 const LOTTERY_MODES = [
@@ -28,7 +31,7 @@ type Draft = { caps: Record<StoreCapability, boolean>; googleSheets: boolean };
 
 export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const settings = useStoreSettings(orgId, storeId);
-  const [draft, setDraft] = useState<Draft>({ caps: { fuel: false, lottery: false, coam: false }, googleSheets: false });
+  const [draft, setDraft] = useState<Draft>({ caps: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false }, googleSheets: false });
   const lotteryNote = useId();
 
   const saved: Draft | null = settings.data

@@ -51,7 +51,7 @@ describe("GET …/settings", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       settings: {
-        capabilities: { lottery: false, coam: false, fuel: false },
+        capabilities: { lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false },
         lottery: { setupMode: null },
         integrations: {
           googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
@@ -70,7 +70,7 @@ describe("GET …/settings", () => {
     const res = await call(getSettings, request("GET", "/", { token: admin.token }), params);
     expect(res.body.settingsVersion).toBe(1);
     expect(res.body.settings.capabilities.fuel).toBe(false);
-    const saved = await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: false, coam: false } } });
+    const saved = await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } } });
     expect(saved.status).toBe(200);
     expect(saved.body.settingsVersion).toBe(2);
   });
@@ -78,10 +78,10 @@ describe("GET …/settings", () => {
 
 describe("PUT …/settings", () => {
   it("saves features on top of the version read, audits and notifies the store", async () => {
-    const res = await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: true, coam: false } } });
+    const res = await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: true, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } } });
     expect(res.status).toBe(200);
     expect(res.body.settingsVersion).toBe(2);
-    expect(res.body.settings.capabilities).toEqual({ fuel: true, lottery: true, coam: false });
+    expect(res.body.settings.capabilities).toEqual({ fuel: true, lottery: true, coam: false, ebt: false, moneyOrder: false, prepaidGift: false });
     const audit = await lastAudit("store.settings.update");
     expect(audit).toMatchObject({ storeId: params.storeId, actorId: admin.adminId });
     expect(audit?.metadata).toMatchObject({ changed: ["capabilities"], settingsVersion: 2 });
@@ -89,7 +89,7 @@ describe("PUT …/settings", () => {
   });
 
   it("answers 409 SETTINGS_VERSION_CONFLICT with the current settings for a stale version", async () => {
-    await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: false, coam: false } } });
+    await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } } });
     const stale = await put({ settingsVersion: 1, settings: { timeZone: "America/Denver" } });
     expect(stale.status).toBe(409);
     expect(stale.body.error.code).toBe("SETTINGS_VERSION_CONFLICT");
@@ -143,7 +143,7 @@ describe("PUT …/settings", () => {
 
   it("writes nothing for an update that changes nothing", async () => {
     vi.mocked(scheduleNotify).mockClear();
-    const res = await put({ settingsVersion: 1, settings: { capabilities: { fuel: false, lottery: false, coam: false } } });
+    const res = await put({ settingsVersion: 1, settings: { capabilities: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } } });
     expect(res.status).toBe(200);
     expect(res.body.settingsVersion).toBe(1);
     expect(await AuditEventModel.countDocuments({ action: "store.settings.update" })).toBe(0);
@@ -151,9 +151,9 @@ describe("PUT …/settings", () => {
   });
 
   it.each([
-    ["an unknown feature", { settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: false, coam: false, carWash: true } } }],
+    ["an unknown feature", { settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false, carWash: true } } }],
     ["a missing feature", { settingsVersion: 1, settings: { capabilities: { fuel: true } } }],
-    ["a non-boolean feature", { settingsVersion: 1, settings: { capabilities: { fuel: "yes", lottery: false, coam: false } } }],
+    ["a non-boolean feature", { settingsVersion: 1, settings: { capabilities: { fuel: "yes", lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } } }],
     ["an unknown time zone", { settingsVersion: 1, settings: { timeZone: "Mars/Olympus" } }],
     ["a lottery mode", { settingsVersion: 1, settings: { lottery: { setupMode: "scratch" } } }],
     ["a free-form config", { settingsVersion: 1, settings: { configJson: "{}" } }],
@@ -179,7 +179,7 @@ describe("what the store receives, and suspension (P12)", () => {
     const first = await pull(pc.token);
     expect(first.status).toBe(200);
     expect(first.body.store).toMatchObject({
-      capabilities: { lottery: false, coam: false, fuel: false },
+      capabilities: { lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false },
       settingsVersion: 1,
       settings: { lottery: { setupMode: null }, timeZone: null }
     });
@@ -189,7 +189,7 @@ describe("what the store receives, and suspension (P12)", () => {
 
     await put({
       settingsVersion: 1,
-      settings: { capabilities: { fuel: true, lottery: false, coam: false }, integrations: { googleSheets: { enabled: true } } }
+      settings: { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false }, integrations: { googleSheets: { enabled: true } } }
     });
     const second = await pull(pc.token);
     expect(second.body.store.capabilities.fuel).toBe(true);

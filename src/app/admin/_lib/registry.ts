@@ -17,7 +17,10 @@ export const APPS: Array<{ key: App; label: string }> = [
 export const CAPABILITY_LABEL: Record<StoreCapability, string> = {
   fuel: "fuel",
   lottery: "lottery",
-  coam: "COAM"
+  coam: "COAM",
+  ebt: "EBT",
+  moneyOrder: "money orders",
+  prepaidGift: "prepaid and gift cards"
 };
 
 export function pagesFor(app: App): PageDefinition[] {

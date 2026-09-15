@@ -541,6 +541,17 @@ export async function lookupOrganization(rawSlug: string) {
     .sort({ name: 1 })
     .lean()) as Doc[];
   const remote = await remoteStatuses(stores);
+  // Whether a store PC has been activated: the phone shows a store that is still waiting for its PC as
+  // disabled ("Not set up yet") instead of hiding it.
+  const installations = (await WorkerInstallationModel.find({ storeId: { $in: stores.map((s) => String(s.storeId)) } })
+    .select({ storeId: 1, status: 1 })
+    .lean()) as Doc[];
+  const setupOf = (storeId: string): "active" | "awaiting_activation" | "none" => {
+    const mine = installations.filter((i) => String(i.storeId) === storeId).map((i) => String(i.status));
+    if (mine.includes("active")) return "active";
+    if (mine.includes("awaiting_activation")) return "awaiting_activation";
+    return "none";
+  };
   return {
     contractVersion: CONTRACT_VERSION,
     organization: { slug: String(org.slug), name: String(org.name) },
@@ -549,6 +560,7 @@ export async function lookupOrganization(rawSlug: string) {
       name: String(store.name),
       storeNumber: store.storeNumber ? String(store.storeNumber) : null,
       tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null,
+      setup: setupOf(String(store.storeId)),
       remote: remote.get(String(store.storeId)) ?? { status: "unknown" as const, since: null }
     }))
   };

@@ -132,7 +132,10 @@ const StoreSettingsSchema = new Schema(
     capabilities: {
       lottery: { type: Boolean, default: false },
       coam: { type: Boolean, default: false },
-      fuel: { type: Boolean, default: false }
+      fuel: { type: Boolean, default: false },
+      ebt: { type: Boolean, default: false },
+      moneyOrder: { type: Boolean, default: false },
+      prepaidGift: { type: Boolean, default: false }
     },
     lottery: {
       // The recording choices are "Coming soon"; null until one ships.

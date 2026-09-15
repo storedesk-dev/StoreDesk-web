@@ -48,7 +48,8 @@ export const DEFAULT_ORG_ROLES = [
           { key: "mobileTransactions",   enabled: true, featureFlags: { enableExport: true } },
           { key: "mobileReports",        enabled: true, featureFlags: {} },
           { key: "mobileAnalytics",      enabled: true, featureFlags: {} },
-          { key: "mobileSalesTax",       enabled: true, featureFlags: {} }
+          { key: "mobileSalesTax",       enabled: true, featureFlags: {} },
+          { key: "mobileSettings",       enabled: true, featureFlags: {} }
         ]
       }
     }

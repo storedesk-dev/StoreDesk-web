@@ -38,7 +38,7 @@ export type StoreSettings = {
 
 export function defaultStoreSettings(): StoreSettings {
   return {
-    capabilities: { lottery: false, coam: false, fuel: false },
+    capabilities: { lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false },
     lottery: { setupMode: null },
     integrations: {
       googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
@@ -83,7 +83,10 @@ export function normalizeStoreSettings(raw: unknown): StoreSettings {
     capabilities: {
       lottery: capabilities.lottery === true,
       coam: capabilities.coam === true,
-      fuel: capabilities.fuel === true
+      fuel: capabilities.fuel === true,
+      ebt: capabilities.ebt === true,
+      moneyOrder: capabilities.moneyOrder === true,
+      prepaidGift: capabilities.prepaidGift === true
     },
     lottery: { setupMode: null },
     integrations: {
@@ -130,7 +133,7 @@ export const StoreSettingsUpdateSchema = z
   .object({
     settingsVersion: z.number().int().min(1).optional(),
     capabilities: z
-      .object({ lottery: z.boolean(), coam: z.boolean(), fuel: z.boolean() })
+      .object({ lottery: z.boolean(), coam: z.boolean(), fuel: z.boolean(), ebt: z.boolean(), moneyOrder: z.boolean(), prepaidGift: z.boolean() })
       .strict()
       .optional(),
     lottery: z.object({ setupMode: z.null() }).strict().optional(),

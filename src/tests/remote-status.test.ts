@@ -200,9 +200,10 @@ describe("where it shows", () => {
         name: "Store 42",
         storeNumber: "42",
         tunnelUrl: "https://cf-lookup-down.tunnels.example",
+        setup: expect.stringMatching(/^(active|awaiting_activation|none)$/),
         remote: { status: "offline", since: "2026-09-12T20:14:00.000Z" }
       },
-      { storeId: noTunnel.storeId, name: "Store 90", storeNumber: null, tunnelUrl: null, remote: { status: "unknown", since: null } }
+      { storeId: noTunnel.storeId, name: "Store 90", storeNumber: null, tunnelUrl: null, setup: "none", remote: { status: "unknown", since: null } }
     ]);
     const text = JSON.stringify(res.body);
     expect(text).not.toContain("192.168.");

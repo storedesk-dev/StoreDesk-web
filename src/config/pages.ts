@@ -8,9 +8,9 @@
 
 export type App = "electron" | "mobile";
 
-export type StoreCapability = "lottery" | "coam" | "fuel";
+export type StoreCapability = "lottery" | "coam" | "fuel" | "ebt" | "moneyOrder" | "prepaidGift";
 
-export const STORE_CAPABILITIES: StoreCapability[] = ["lottery", "coam", "fuel"];
+export const STORE_CAPABILITIES: StoreCapability[] = ["lottery", "coam", "fuel", "ebt", "moneyOrder", "prepaidGift"];
 
 export interface PageFeatureFlagDef {
   label: string;

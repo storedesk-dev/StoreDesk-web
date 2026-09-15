@@ -104,7 +104,7 @@ describe("buildAccessSyncBody", () => {
       status: "active",
       tunnelUrl: "https://store-42.example.invalid",
       // A store record from an older build: every setting reads as its default.
-      capabilities: { lottery: false, coam: false, fuel: false },
+      capabilities: { lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false },
       settings: {
         lottery: { setupMode: null },
         integrations: {
@@ -201,7 +201,7 @@ describe("access sync version", () => {
   it("changes when the store's features or settings change", () => {
     const base = build().version;
     const withFuel = build({ store: { ...store, settings: { capabilities: { fuel: true } }, settingsVersion: 2 } });
-    expect(withFuel.store.capabilities).toEqual({ lottery: false, coam: false, fuel: true });
+    expect(withFuel.store.capabilities).toEqual({ lottery: false, coam: false, fuel: true, ebt: false, moneyOrder: false, prepaidGift: false });
     expect(withFuel.store.settingsVersion).toBe(2);
     expect(withFuel.version).not.toBe(base);
     const withZone = build({ store: { ...store, settings: { timeZone: "America/Chicago" } } });

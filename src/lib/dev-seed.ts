@@ -76,7 +76,7 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
     organizationId,
     main.storeId,
     {
-      capabilities: { fuel: true, lottery: true, coam: false },
+      capabilities: { fuel: true, lottery: true, coam: false, ebt: true, moneyOrder: true, prepaidGift: false },
       // Switched on; no sheet yet — the store connects it in the desktop app.
       integrations: { googleSheets: { enabled: true } }
     },
