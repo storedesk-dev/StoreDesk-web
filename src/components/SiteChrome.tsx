@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ArrowDownToLine, BookOpen, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { NAV, SITE, contactMailto } from "@/lib/site";
+import { DOCS, NAV, SITE, contactMailto } from "@/lib/site";
+import { useRelease } from "@/components/ReleaseContext";
 
 const NAV_ITEMS = [{ href: "/", label: "Home" }, ...NAV] as const;
 
@@ -101,20 +103,30 @@ export function SiteHeader() {
         </LayoutGroup>
 
         <div className="hidden items-center gap-2 justify-self-end md:flex">
+          {/* The user guide is its own site (docs.storedesk.net), so a plain anchor, not next/link. */}
+          <a
+            href={DOCS.home}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[13.5px] font-semibold text-[#475467] transition-colors hover:text-[#1A63F4]"
+          >
+            <BookOpen className="h-3.5 w-3.5" aria-hidden />
+            Guide
+          </a>
           <Link
             href="/download"
-            className={`rounded-full border px-3.5 py-1.5 text-[13.5px] font-semibold backdrop-blur-md transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13.5px] font-semibold backdrop-blur-md transition-colors ${
               isActive(pathname, "/download")
                 ? "border-[#1A63F4]/40 bg-white text-[#1A63F4]"
                 : "border-[#1A63F4]/20 bg-white/60 text-[#1A63F4] hover:bg-white"
             }`}
           >
+            <ArrowDownToLine className="h-3.5 w-3.5" aria-hidden />
             Download
           </Link>
           <a
             href={contactMailto({ subject: "StoreDesk enquiry" })}
-            className="rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-4 py-1.5 text-[13.5px] font-semibold text-white shadow-[0_4px_14px_-4px_rgba(26,99,244,0.55)] transition-[filter] hover:brightness-110"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-4 py-1.5 text-[13.5px] font-semibold text-white shadow-[0_4px_14px_-4px_rgba(26,99,244,0.55)] transition-[filter] hover:brightness-110"
           >
+            <Mail className="h-3.5 w-3.5" aria-hidden />
             Email us
           </a>
         </div>
@@ -173,16 +185,25 @@ export function SiteHeader() {
                   </Link>
                 );
               })}
+              <a
+                href={DOCS.home}
+                className="mt-2 inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[15px] font-semibold text-[#17202A] hover:bg-white/70"
+              >
+                <BookOpen className="h-4 w-4" aria-hidden />
+                Guide
+              </a>
               <Link
                 href="/download"
-                className="mt-2 rounded-xl border border-[#1A63F4]/20 bg-white/70 px-3 py-2.5 text-center text-[15px] font-semibold text-[#1A63F4]"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#1A63F4]/20 bg-white/70 px-3 py-2.5 text-[15px] font-semibold text-[#1A63F4]"
               >
+                <ArrowDownToLine className="h-4 w-4" aria-hidden />
                 Download
               </Link>
               <a
                 href={contactMailto({ subject: "StoreDesk enquiry" })}
-                className="rounded-xl bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3 py-2.5 text-center text-[15px] font-semibold text-white"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3 py-2.5 text-[15px] font-semibold text-white"
               >
+                <Mail className="h-4 w-4" aria-hidden />
                 Email us
               </a>
             </div>
@@ -193,14 +214,40 @@ export function SiteHeader() {
   );
 }
 
+/**
+ * What is published right now, on every page. It comes from the downloads site through the layout
+ * (components/ReleaseContext), so it is never a number someone has to remember to edit; when that
+ * read fails it renders nothing rather than a stale version.
+ */
+function CurrentVersion() {
+  const release = useRelease();
+  if (!release) return null;
+  return (
+    <p className="sd-num shrink-0 text-[12.5px] text-[#A3AEBF]">
+      StoreDesk {release.version}
+      {release.channel === "beta" ? " (beta)" : ""} ·{" "}
+      <a href={release.notesUrl} className="font-semibold text-[#6E9BFA] underline decoration-[#6E9BFA]/40 underline-offset-4 hover:decoration-[#6E9BFA]">
+        What&rsquo;s new
+      </a>
+    </p>
+  );
+}
+
 export function SiteFooter() {
   return (
-    <footer className="relative overflow-hidden bg-gradient-to-br from-[#0E43D8] via-[#1A63F4] to-[#00A87B] px-6 py-14 text-white">
-      {/* Soft light pools, kept to the corners so the text sits on clean colour. */}
-      <div className="pointer-events-none absolute -right-24 -top-10 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-[#28C88B]/25 blur-3xl" />
+    /*
+     * The same dark surface as the desktop app in dark mode: background #0A1224, text #F3F4F6,
+     * secondary #A3AEBF, dividers at 10% white (store-desk-electron/src/theme). The footer used to be
+     * a blue-to-green gradient, which put white body copy on a moving, mid-light ground and never
+     * reached a comfortable contrast; a flat dark panel reads cleanly and makes the site and the app
+     * look like one product.
+     */
+    <footer className="relative overflow-hidden bg-[#0A1224] px-6 py-14 text-[#F3F4F6]">
+      {/* A single quiet brand wash, well away from the text. */}
+      <div className="pointer-events-none absolute -right-32 -top-24 h-72 w-72 rounded-full bg-[#1A63F4]/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#10B981]/10 blur-3xl" />
 
-      <div className="relative mx-auto grid max-w-6xl gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
+      <div className="relative mx-auto grid max-w-6xl gap-10 sm:grid-cols-2 md:grid-cols-[1.5fr_1fr_1.1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
             {/* Brand kit: on a dark surface the mark sits on a white chip. */}
@@ -209,30 +256,30 @@ export function SiteFooter() {
             </span>
             <span className="font-[family-name:var(--font-display)] text-[18px] font-extrabold uppercase tracking-[0.03em]">Store Desk</span>
           </div>
-          <p className="mt-4 max-w-sm text-[14.5px] leading-relaxed text-white/85">
+          <p className="mt-4 max-w-sm text-[14.5px] leading-relaxed text-[#A3AEBF]">
             {SITE.tagline}. Runs on the PC in your back office and keeps working when the
             internet does not.
           </p>
           <a
             href="/download"
-            className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-[13.5px] font-semibold text-[#1A63F4] shadow-md shadow-black/10 transition-transform hover:-translate-y-0.5"
+            className="mt-5 inline-flex rounded-full bg-[#10B981] px-4 py-2 text-[13.5px] font-semibold text-[#0B0F19] shadow-md shadow-black/30 transition-transform hover:-translate-y-0.5"
           >
             Get StoreDesk
           </a>
         </div>
 
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/65">Product</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97AC]">Product</p>
           <ul className="mt-4 space-y-2.5 text-[14px]">
             {NAV_ITEMS.slice(1).map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="text-white/90 transition-colors hover:text-white hover:underline">
+                <Link href={item.href} className="text-[#E4E7EC] transition-colors hover:text-white hover:underline">
                   {item.label}
                 </Link>
               </li>
             ))}
             <li>
-              <Link href="/download" className="text-white/90 transition-colors hover:text-white hover:underline">
+              <Link href="/download" className="text-[#E4E7EC] transition-colors hover:text-white hover:underline">
                 Download
               </Link>
             </li>
@@ -240,29 +287,49 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/65">Get in touch</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97AC]">Support</p>
+          <ul className="mt-4 space-y-2.5 text-[14px]">
+            {[
+              { href: DOCS.home, label: "User guide" },
+              { href: DOCS.install, label: "Install StoreDesk" },
+              { href: DOCS.connectRegister, label: "Connect your register" },
+              { href: DOCS.troubleshooting, label: "Troubleshooting" },
+              { href: DOCS.releaseNotes, label: "What's new" }
+            ].map((item) => (
+              <li key={item.href}>
+                <a href={item.href} className="text-[#E4E7EC] transition-colors hover:text-white hover:underline">
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97AC]">Get in touch</p>
           <a
             href={contactMailto()}
-            className="mt-4 block text-[14px] font-semibold underline decoration-white/40 underline-offset-4 hover:decoration-white"
+            className="mt-4 block text-[14px] font-semibold text-[#6E9BFA] underline decoration-[#6E9BFA]/50 underline-offset-4 hover:decoration-[#6E9BFA]"
           >
             {SITE.email}
           </a>
           <ul className="mt-4 space-y-2.5 text-[14px]">
             <li>
-              <Link href="/privacy" className="text-white/80 transition-colors hover:text-white">Privacy</Link>
+              <Link href="/privacy" className="text-[#A3AEBF] transition-colors hover:text-white">Privacy</Link>
             </li>
             <li>
-              <Link href="/terms" className="text-white/80 transition-colors hover:text-white">Terms</Link>
+              <Link href="/terms" className="text-[#A3AEBF] transition-colors hover:text-white">Terms</Link>
             </li>
           </ul>
         </div>
       </div>
 
-      <div className="relative mx-auto mt-12 max-w-6xl border-t border-white/20 pt-6">
-        <p className="text-[12.5px] text-white/70">
+      <div className="relative mx-auto mt-12 flex max-w-6xl flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[12.5px] text-[#A3AEBF]">
           © {new Date().getFullYear()} StoreDesk. Built for convenience stores and gas stations.
           Verifone and Commander are trademarks of Verifone, Inc.; StoreDesk is not affiliated with Verifone.
         </p>
+        <CurrentVersion />
       </div>
     </footer>
   );

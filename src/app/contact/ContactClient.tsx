@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, Copy, Mail, Send } from "lucide-react";
+import { ArrowUpRight, BookOpen, Check, Copy, KeyRound, LifeBuoy, Mail, MessageSquare, Plug, Send, Smartphone, Store } from "lucide-react";
 import { PageFrame, PageHero } from "@/components/PageHero";
-import { SITE, contactMailto } from "@/lib/site";
+import { DOCS, SITE, contactMailto } from "@/lib/site";
 
 /**
  * Contact.
@@ -15,25 +15,42 @@ import { SITE, contactMailto } from "@/lib/site";
  * otherwise have to ask for, so most problems are answered in one reply.
  */
 
-type Topic = { key: string; label: string; subject: string; ask: string[] };
+type Topic = {
+  key: string;
+  label: string;
+  hint: string;
+  icon: ReactNode;
+  subject: string;
+  ask: string[];
+  /** The page in the guide that answers this without an email, when there is one. */
+  guide?: { href: string; label: string };
+};
 
 const TOPICS: Topic[] = [
   {
     key: "fit",
+    hint: "Before you buy",
+    icon: <Store className="h-4 w-4" />,
     label: "Would it work for my store?",
-    subject: "StoreDesk — would this work for my store?",
+    subject: "StoreDesk: would this work for my store?",
+    guide: { href: DOCS.home, label: "What every screen does" },
     ask: ["Register (Commander model or version, if you know it)", "How many stores", "Does the back-office PC run Windows 10 or later?"]
   },
   {
     key: "key",
+    hint: "To install or reinstall",
+    icon: <KeyRound className="h-4 w-4" />,
     label: "I need a setup key",
-    subject: "StoreDesk — setup key",
+    subject: "StoreDesk setup key",
     ask: ["Store name and address", "The email address the last key went to, if there was one"]
   },
   {
     key: "register",
+    hint: "Setup or connection trouble",
+    icon: <Plug className="h-4 w-4" />,
     label: "The register won’t connect",
-    subject: "StoreDesk — register connection",
+    subject: "StoreDesk: register connection",
+    guide: { href: DOCS.troubleshooting, label: "Register and service troubleshooting" },
     ask: [
       "Commander address and port you entered (default 192.168.31.11 and 443)",
       "The exact message on screen, or a photo of it",
@@ -42,12 +59,17 @@ const TOPICS: Topic[] = [
   },
   {
     key: "phone",
+    hint: "Android app trouble",
+    icon: <Smartphone className="h-4 w-4" />,
     label: "Phone app",
-    subject: "StoreDesk — phone app",
+    subject: "StoreDesk: phone app",
+    guide: { href: DOCS.mobileSetup, label: "Setting up the phone app" },
     ask: ["Phone model and Android version", "What you were doing when it went wrong", "A screenshot, if you can"]
   },
   {
     key: "other",
+    hint: "Anything not above",
+    icon: <MessageSquare className="h-4 w-4" />,
     label: "Something else",
     subject: "StoreDesk enquiry",
     ask: ["Anything that helps us answer in one reply"]
@@ -79,27 +101,33 @@ function Composer() {
     <div className="overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_30px_80px_-30px_rgba(26,99,244,0.45)] backdrop-blur-xl">
       <div className="border-b border-[var(--border)] bg-gradient-to-r from-[#F5F8FF] to-[#F0FBF6] p-4">
         <p className="px-1 text-[13px] font-semibold text-[var(--muted)]">What is it about?</p>
-        <div className="mt-2.5 flex flex-wrap gap-2">
+        <div role="radiogroup" aria-label="What is it about?" className="mt-2.5 space-y-1.5">
           {TOPICS.map((t) => {
             const on = t.key === topicKey;
             return (
               <button
                 key={t.key}
                 type="button"
+                role="radio"
+                aria-checked={on}
                 onClick={() => setTopicKey(t.key)}
-                aria-pressed={on}
-                className={`relative rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition-colors ${
-                  on ? "text-white" : "bg-white text-[#17202A] ring-1 ring-[var(--border)] hover:text-[#1A63F4]"
+                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
+                  on ? "bg-white shadow-sm ring-2 ring-[#1A63F4]" : "bg-white/70 ring-1 ring-[var(--border)] hover:bg-white"
                 }`}
               >
-                {on ? (
-                  <motion.span
-                    layoutId="contact-topic"
-                    className="absolute inset-0 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B]"
-                    transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
-                  />
-                ) : null}
-                <span className="relative">{t.label}</span>
+                <span
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                    on ? "bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white" : "bg-[#F2F4F7] text-[#475467]"
+                  }`}
+                >
+                  {t.icon}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-[15px] font-semibold leading-tight ${on ? "text-[#1A63F4]" : "text-[#17202A]"}`}>
+                    {t.label}
+                  </span>
+                  <span className="block text-[12.5px] leading-tight text-[var(--muted)]">{t.hint}</span>
+                </span>
               </button>
             );
           })}
@@ -127,6 +155,19 @@ function Composer() {
               </motion.span>
             </AnimatePresence>
           </div>
+          {topic.guide ? (
+            <a
+              href={topic.guide.href}
+              className="flex items-center gap-2.5 border-b border-[var(--border)] bg-[#F5F8FF] px-4 py-2.5 text-[13.5px] hover:bg-[#EDF3FF]"
+            >
+              <BookOpen className="h-4 w-4 shrink-0 text-[#1A63F4]" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="font-semibold text-[#1A63F4]">Try this first: {topic.guide.label}</span>
+                <span className="block text-[12px] text-[var(--muted)]">Most of these are answered there in a minute.</span>
+              </span>
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-[#1A63F4]" aria-hidden />
+            </a>
+          ) : null}
           <div className="px-4 py-3.5">
             <p className="text-[13px] font-semibold text-[var(--muted)]">We will ask for these, so they are already in the draft:</p>
             <ul className="mt-2.5 space-y-2">
@@ -177,7 +218,33 @@ const NOTES = [
   },
   {
     title: "Say which part",
-    body: "The desktop app, the phone app, or the setup on the store PC — and roughly when it started."
+    body: "The desktop app, the phone app, or the setup on the store PC, and roughly when it started."
+  }
+];
+
+/**
+ * The guide, before the inbox.
+ *
+ * Most of what people write in about — the register not connecting, a phone that will not sign in,
+ * what a screen is for — already has a page with screenshots. Sending those to email is slower for
+ * the store and slower for us, so the guide leads and the composer is for what is genuinely left:
+ * a setup key, a question before buying, and anything the guide did not answer.
+ */
+const FIRST_STOPS = [
+  {
+    href: DOCS.troubleshooting,
+    title: "Something is not working",
+    body: "The service will not start, the register will not answer, phones cannot reach the store."
+  },
+  {
+    href: DOCS.install,
+    title: "Installing or setting up",
+    body: "Every step of a first setup, with a screenshot of each screen."
+  },
+  {
+    href: DOCS.home,
+    title: "How a screen works",
+    body: "Every desktop screen and every phone screen, explained one by one."
   }
 ];
 
@@ -187,12 +254,36 @@ export function ContactClient() {
       <PageHero
         eyebrow="Contact"
         title="Talk to the people who built it"
-        lede="Pick what it is about and we will start the email for you, with the details we would otherwise have to ask for."
+        lede="Most questions are answered in the guide in a minute. When they are not, pick what it is about and we will start the email for you, with the details we would otherwise have to ask for."
         aside={<Composer />}
       >
+        <div className="mt-7 space-y-2.5">
+          <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#00875F]">
+            <LifeBuoy className="h-4 w-4" aria-hidden />
+            Try the guide first
+          </p>
+          {FIRST_STOPS.map((stop) => (
+            <a
+              key={stop.href}
+              href={stop.href}
+              className="group flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-white/80 px-4 py-3 backdrop-blur transition-colors hover:border-[#1A63F4]/40"
+            >
+              <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-[#1A63F4]" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15.5px] font-semibold">{stop.title}</span>
+                <span className="block text-[14px] leading-snug text-[var(--muted)]">{stop.body}</span>
+              </span>
+              <ArrowUpRight
+                className="mt-0.5 h-4 w-4 shrink-0 text-[#1A63F4] opacity-0 transition-opacity group-hover:opacity-100"
+                aria-hidden
+              />
+            </a>
+          ))}
+        </div>
+
         <a
           href={contactMailto()}
-          className="mt-7 inline-flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-white/80 px-4 py-3 backdrop-blur hover:border-[#1A63F4]/40"
+          className="mt-5 inline-flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-white/80 px-4 py-3 backdrop-blur hover:border-[#1A63F4]/40"
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white">
             <Mail className="h-5 w-5" />

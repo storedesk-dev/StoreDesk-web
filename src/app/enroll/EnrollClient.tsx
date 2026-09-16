@@ -21,7 +21,7 @@ const MIN_PASSWORD = 8;
 
 const ERRORS: Record<string, string> = {
   ENROLLMENT_INVALID:
-    "That code doesn't look right. Check you copied all of it — it starts with appu_ and has a dot in the middle.",
+    "That code doesn't look right. Check you copied all of it: it starts with appu_ and has a dot in the middle.",
   ENROLLMENT_CONSUMED:
     "This code has already been used. If that wasn't you, tell whoever set up your account straight away.",
   ENROLLMENT_EXPIRED: "This code has expired. Ask whoever set up your account to send a new one.",
@@ -110,7 +110,7 @@ export function EnrollClient() {
             {!state.linkedToStore ? (
               <p className="mt-4 rounded-lg border border-[#1A63F4]/20 bg-[#1A63F4]/[0.04] p-3.5 text-[14px] leading-relaxed text-[var(--foreground)]">
                 Your account isn&apos;t linked to a store yet. Whoever set it up will add you to your
-                store&apos;s access — once they have, the store appears when you sign in.
+                store&apos;s access. Once they have, the store appears when you sign in.
               </p>
             ) : null}
           </div>

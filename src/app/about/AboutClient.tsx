@@ -1,99 +1,17 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Building2, Cloud, HardDrive } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { PageFrame, PageHero, SectionHead, primaryButton, secondaryButton } from "@/components/PageHero";
 import { contactMailto } from "@/lib/site";
 
 /**
- * Why the product exists, and where each kind of data lives.
+ * Why the product exists.
  *
- * The data map is the page's argument made concrete: a store owner's first
- * question about any back office is "who else can see my numbers". Each entry
- * matches the split in CLAUDE.md — store data on the Worker, licensing on the
- * control plane.
+ * The hero used to carry a clickable map of which numbers sit on the store PC and which sit in the
+ * account. It was a lot of interaction for a point the page already makes twice in plain words, so
+ * it went; "your data stays in your store" is argued below, and the privacy page has the detail.
  */
-
-type Entry = { name: string; why: string };
-
-const ON_PC: Entry[] = [
-  { name: "Price book and PLUs", why: "Read from your register and kept on the PC. A refresh only rewrites the items that changed." },
-  { name: "Supplier costs", why: "The numbers you type in. Nobody outside the store needs them, so they never leave it." },
-  { name: "Sales and shift reports", why: "Pulled from the Commander and stored on the PC, with the individual transactions behind them." },
-  { name: "Sales tax returns", why: "Worked out on the PC from the same sales data, and saved as a file you file yourself." }
-];
-
-const IN_ACCOUNT: Entry[] = [
-  { name: "Your organisation and stores", why: "So we know which licence covers which store. Names and addresses, not figures." },
-  { name: "Licence and plan", why: "Whether you are on the trial or the standard plan, and when it renews." },
-  { name: "Which PCs are connected", why: "Each store PC gets its own credential, so one can be replaced without touching the others." },
-  { name: "A log of account changes", why: "Who changed what in the account, and when — useful if more than one person manages it." }
-];
-
-function DataMap() {
-  const [selected, setSelected] = useState<string>(ON_PC[0].name);
-  const reduceMotion = useReducedMotion();
-  const entry = [...ON_PC, ...IN_ACCOUNT].find((e) => e.name === selected) ?? ON_PC[0];
-  const onPc = ON_PC.some((e) => e.name === entry.name);
-
-  const column = (title: string, icon: ReactNode, entries: Entry[], tint: "blue" | "green") => (
-    <div
-      className={`rounded-3xl p-4 ${tint === "green" ? "bg-[#00A87B]/[0.07]" : "bg-[#1A63F4]/[0.06]"}`}
-    >
-      <p className={`flex items-center gap-2 text-[13px] font-bold uppercase tracking-[0.1em] ${tint === "green" ? "text-[#00875F]" : "text-[#1A63F4]"}`}>
-        {icon}
-        {title}
-      </p>
-      <ul className="mt-3 space-y-1.5">
-        {entries.map((e) => {
-          const on = e.name === selected;
-          return (
-            <li key={e.name}>
-              <button
-                type="button"
-                onClick={() => setSelected(e.name)}
-                aria-pressed={on}
-                className={`w-full rounded-xl px-3 py-2 text-left text-[14.5px] font-semibold transition-colors ${
-                  on ? "bg-white text-[#17202A] shadow-sm" : "text-[#344054] hover:bg-white/70"
-                }`}
-              >
-                {e.name}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-
-  return (
-    <div className="rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-[0_30px_80px_-30px_rgba(26,99,244,0.45)] backdrop-blur-xl md:p-5">
-      <p className="px-1 text-[15px] font-semibold">Where your numbers live</p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        {column("On your store PC", <HardDrive className="h-4 w-4" />, ON_PC, "green")}
-        {column("In your account", <Cloud className="h-4 w-4" />, IN_ACCOUNT, "blue")}
-      </div>
-      <div className="mt-3 min-h-[92px] rounded-2xl bg-[#17202A] p-4 text-white">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={entry.name}
-            initial={{ y: reduceMotion ? 0 : 6, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.18 }}
-          >
-            <p className={`text-[12px] font-bold uppercase tracking-[0.1em] ${onPc ? "text-[#28C88B]" : "text-[#8DB4FF]"}`}>
-              {onPc ? "Stays in the store" : "Held by StoreDesk"}
-            </p>
-            <p className="mt-1.5 text-[15px] leading-relaxed text-white/85">{entry.why}</p>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
 
 const BELIEFS = [
   {
@@ -106,7 +24,7 @@ const BELIEFS = [
   },
   {
     title: "The register is the source of truth",
-    body: "StoreDesk reads from your Commander and never writes to it. Nothing we do can put a wrong price on a till. If StoreDesk vanished tomorrow, the store would keep trading."
+    body: "StoreDesk reads from your Commander, and only sends something back when you have turned that on and a person confirms it. Nothing is pushed to a till automatically. If StoreDesk vanished tomorrow, the store would keep trading."
   },
   {
     title: "No feature nobody asked for",
@@ -121,13 +39,12 @@ export function AboutClient() {
         eyebrow="About StoreDesk"
         title="Because the margin report took a Sunday afternoon"
         lede="StoreDesk started as a spreadsheet, a stack of supplier invoices, and the nagging feeling that nobody actually knew which items were making money."
-        aside={<DataMap />}
         actions={
           <>
             <Link href="/product" className={primaryButton}>
               See what it does
             </Link>
-            <a href={contactMailto({ subject: "StoreDesk — feedback" })} className={secondaryButton}>
+            <a href={contactMailto({ subject: "StoreDesk feedback" })} className={secondaryButton}>
               Tell us what is missing
             </a>
           </>
@@ -136,24 +53,29 @@ export function AboutClient() {
 
       <section className="mx-auto grid max-w-6xl gap-14 px-6 py-20 lg:grid-cols-[1.1fr_1fr]">
         <div>
-          <SectionHead eyebrow="The problem" title="Two numbers that never sat side by side" />
+          <SectionHead eyebrow="The problem" title="The back office ran on paper and retyping" />
           <div className="mt-6 max-w-2xl space-y-5 text-[17.5px] leading-[1.7] text-[#17202A]">
             <p>
-              A convenience store carries several thousand items. The register knows what each one
-              sells for. The invoices in the filing cabinet know what each one cost. Almost nowhere
-              are the two written down next to each other — so “are we making anything on this?”
-              turns into an afternoon of typing.
+              Reports come off the register on paper. Fuel tank readings come off another printout.
+              Invoices come in a stack. Every week someone sits down and copies all of it into a
+              spreadsheet by hand, then reconciles the spreadsheet against the paper it came from,
+              because that is the only place the numbers ever meet.
             </p>
             <p>
-              Most software sold to fix this wants to move the whole operation into a web app,
-              charge per till, and stop working the moment the DSL blinks. That is a poor trade for
-              a shop doing steady business on a state highway.
+              Changing prices is its own afternoon. The Commander can do it, through an interface
+              that was not built for a person updating a few hundred PLUs in a sitting. The software
+              sold to fix that wants a monthly fee for what amounts to basic price-book work, or
+              wants the whole operation in a web app that stops the moment the DSL blinks.
             </p>
             <p>
-              So StoreDesk does the narrow thing well. It reads the price list off the register you
-              already own, lets you record what you actually pay, and puts the two side by side — on
-              the back-office PC, on a phone you can carry down the aisle, and in a sales tax return
-              you can file without retyping it.
+              And then there is the sales tax return, worked out from the same retyped numbers, in a
+              form that has to be right.
+            </p>
+            <p>
+              So StoreDesk reads the register directly and keeps it on your own PC: the price book
+              and what you actually pay for each item, the daily and shift reports, the fuel
+              readings, and a Georgia ST-3 return built from the same data you already have. No
+              retyping, and nothing to reconcile against a printout.
             </p>
           </div>
         </div>
@@ -163,8 +85,10 @@ export function AboutClient() {
             Everything on this site describes software that exists and runs in a store today.
           </p>
           <p className="mt-4 text-[16px] leading-relaxed text-white/80">
-            Lottery settlement and invoice upload are on the way. Until they ship, we list them as
-            planned — not as features.
+            Two things are being built and are not here yet: EDI, so invoices from H.T. Hackney and
+            the other distributors that support it land as costs without anyone typing them, and a
+            lottery module for settling the daily ticket count. Until they ship we list them as
+            planned, not as features.
           </p>
         </div>
       </section>

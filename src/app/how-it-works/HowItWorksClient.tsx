@@ -2,11 +2,9 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  ArrowLeft,
   ArrowRight,
-  Check,
   Cloud,
   FileSpreadsheet,
   KeyRound,
@@ -19,7 +17,7 @@ import {
   UserCheck
 } from "lucide-react";
 import { PageFrame, PageHero, SectionHead, primaryButton } from "@/components/PageHero";
-import { PLANS } from "@/lib/site";
+import { DOCS, PLANS } from "@/lib/site";
 
 /**
  * How the pieces fit together, in the order an owner meets them.
@@ -30,202 +28,100 @@ import { PLANS } from "@/lib/site";
  * "what happens when the line drops" — each row matches the Worker's behaviour.
  */
 
-function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <p className="text-[12px] font-semibold text-[var(--muted)]">{label}</p>
-      <p
-        className={`mt-1 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-[14.5px] text-[#17202A] ${mono ? "sd-num" : ""}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
+type Step = {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  title: string;
+  /** What the store ends up with — not the keystrokes; those are the guide's job. */
+  outcome: string;
+  minutes: string;
+  href: string;
+};
 
-type Step = { key: string; label: string; icon: ReactNode; title: string; note: string; screen: ReactNode };
-
+/**
+ * The four stages of a first setup, in order.
+ *
+ * Deliberately not a copy of the screens. The guide already walks each one keystroke by keystroke,
+ * with real screenshots (docs.storedesk.net), and a second set of hand-drawn mock fields here would
+ * drift from the product the first time a screen changed. So this says what each stage is for and
+ * roughly how long it takes, and hands off.
+ */
 const STEPS: Step[] = [
   {
     key: "install",
     label: "Install",
     icon: <KeyRound className="h-4 w-4" />,
-    title: "Install on the back-office PC and enter your setup key",
-    note: `The key arrives by email when your store is set up. It is good for ${PLANS.setupKeyHours} hours and works once — if it runs out, we send another.`,
-    screen: (
-      <div className="space-y-4">
-        <Field label="Setup key" value="•••• •••• •••• ••••" mono />
-        <p className="text-[13px] text-[var(--muted)]">From the email we sent you. Paste it in; nothing else to type.</p>
-        <span className="inline-flex rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-4 py-2 text-[14px] font-semibold text-white">
-          Activate this PC
-        </span>
-      </div>
-    )
+    title: "Install on the back-office PC",
+    outcome: `Run the installer, paste the setup key from your email, and this PC is your store's. The key lasts ${PLANS.setupKeyHours} hours and works once.`,
+    minutes: "about 10 minutes",
+    href: DOCS.install
   },
   {
     key: "register",
     label: "Connect",
     icon: <Plug className="h-4 w-4" />,
     title: "Point it at your Commander",
-    note: "Use the Commander login you already have. It only needs permission to view — StoreDesk never writes to the register.",
-    screen: (
-      <div className="space-y-3">
-        <div className="grid grid-cols-[1fr_88px] gap-3">
-          <Field label="Commander address" value="192.168.31.11" mono />
-          <Field label="Port" value="443" mono />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Username" value="Your Commander login" />
-          <Field label="Password" value="••••••••" mono />
-        </div>
-        <div className="rounded-xl bg-[#00A87B]/10 px-3 py-2.5">
-          <p className="flex items-center gap-2 text-[13.5px] font-semibold text-[#00875F]">
-            <Check className="h-4 w-4" /> Connected — importing the price book
-          </p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#00A87B]/15">
-            <motion.div
-              className="h-full rounded-full bg-[#00A87B]"
-              initial={{ width: "8%" }}
-              animate={{ width: "100%" }}
-              transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.8 }}
-            />
-          </div>
-        </div>
-      </div>
-    )
+    outcome:
+      "Give it the register's address and your existing Commander login. The price book imports itself: ten thousand items in a few minutes.",
+    minutes: "about 15 minutes",
+    href: DOCS.connectRegister
   },
   {
     key: "costs",
     label: "Add costs",
     icon: <Tags className="h-4 w-4" />,
     title: "Add what you pay your suppliers",
-    note: "Enter by the case or the pack. StoreDesk works out the cost of one, so suppliers compare fairly.",
-    screen: (
-      <div className="space-y-3">
-        <Field label="Item" value="Cola, 20 oz bottle" />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Supplier" value="Peach State Wholesale" />
-          <Field label="Case of" value="24" mono />
-        </div>
-        <Field label="Case cost" value="$27.36" mono />
-        <p className="rounded-xl bg-[#1A63F4]/[0.07] px-3 py-2.5 text-[14px] text-[#17202A]">
-          <span className="sd-num font-semibold">$1.14</span> each · <span className="sd-num font-semibold">54%</span>{" "}
-          margin at the register price of <span className="sd-num">$2.49</span>
-        </p>
-      </div>
-    )
+    outcome:
+      "Enter case or pack costs as invoices come in. StoreDesk works out the cost of one, so two suppliers on the same item compare fairly.",
+    minutes: "as invoices arrive",
+    href: DOCS.topic("page.vendors")
   },
   {
     key: "floor",
     label: "On the floor",
     icon: <ScanLine className="h-4 w-4" />,
-    title: "Take it to the floor",
-    note: "Staff sign in with their own account, and you choose which screens each person can open.",
-    screen: (
-      <div className="mx-auto max-w-[250px] rounded-[26px] border-[5px] border-[#17202A] bg-white p-3.5 shadow-lg">
-        <div className="flex h-24 items-center justify-center rounded-2xl bg-[#17202A]">
-          <motion.div
-            className="h-0.5 w-3/4 rounded-full bg-[#28C88B] shadow-[0_0_12px_#28C88B]"
-            animate={{ y: [-26, 26, -26] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </div>
-        <p className="mt-3 text-[14px] font-semibold">Cola, 20 oz bottle</p>
-        <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
-          {[
-            ["Price", "$2.49"],
-            ["Cost", "$1.14"],
-            ["Margin", "54%"]
-          ].map(([k, v]) => (
-            <div key={k} className="rounded-lg bg-[#F5F8FF] py-1.5">
-              <p className="text-[10.5px] text-[var(--muted)]">{k}</p>
-              <p className="sd-num text-[13px] font-semibold">{v}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
+    title: "Put it in your staff's hands",
+    outcome:
+      "Install the phone app, and staff scan a shelf tag to see price, cost and margin. You choose which screens each person can open.",
+    minutes: "a few minutes each",
+    href: DOCS.mobileSetup
   }
 ];
 
-function SetupWalkthrough() {
-  const [index, setIndex] = useState(0);
-  const reduceMotion = useReducedMotion();
-  const step = STEPS[index];
-
+/**
+ * The four stages, as one glance.
+ *
+ * This was a carousel that advanced through the four steps one panel at a time. The panels only ever
+ * said what the stage was for and then linked to the guide, which is a lot of screen and motion for
+ * very little: the guide is where the actual steps live, with screenshots. So the shape of the
+ * afternoon is shown all at once, which is the only thing this section is really claiming, and the
+ * links go straight to the step a reader wants.
+ */
+function SetupStages() {
   return (
-    <div className="overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_30px_80px_-30px_rgba(26,99,244,0.45)] backdrop-blur-xl">
-      <div role="tablist" aria-label="Setup steps" className="grid grid-cols-4 gap-1 border-b border-[var(--border)] bg-gradient-to-r from-[#F5F8FF] to-[#F0FBF6] p-1.5">
-        {STEPS.map((s, i) => {
-          const on = i === index;
-          return (
-            <button
-              key={s.key}
-              role="tab"
-              type="button"
-              aria-selected={on}
-              onClick={() => setIndex(i)}
-              className={`relative flex flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[12.5px] font-semibold transition-colors ${
-                on ? "text-white" : i < index ? "text-[#00875F]" : "text-[var(--muted)] hover:text-[#1A63F4]"
-              }`}
-            >
-              {on ? (
-                <motion.span
-                  layoutId="setup-step"
-                  className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#1A63F4] to-[#00A87B]"
-                  transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 34 }}
-                />
-              ) : null}
-              <span className="relative flex items-center gap-1">
-                {i < index ? <Check className="h-4 w-4" /> : s.icon}
-                <span className="sd-num">{i + 1}</span>
+    <ol className="overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_30px_80px_-30px_rgba(26,99,244,0.45)] backdrop-blur-xl">
+      {STEPS.map((step, index) => (
+        <li key={step.key} className={index > 0 ? "border-t border-[var(--border)]" : ""}>
+          <a href={step.href} className="group flex items-start gap-4 p-5 transition-colors hover:bg-[#F5F8FF]">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white">
+              {step.icon}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-[17px] font-bold tracking-tight">{step.title}</span>
+                <span className="sd-num text-[12.5px] text-[var(--muted)]">{step.minutes}</span>
               </span>
-              <span className="relative hidden sm:block">{s.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="p-5 md:p-6">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={step.key}
-            initial={{ x: reduceMotion ? 0 : 16, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: reduceMotion ? 0 : -16, opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0 : 0.22 }}
-          >
-            <h2 className="text-[20px] font-bold tracking-tight">{step.title}</h2>
-            <div className="mt-4 min-h-[232px] rounded-2xl bg-[#F7F9FC] p-4">{step.screen}</div>
-            <p className="mt-4 border-l-2 border-[#00A87B]/50 pl-3 text-[14.5px] leading-relaxed text-[var(--muted)]">
-              {step.note}
-            </p>
-          </motion.div>
-        </AnimatePresence>
-
-        <div className="mt-5 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setIndex((i) => Math.max(0, i - 1))}
-            disabled={index === 0}
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[14px] font-semibold text-[#17202A] disabled:opacity-35"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back
-          </button>
-          <span className="sd-num text-[13px] text-[var(--muted)]">
-            Step {index + 1} of {STEPS.length}
-          </span>
-          <button
-            type="button"
-            onClick={() => setIndex((i) => Math.min(STEPS.length - 1, i + 1))}
-            disabled={index === STEPS.length - 1}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#17202A] px-4 py-2 text-[14px] font-semibold text-white disabled:opacity-35"
-          >
-            Next <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </div>
+              <span className="mt-1 block text-[15px] leading-relaxed text-[var(--muted)]">{step.outcome}</span>
+            </span>
+            <ArrowRight
+              className="mt-2 h-4 w-4 shrink-0 text-[#1A63F4] opacity-0 transition-opacity group-hover:opacity-100"
+              aria-hidden
+            />
+          </a>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -244,7 +140,7 @@ const LINKS: Link_[] = [
     name: "Register ↔ store PC",
     where: "store",
     online: "Reading prices and sales over the store network",
-    offline: "Carries on — it never used the internet",
+    offline: "Carries on. It never used the internet",
     offlineState: "up"
   },
   {
@@ -252,7 +148,7 @@ const LINKS: Link_[] = [
     name: "Desktop app",
     where: "store",
     online: "Price book, costs, reports, sales tax",
-    offline: "Works as normal — it runs on the same PC",
+    offline: "Works as normal. It runs on the same PC",
     offlineState: "up"
   },
   {
@@ -260,15 +156,21 @@ const LINKS: Link_[] = [
     name: "Staff sign-in",
     where: "store",
     online: "Signs in and stays signed in for a shift",
-    offline: `Anyone already signed in keeps going for ${PLANS.offlineSessionHours} hours`,
-    offlineState: "limited"
+    // Passwords are argon2id hashes in the store's own database and are checked there
+    // (StoreAuthHandlers + AccessUser), so signing in fresh works with the line down, not just
+    // staying signed in. A session then lasts PLANS.offlineSessionHours.
+    offline: `Signing in still works. Passwords are checked on the store PC, and a session lasts ${PLANS.offlineSessionHours} hours`,
+    offlineState: "up"
   },
   {
     icon: <Smartphone className="h-5 w-5" />,
-    name: "Phone app away from the store",
+    name: "Phone app",
     where: "outside",
     online: "Check prices and takings from anywhere",
-    offline: "Back as soon as the line is",
+    // Phones reach the store through the tunnel, so they need the line. An admin can turn on local
+    // network access (STOREDESK_LAN_ACCESS) and phones on the store's own Wi-Fi keep working; it is
+    // off by default, so the honest default answer is "down".
+    offline: "Back as soon as the line is, unless an admin has turned on local network access",
     offlineState: "down"
   },
   {
@@ -276,7 +178,7 @@ const LINKS: Link_[] = [
     name: "Google Sheet",
     where: "outside",
     online: "Daily sales written on schedule",
-    offline: "Catches up on its own afterwards",
+    offline: "Writes the days it missed once the line is back",
     offlineState: "down"
   },
   {
@@ -391,7 +293,7 @@ const PIECES = [
   {
     icon: <Cloud className="h-5 w-5" />,
     name: "Your account",
-    role: "We look after licensing and which PCs are connected. That is all it holds — your sales figures never leave the store."
+    role: "We look after licensing and which PCs are connected. That is all it holds. Your sales figures never leave the store."
   }
 ];
 
@@ -408,8 +310,8 @@ export function HowItWorksClient() {
             </span>
           </>
         }
-        lede="Four steps on hardware you already own — nothing to rack, nothing to rewire at the till. Click through them to see what each screen asks for."
-        aside={<SetupWalkthrough />}
+        lede="Four steps on hardware you already own. Nothing to rack, nothing to rewire at the till. Each one links to the guide, which walks it screen by screen."
+        aside={<SetupStages />}
         actions={
           <Link href="/download" className={primaryButton}>
             Start with the installer <ArrowRight className="h-4 w-4" />

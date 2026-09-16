@@ -35,7 +35,8 @@ export function PageHero({
   lede: ReactNode;
   actions?: ReactNode;
   /** The interactive piece that sits beside the title. */
-  aside: ReactNode;
+  /** The panel beside the hero. Omit it and the hero runs the full width. */
+  aside?: ReactNode;
   /** Optional extra copy under the lede. */
   children?: ReactNode;
 }) {
@@ -53,7 +54,11 @@ export function PageHero({
 
   return (
     <section className="sd-hero-wash relative border-b border-[var(--border)]">
-      <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-6 pb-14 pt-10 md:pt-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-14 lg:pb-20">
+      <div
+        className={`relative mx-auto grid max-w-6xl items-center gap-10 px-6 pb-14 pt-10 md:pt-14 lg:gap-14 lg:pb-20 ${
+          aside ? "lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" : ""
+        }`}
+      >
         <div>
           <motion.p {...rise(0)} className="sd-eyebrow">
             {eyebrow}
@@ -71,9 +76,11 @@ export function PageHero({
             </motion.div>
           ) : null}
         </div>
-        <motion.div {...rise(0.12)} className="min-w-0">
-          {aside}
-        </motion.div>
+        {aside ? (
+          <motion.div {...rise(0.12)} className="min-w-0">
+            {aside}
+          </motion.div>
+        ) : null}
       </div>
     </section>
   );

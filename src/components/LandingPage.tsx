@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 import { DeviceStage } from "@/components/DeviceStage";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
-import { contactMailto } from "@/lib/site";
+import { GooglePlayIcon, WindowsIcon } from "@/components/BrandIcons";
+import { DOCS, contactMailto } from "@/lib/site";
 import {
   HardDrive,
   ArrowRight,
@@ -42,7 +43,7 @@ const validatedScreens = [
     src: "/screenshots/mobile-app-1.jpeg",
     title: "Sign in",
     subtitle: "Staff accounts you set up",
-    desc: "Each person signs in with an account you create for them — there is no public sign-up — and you choose which screens they can open.",
+    desc: "Each person signs in with an account you create for them. There is no public sign-up, and you choose which screens they can open.",
     tag: "Sign in",
     icon: Smartphone
   },
@@ -60,7 +61,7 @@ const validatedScreens = [
     src: "/screenshots/mobile-app-3.jpeg",
     title: "Transaction detail",
     subtitle: "Every line and every tax",
-    desc: "Open any sale to see what was rung up, how it was paid, and how the tax was split — without walking back to the register.",
+    desc: "Open any sale to see what was rung up, how it was paid, and how the tax was split, without walking back to the register.",
     tag: "Receipts",
     icon: Receipt
   },
@@ -87,34 +88,12 @@ const validatedScreens = [
     src: "/screenshots/mobile-app-6.jpeg",
     title: "Cost analysis",
     subtitle: "What each supplier charges",
-    desc: "Every supplier you buy the item from, cheapest per unit first and marked Best cost — handy when a rep is on the phone.",
+    desc: "Every supplier you buy the item from, cheapest per unit first and marked Best cost. Handy when a rep is on the phone.",
     tag: "Suppliers",
     icon: DollarSign
   }
 ];
 
-const steps = [
-  {
-    n: "01",
-    title: "Install on the back-office PC",
-    body: "Run the installer on the Windows PC that can reach your register. Your catalogue and sales history are stored on that machine, not in the cloud."
-  },
-  {
-    n: "02",
-    title: "Pull in your price book",
-    body: "Point StoreDesk at your Commander and it reads the whole PLU list. Then add what each supplier charges you — per case, pack or unit."
-  },
-  {
-    n: "03",
-    title: "Sign in on your phone",
-    body: "Install the Android app and sign in with the account you were given. It reaches your store securely from anywhere — it does not need to be on the store Wi-Fi."
-  },
-  {
-    n: "04",
-    title: "Walk the floor",
-    body: "Scan a shelf tag to see the price, the cheapest supplier and the margin. Catch the items you are selling below cost before the next delivery."
-  }
-];
 
 /** Linear-style Spotlight Card Component */
 /** Interactive Single 3D Phone Circular Carousel Component */
@@ -354,7 +333,7 @@ export function LandingPage() {
               animate={{ y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              Runs on your back-office PC. Track every vendor&apos;s cost, compare prices across suppliers, see the margin on every item, and let your staff scan barcodes anywhere on the floor.
+              Runs on your back-office PC. Track every vendor&apos;s cost, compare prices across suppliers, see the margin on every item, watch your fuel prices, and let your staff scan barcodes anywhere on the floor.
             </motion.p>
 
             {/* Dynamic Focus Feature Pill */}
@@ -400,10 +379,22 @@ export function LandingPage() {
               transition={{ delay: 0.13 }}
             >
               <VerifoneBadge />
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-[13px] font-bold text-slate-900 shadow-sm">
-                <HardDrive className="h-3.5 w-3.5 text-[#00A87B]" />
-                Windows back-office PC &middot; Android phone app
-              </span>
+              {/* The two platforms, as the way in: a visitor who recognises the icon wants the file. */}
+              <Link
+                href="/download"
+                aria-label="Download StoreDesk for Windows and Android"
+                className="group inline-flex items-center gap-2.5 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-[13px] font-bold text-slate-900 shadow-sm transition-colors hover:border-[#1A63F4] hover:text-[#1A63F4]"
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#0078D4] text-white">
+                  <WindowsIcon className="h-3.5 w-3.5" />
+                </span>
+                {/* Play, not the Android robot: the phone app is listed, and the robot reads as a sideload. */}
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white ring-1 ring-slate-200">
+                  <GooglePlayIcon className="h-3.5 w-3.5" />
+                </span>
+                <span>Download</span>
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+              </Link>
             </motion.div>
 
             {/* Action Row */}
@@ -448,7 +439,8 @@ export function LandingPage() {
               <div className="mb-3 h-1.5 w-14 rounded-full bg-[#00A87B]" />
               <h2 className="text-3xl font-extrabold tracking-tight text-[#17202A] md:text-[40px]">What it is for</h2>
               <p className="mt-3 text-[16px] font-medium leading-relaxed text-slate-700">
-                Three things the register cannot tell you on its own.
+                Margin you can see before you reprice, a register nothing changes behind your back,
+                and answers in the aisle.
               </p>
             </div>
           </div>
@@ -484,10 +476,10 @@ export function LandingPage() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1A63F4] text-white font-bold shadow-sm">
                   <Zap className="h-5 w-5" />
                 </span>
-                <h3 className="text-xl font-bold text-[#17202A] sm:text-[22px]">It only reads from the register</h3>
+                <h3 className="text-xl font-bold text-[#17202A] sm:text-[22px]">Nothing reaches the till unless you send it</h3>
               </div>
               <p className="mt-4 text-base font-normal leading-relaxed text-slate-700">
-                StoreDesk reads prices and sales from your Verifone Commander and never writes back. Nothing it does can change a price at the till or slow a lane during a rush — if StoreDesk stopped tomorrow, the store would keep trading.
+                StoreDesk reads prices and sales from your Verifone Commander. Sending a price back is off by default; when you turn it on, changes wait in a list until a person checks them and sends them. Nothing goes to a till on its own, and if StoreDesk stopped tomorrow the store would keep trading.
               </p>
             </motion.article>
 
@@ -527,36 +519,45 @@ export function LandingPage() {
         <MobileShowcaseCarousel />
       </section>
 
-      {/* 6. HOW IT WORKS (Background: White to Light Gradient) */}
-      <section className="border-t border-[var(--border)] bg-[#FBFCFD] py-24">
+      {/* 6. SETUP — the shape of it only; /how-it-works and the guide carry the steps. */}
+      <section className="border-t border-[var(--border)] bg-[#FBFCFD] py-20">
         <div className="mx-auto max-w-6xl px-6">
-          <div>
-            <span className="inline-flex rounded-full bg-[#00A87B]/15 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[#00A87B]">
-              HOW IT WORKS
-            </span>
-            <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#17202A] md:text-[40px]">
-              From setup to daily operations
-            </h2>
-          </div>
-
-          {/* 2x2 Grid of Step Cards */}
-          <div className="mt-12 grid gap-6 md:grid-cols-2">
-            {steps.map((s, i) => (
-              <motion.div
-                key={s.n}
-                className="group rounded-2xl border border-slate-300 bg-white p-6 shadow-sm transition hover:border-[#1A63F4] hover:shadow-md"
-                initial={{ y: 16 }}
-                whileInView={{ y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <span className="inline-flex rounded-full bg-[#1A63F4]/10 px-3 py-1 font-mono text-xs font-bold text-[#1A63F4]">
-                  Step {s.n}
-                </span>
-                <h3 className="mt-3 text-xl font-bold text-[#17202A]">{s.title}</h3>
-                <p className="mt-2 text-[16px] font-medium leading-relaxed text-slate-700">{s.body}</p>
-              </motion.div>
-            ))}
+          <div className="flex flex-col gap-8 rounded-[28px] border border-slate-300 bg-white p-8 md:flex-row md:items-center md:justify-between md:p-10">
+            <div className="max-w-xl">
+              <span className="inline-flex rounded-full bg-[#00A87B]/15 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[#00A87B]">
+                Getting started
+              </span>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#17202A] md:text-[36px]">
+                An afternoon to set up
+              </h2>
+              <p className="mt-3 text-[16.5px] font-medium leading-relaxed text-slate-700">
+                Install on the back-office PC, point it at your register, add what you pay your
+                suppliers, then put the phone app in your staff&apos;s hands. On hardware you already
+                own, with nothing to rack and nothing to rewire at the till.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/how-it-works" className="rounded-full bg-[#17202A] px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-[#1A63F4]">
+                  How it works
+                </Link>
+                <a
+                  href={DOCS.install}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-5 py-2.5 text-[15px] font-semibold text-[#17202A] hover:border-[#1A63F4] hover:text-[#1A63F4]"
+                >
+                  Setup guide
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </a>
+              </div>
+            </div>
+            <ol className="grid shrink-0 gap-3 sm:grid-cols-2 md:w-[300px] md:grid-cols-1">
+              {["Install", "Connect the register", "Add supplier costs", "Phones on the floor"].map((label, i) => (
+                <li key={label} className="flex items-center gap-3 text-[15.5px] font-semibold text-[#17202A]">
+                  <span className="sd-num flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1A63F4]/10 text-[13px] text-[#1A63F4]">
+                    {i + 1}
+                  </span>
+                  {label}
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>

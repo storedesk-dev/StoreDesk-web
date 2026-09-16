@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Terms",
-  description: "StoreDesk terms for Worker, Desktop, and Mobile at store locations."
+  description: "The terms for StoreDesk Desktop, StoreDesk Mobile and the StoreDesk Service in your store."
 };
 
 export default function TermsLayout({ children }: { children: React.ReactNode }) {
