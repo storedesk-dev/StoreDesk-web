@@ -141,7 +141,11 @@ export async function deleteCloudflareTunnel(ids: {
     console.warn(`[cloudflare] Could not delete tunnel ${ids.tunnelId}: ${error instanceof Error ? error.message : error}`);
   }
   const zoneId = process.env.CLOUDFLARE_ZONE_ID?.trim();
-  if (ids.dnsRecordId && zoneId) {
+  // The hostname goes only with the tunnel. A store PC's cloudflared reconnects within seconds of its
+  // connections being dropped, and Cloudflare will not delete a tunnel with live connections; deleting the
+  // DNS record anyway left a healthy tunnel with no hostname, and the store's phones on error 1033
+  // (hars.storedesk.net, 2026-09-16). Leaving both lets removeStoreTunnel hand the tunnel to an operator whole.
+  if (tunnelDeleted && ids.dnsRecordId && zoneId) {
     try {
       await cf(token, `/zones/${zoneId}/dns_records/${encodeURIComponent(ids.dnsRecordId)}`, { method: "DELETE" });
       dnsDeleted = true;
