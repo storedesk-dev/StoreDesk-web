@@ -274,8 +274,35 @@ const SetupKeySchema = new Schema(
       enum: ["queued", "shown", "sent", "delivery_failed", "consumed", "expired", "revoked"],
       default: "shown"
     },
-    expiresAt: { type: Date, required: true, index: true },
+    /**
+     * Reusable store key (owner decision 2026-09-17, "Replace PC"): it never
+     * expires and is not used up. Redeeming it activates a PC for the same
+     * installation and replaces whichever PC held it (old credential revoked,
+     * tunnel secret rotated). Valid until an admin rotates it. False on the
+     * single-use keys older builds issued.
+     */
+    reusable: { type: Boolean, default: false },
+    /**
+     * The key's secret sealed with STORE_SECRET_KEY (lib/store-secrets.ts), so
+     * an authorised admin, or the store's own PC, can read the key again.
+     * `select: false`, and named so safeJson() scrubs it. Missing when
+     * STORE_SECRET_KEY was not configured at issue: the key works but can't be
+     * shown again until it is rotated.
+     */
+    sealedSecret: { type: String, select: false },
+    /** Single-use keys only; reusable keys never expire. */
+    expiresAt: {
+      type: Date,
+      required(this: { reusable?: boolean }) {
+        return !this.reusable;
+      },
+      index: true
+    },
+    /** The first redeem. */
     consumedAt: Date,
+    /** Reusable keys: the latest redeem and how many activations the key has made. */
+    lastRedeemedAt: Date,
+    redeemCount: { type: Number, default: 0 },
     revokedAt: Date,
     attempts: { type: Number, default: 0 },
     maxAttempts: { type: Number, default: 8 },

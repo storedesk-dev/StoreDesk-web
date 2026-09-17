@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowDownToLine, ArrowUpRight, Check, ChevronRight, Copy, KeyRound, Monitor, ShieldAlert, Smartphone } from "lucide-react";
 import { GooglePlayIcon, WindowsIcon } from "@/components/BrandIcons";
 import { PageFrame, PageHero, SectionHead } from "@/components/PageHero";
-import { DOCS, PLANS, PLAY_STORE_URL, contactMailto } from "@/lib/site";
+import { DOCS, PLAY_STORE_URL, contactMailto } from "@/lib/site";
 import { useRelease } from "@/components/ReleaseContext";
 import { formatReleaseDate, formatSize, type LatestRelease, type ReleaseFile } from "@/lib/release";
 
@@ -231,7 +231,7 @@ const BEFORE = [
   {
     icon: <KeyRound className="h-5 w-5" />,
     title: "A setup key",
-    body: `We email it when your store is set up on our side. It lasts ${PLANS.setupKeyHours} hours and works once.`,
+    body: `We email it when your store is set up on our side. Keep it: it sets up your store's PC again, or a new one.`,
     action: { href: contactMailto({ subject: "StoreDesk setup key" }), label: "Request a key" }
   },
   {

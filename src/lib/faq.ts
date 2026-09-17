@@ -63,7 +63,7 @@ export const FAQ: FaqEntry[] = [
   },
   {
     question: "How long does setup take?",
-    answer: `About an afternoon. Install on the back-office PC and paste the setup key we email you, which lasts ${PLANS.setupKeyHours} hours and works once, then point StoreDesk at your register and let the price book import.`,
+    answer: `About an afternoon. Install on the back-office PC and paste the setup key we email you (keep it: it also sets up a replacement PC), then point StoreDesk at your register and let the price book import.`,
     href: `${DOCS_BASE}/t/flow.install`
   },
   {

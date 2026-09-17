@@ -48,7 +48,7 @@ See `.env.example` for the full list with notes.
 |---|---|
 | `MONGODB_URI` | Everything (Atlas; a replica set, for transactions) |
 | `SUPPORT_ADMIN_EMAIL`, `SUPPORT_ADMIN_PASSWORD` | The first staff sign-in at `/admin-gate` |
-| `STORE_SECRET_KEY` | Storing the register (Commander) password, encrypted; 32+ characters |
+| `STORE_SECRET_KEY` | Storing the register (Commander) password and a readable copy of each store's reusable setup key, encrypted; 32+ characters |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_TUNNEL_DOMAIN` | Creating each store's tunnel (optional; stores then show *not configured*) |
 | `RESEND_API_KEY`, `SETUP_EMAIL_FROM` | E-mailing setup keys and invitations (optional; otherwise shown once to the admin) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Google Sheets: the StoreDesk service account key, raw JSON or base64 (optional). The admin only switches Sheets on per store; the sheet is connected in the desktop app and reached through the store-scoped proxy |
@@ -68,7 +68,8 @@ See `.env.example` for the full list with notes.
 - `src/lib/` — one module per area: `organizations`, `licenses` (licensing modes — master or store-wise —
   the one coverage rule, the mode switch), `migrations` (subscriptions → licenses → modes, run once per
   process on connect),
-  `tenant-stores` (stores and settings), `setup` (setup keys, Replace PC), `users`, `roles`,
+  `tenant-stores` (stores and settings), `setup` (setup keys, Replace PC), `store-setup-key` (the reusable
+  key: reveal, rotate, the PC reading its key and releasing its installation), `users`, `roles`,
   `role-templates`, `admin-views` (dashboard, audit, access preview), `access-sync`, `store-notify`,
   `google`, `tunnel`, `http` (errors and body parsing), `audit`.
 - `src/config/pages.ts` — generated page registry; never edit it (regenerate from the parent repo).

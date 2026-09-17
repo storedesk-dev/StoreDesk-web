@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { KeyRound, Mail, RefreshCw, Replace } from "lucide-react";
+import { Eye, KeyRound, Mail, RefreshCw, Replace, RotateCw } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
 import { api, errorMessage, type IssuedSetupKey, type SetupKeyStatus } from "../../../../../_lib/api";
 import { formatDateTime, relativeTime } from "../../../../../_lib/format";
@@ -37,6 +37,9 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
   const [issuing, setIssuing] = useState<"show" | "email" | null>(null);
   const [issued, setIssued] = useState<IssuedSetupKey | null>(null);
   const [replacing, setReplacing] = useState(false);
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState(false);
+  const [rotating, setRotating] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
   if (error && !data) return <ErrorBanner error={error} onRetry={reload} />;
@@ -53,6 +56,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
       const res = await api.issueSetupKey(orgId, storeId, deliver);
       if (deliver === "show") {
         setIssued(res);
+        setRevealed(null);
         toast("Setup key issued", "success");
       } else {
         setIssued(null);
@@ -63,6 +67,19 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
       toast(errorMessage(e, "Couldn't issue a setup key."), "error");
     } finally {
       setIssuing(null);
+    }
+  }
+
+  async function showKey() {
+    setRevealing(true);
+    try {
+      const res = await api.revealSetupKey(orgId, storeId);
+      setIssued(null);
+      setRevealed(res.setupKey);
+    } catch (e) {
+      toast(errorMessage(e, "Couldn't show the setup key."), "error");
+    } finally {
+      setRevealing(false);
     }
   }
 
@@ -108,8 +125,13 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
               label: "Latest setup key",
               value: data.setupKey ? (
                 <span className="sd-num">
-                  <span className="font-mono text-[12px]">{data.setupKey.keyId}</span> · {KEY_STATUS[data.setupKey.status] ?? data.setupKey.status}
-                  {data.setupKey.status !== "consumed" && data.setupKey.status !== "revoked" ? ` · expires ${formatDateTime(data.setupKey.expiresAt)}` : ""}
+                  <span className="font-mono text-[12px]">{data.setupKey.keyId}</span> ·{" "}
+                  {data.setupKey.reusable
+                    ? `reusable · used ${data.setupKey.redeemCount ?? 0}×${data.setupKey.readable ? "" : " · can't be shown (rotate)"}`
+                    : KEY_STATUS[data.setupKey.status] ?? data.setupKey.status}
+                  {!data.setupKey.reusable && data.setupKey.expiresAt && data.setupKey.status !== "consumed" && data.setupKey.status !== "revoked"
+                    ? ` · expires ${formatDateTime(data.setupKey.expiresAt)}`
+                    : ""}
                 </span>
               ) : (
                 <span className="text-slate-400">none issued</span>
@@ -139,22 +161,40 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
           >
             E-mail key to store contact
           </Button>
+          <Button
+            icon={<Eye className="h-4 w-4" />}
+            busy={revealing}
+            disabled={!data.setupKey?.reusable || !data.setupKey.readable || data.setupKey.status === "revoked"}
+            title="Show the store's setup key (recorded in Activity)"
+            onClick={showKey}
+          >
+            Show key
+          </Button>
+          <Button icon={<RotateCw className="h-4 w-4" />} disabled={!data.installation} onClick={() => setRotating(true)}>
+            Rotate key
+          </Button>
           <Button variant="danger-ghost" icon={<Replace className="h-4 w-4" />} disabled={!data.installation} onClick={() => setReplacing(true)}>
             Replace this PC
           </Button>
         </div>
         {active ? (
-          <p className="mt-2 text-[13px] text-slate-500">This store&apos;s PC is active. To move StoreDesk to another PC, use Replace this PC first.</p>
+          <p className="mt-2 text-[13px] text-slate-500">This store&apos;s PC is active. The setup key moves StoreDesk to another PC: the new PC takes over.</p>
         ) : data.setupKey && ["shown", "sent", "queued"].includes(data.setupKey.status) ? (
           <p className="mt-2 text-[13px] text-slate-500">Issuing a new key cancels the earlier unused one.</p>
         ) : null}
 
-        {issued?.setupKey ? (
+        {issued?.setupKey || revealed ? (
           <div className="mt-3">
             <SecretBox
               label="Setup key"
-              value={issued.setupKey}
-              note={<>Shown once; expires {formatDateTime(issued.expiresAt)}. Anyone with it can activate a PC as this store.</>}
+              value={(issued?.setupKey ?? revealed)!}
+              note={
+                issued?.expiresAt ? (
+                  <>Shown once; expires {formatDateTime(issued.expiresAt)}. Anyone with it can activate a PC as this store.</>
+                ) : (
+                  <>Reusable: sets up this store&apos;s PC again, here or on a new PC. Anyone with it can take the store over; rotate it if it leaks.</>
+                )
+              }
             />
           </div>
         ) : null}
@@ -236,15 +276,33 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
         onConfirm={async () => {
           await api.replacePc(orgId, storeId);
           setIssued(null);
-          toast("PC reset — issue a setup key for the new PC", "success");
+          setRevealed(null);
+          toast(data.setupKey?.reusable ? "PC reset — set up the new PC with the store's setup key" : "PC reset — issue a setup key for the new PC", "success");
           void reload();
           refreshStore();
         }}
       >
         <p>
           The current PC stops working until the new one is activated. Its credential is revoked now; the store is then
-          waiting for activation and you can issue a setup key for the new PC.
+          waiting for activation. The store&apos;s setup key activates the new PC.
         </p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={rotating}
+        onClose={() => setRotating(false)}
+        title="Rotate the setup key?"
+        confirmLabel="Rotate key"
+        destructive
+        onConfirm={async () => {
+          const res = await api.rotateSetupKey(orgId, storeId);
+          setIssued(null);
+          setRevealed(res.setupKey);
+          toast("Setup key rotated", "success");
+          void reload();
+        }}
+      >
+        <p>The old key stops working at once. The store&apos;s PC keeps running; only setting up a PC needs the new key.</p>
       </ConfirmDialog>
     </div>
   );

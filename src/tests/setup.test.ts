@@ -69,6 +69,14 @@ function redeemKey(setupKey: string, ip = "198.51.100.1", overrides: Record<stri
   );
 }
 
+/** Turn an issued key into the single-use, 24-hour key older builds issued. */
+async function singleUse(keyId: string) {
+  await SetupKeyModel.updateOne(
+    { keyId },
+    { $set: { reusable: false, expiresAt: new Date(Date.now() + 24 * 60 * 60_000) }, $unset: { sealedSecret: 1 } }
+  );
+}
+
 function useEmail(ok = true) {
   process.env.RESEND_API_KEY = "re_test";
   process.env.SETUP_EMAIL_FROM = "StoreDesk <setup@example.invalid>";
@@ -224,8 +232,9 @@ describe("activation, Replace PC, and the PC limit", () => {
     expect(await WorkerInstallationModel.countDocuments({ storeId: params.storeId })).toBe(1);
   });
 
-  it("safe re-redeem: the same key for the same installation within 15 minutes gets a fresh credential; the first is revoked", async () => {
+  it("safe re-redeem (single-use key): the same key for the same installation within 15 minutes gets a fresh credential; the first is revoked", async () => {
     const { body } = await issue();
+    await singleUse(body.keyId);
     const first = await redeemKey(body.setupKey);
     expect(first.status).toBe(201);
     const again = await redeemKey(body.setupKey, "198.51.100.11");
@@ -246,8 +255,9 @@ describe("activation, Replace PC, and the PC limit", () => {
     expect(named.status).toBe(201);
   });
 
-  it("re-redeem: 409 SETUP_KEY_CONSUMED after 15 minutes or after Replace PC; 409 INSTALLATION_ALREADY_BOUND for another installation", async () => {
+  it("re-redeem (single-use key): 409 SETUP_KEY_CONSUMED after 15 minutes or after Replace PC; 409 INSTALLATION_ALREADY_BOUND for another installation", async () => {
     const { body } = await issue();
+    await singleUse(body.keyId);
     const first = await redeemKey(body.setupKey);
     const other = await redeemKey(body.setupKey, "198.51.100.13", { workerInstallationId: "winst_someone_else" });
     expect(other.status).toBe(409);
@@ -267,8 +277,9 @@ describe("activation, Replace PC, and the PC limit", () => {
     expect(late.body.error.code).toBe("SETUP_KEY_CONSUMED");
   });
 
-  it("re-redeem: the old key can't come back after Replace PC", async () => {
+  it("re-redeem: an old single-use key can't come back after Replace PC", async () => {
     const { body } = await issue();
+    await singleUse(body.keyId);
     expect((await redeemKey(body.setupKey)).status).toBe(201);
     expect((await call(replacePc, request("POST", "/", { token: admin.token }), params)).status).toBe(200);
     const res = await redeemKey(body.setupKey, "198.51.100.15");
