@@ -73,7 +73,7 @@ async function main() {
         : `    ${user.email.padEnd(30)} ${user.role} @ ${user.where}   invitation code (paste at /enroll):\n      ${user.invitationCode}`
     ),
     ...(seed.setupKey
-      ? ["", `  Setup key for ${seed.setupKey.store} (expires ${seed.setupKey.expiresAt}):`, `    ${seed.setupKey.key}`]
+      ? ["", `  Setup key for ${seed.setupKey.store} (${seed.setupKey.expiresAt ? `expires ${seed.setupKey.expiresAt}` : "reusable"}):`, `    ${seed.setupKey.key}`]
       : []),
     "",
     `  MongoDB         ${uri}  (in memory; gone on exit)`,

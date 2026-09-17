@@ -1,20 +1,16 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
-import {
-  SetupKeyModel,
-  TenantStoreModel,
-  WorkerCredentialModel,
-  WorkerInstallationModel
-} from "@/models/ControlPlane";
-import { ControlPlaneError, hashSecret, issueSetupKey, publicId } from "@/lib/control-plane-security";
+import { SetupKeyModel, WorkerCredentialModel, WorkerInstallationModel } from "@/models/ControlPlane";
+import { ControlPlaneError, publicId } from "@/lib/control-plane-security";
 import { auditAdmin } from "@/lib/audit";
 import { optionalEmail } from "@/lib/http";
 import { getEmailProvider, isEmailConfigured } from "@/lib/email-provider";
-import { PLANS, SITE } from "@/lib/site";
+import { SITE } from "@/lib/site";
+import { mintReusableKey, OPEN_KEY, resetInstallation } from "@/lib/store-setup-key";
 import { requireOrganization } from "@/lib/organizations";
 import { installationSummary, requireStore } from "@/lib/tenant-stores";
 import { coverageFor, expireLapsedLicenses, licenseProblem, licenseSummary } from "@/lib/licenses";
-import { cloudflareConfigured, rotateStoreTunnel, tunnelView } from "@/lib/tunnel";
+import { cloudflareConfigured, tunnelView } from "@/lib/tunnel";
 import { remoteStatusOf } from "@/lib/remote-status";
 import { revokeInstallationsAndNotify } from "@/lib/store-notify";
 import type { InternalAdminActor } from "@/lib/admin-auth";
@@ -22,17 +18,17 @@ import type { InternalAdminActor } from "@/lib/admin-auth";
 /**
  * Store → PC & phones (owner decision 6): the org tag for phones, the setup
  * key for the PC, and the one path that issues keys (P8) — entitlement
- * checked, status `shown` or `sent`, standard errors. Replace PC (P4) cuts
- * the old PC off — credential revoked, tunnel secret rotated — so a new key
- * can activate a new PC.
+ * checked, status `shown` or `sent`, standard errors. Keys are reusable
+ * (lib/store-setup-key.ts): they never expire and activate the store's PC
+ * again, on this PC or another. Replace PC (P4) cuts the old PC off —
+ * credential revoked, tunnel secret rotated — and the same key activates the
+ * next PC.
  */
 
 type Doc = Record<string, unknown>;
 
-const SETUP_KEY_TTL_MS = PLANS.setupKeyHours * 60 * 60 * 1000;
 const PENDING = ["not_installed", "installed", "awaiting_activation"];
 const LIVE = ["active", "degraded", "updating", "rollback", "suspended"];
-const OPEN_KEY = ["queued", "shown", "sent", "delivery_failed"];
 
 type Blocked = { status: number; code: string; message: string };
 
@@ -84,15 +80,23 @@ function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | nul
   return null;
 }
 
+const iso = (value: unknown) => (value instanceof Date ? value.toISOString() : value ? new Date(String(value)).toISOString() : null);
+
+/** The key's facts; never its secret (`readable` only says a sealed copy exists). */
 function keyView(key: Doc | null) {
   if (!key) return null;
-  const expiresAt = key.expiresAt instanceof Date ? key.expiresAt : new Date(String(key.expiresAt));
+  const reusable = key.reusable === true;
+  const expiresAt = key.expiresAt ? new Date(String(key.expiresAt instanceof Date ? key.expiresAt.toISOString() : key.expiresAt)) : null;
   const open = OPEN_KEY.includes(String(key.status));
   return {
     keyId: String(key.keyId),
-    status: open && expiresAt.getTime() <= Date.now() ? "expired" : String(key.status),
-    expiresAt: expiresAt.toISOString(),
-    createdAt: key.createdAt instanceof Date ? key.createdAt.toISOString() : null,
+    status: !reusable && open && expiresAt && expiresAt.getTime() <= Date.now() ? "expired" : String(key.status),
+    reusable,
+    readable: reusable && Boolean(key.sealedSecret),
+    expiresAt: reusable ? null : iso(expiresAt),
+    createdAt: iso(key.createdAt),
+    lastRedeemedAt: iso(key.lastRedeemedAt ?? key.consumedAt),
+    redeemCount: reusable ? Number(key.redeemCount ?? 0) : null,
     contactEmail: key.contactEmail ? String(key.contactEmail) : null,
     deliveryError: key.deliveryError ? String(key.deliveryError) : null
   };
@@ -101,7 +105,12 @@ function keyView(key: Doc | null) {
 export async function getStoreSetup(organizationId: string, storeId: string) {
   const ctx = await loadContext(organizationId, storeId);
   const primary = ctx.installations[0] ?? null;
-  const [latestKey, credential] = await Promise.all([
+  const [openKey, latestKey, credential] = await Promise.all([
+    // The store's open reusable key first: that is the key the store uses.
+    SetupKeyModel.findOne({ organizationId, storeId, reusable: true, status: { $in: OPEN_KEY } })
+      .select("+sealedSecret")
+      .sort({ createdAt: -1 })
+      .lean(),
     SetupKeyModel.findOne({ organizationId, storeId }).sort({ createdAt: -1 }).lean(),
     primary
       ? WorkerCredentialModel.exists({ workerInstallationId: primary.workerInstallationId, status: "active" })
@@ -123,7 +132,7 @@ export async function getStoreSetup(organizationId: string, storeId: string) {
     contactEmail: ctx.store.contactEmail ? String(ctx.store.contactEmail) : null,
     installation: primary ? { ...installationSummary(primary)!, credentialActive: Boolean(credential) } : null,
     installations: ctx.installations.map((row) => installationSummary(row)!),
-    setupKey: keyView(latestKey as Doc | null),
+    setupKey: keyView((openKey ?? latestKey) as Doc | null),
     tunnel,
     remote,
     license: licenseSummary(ctx.license),
@@ -146,10 +155,14 @@ export type IssueSetupKey = z.output<typeof IssueSetupKeySchema>;
 
 export type IssuedSetupKey = {
   keyId: string;
-  /** The key itself — only for `deliver: "show"`, and only in this response. */
+  /** The key itself — only for `deliver: "show"`. Reusable: read it again with `GET …/setup-keys/current`. */
   setupKey?: string;
   status: "shown" | "sent";
-  expiresAt: string;
+  /** Reusable keys never expire. */
+  expiresAt: null;
+  reusable: true;
+  /** False when STORE_SECRET_KEY is not configured: the key works but can't be shown again. */
+  readable: boolean;
   sentTo: string | null;
   workerInstallationId: string;
   installation: ReturnType<typeof installationSummary>;
@@ -207,25 +220,18 @@ export async function issueStoreSetupKey(
   }
   const workerInstallationId = String(installation.workerInstallationId);
 
-  await SetupKeyModel.updateMany(
-    { workerInstallationId, status: { $in: OPEN_KEY } },
-    { $set: { status: "revoked", revokedAt: new Date() } }
-  );
-  const issued = issueSetupKey();
-  const expiresAt = new Date(Date.now() + SETUP_KEY_TTL_MS);
-  const record = await SetupKeyModel.create({
+  // Earlier open keys for the installation are revoked; the new key is reusable.
+  const minted = await mintReusableKey({
     organizationId,
     storeId,
     workerInstallationId,
-    keyId: issued.keyId,
-    secretHash: await hashSecret(issued.secret),
     contactEmail: contactEmail ?? SITE.email,
     status: body.deliver === "show" ? "shown" : "sent",
-    expiresAt,
     deliveryReason: body.deliver === "show" ? "admin_show" : "admin_email",
-    idempotencyKey: publicId("idem"),
-    createdByAdminId: admin.adminId
+    adminId: admin.adminId
   });
+  const { record } = minted;
+  const issued = { keyId: minted.keyId, plaintext: minted.plaintext };
 
   if (body.deliver === "email") {
     try {
@@ -235,7 +241,7 @@ export async function issueStoreSetupKey(
         organizationName: String(ctx.org.name),
         storeName: String(ctx.store.name),
         setupKey: issued.plaintext,
-        expiresAt
+        expiresAt: null
       });
       record.deliveryProvider = delivery.provider;
       record.deliveryMessageId = delivery.messageId;
@@ -271,7 +277,13 @@ export async function issueStoreSetupKey(
     action: "setup_key.issue",
     targetType: "setup_key",
     targetId: issued.keyId,
-    metadata: { deliver: body.deliver, status: record.status, ...(body.deliver === "email" ? { sentTo: contactEmail } : {}) }
+    metadata: {
+      deliver: body.deliver,
+      status: record.status,
+      reusable: true,
+      readable: minted.readable,
+      ...(body.deliver === "email" ? { sentTo: contactEmail } : {})
+    }
   });
 
   const fresh = (await WorkerInstallationModel.findOne({ workerInstallationId }).lean()) as Doc | null;
@@ -279,7 +291,9 @@ export async function issueStoreSetupKey(
     keyId: issued.keyId,
     ...(body.deliver === "show" ? { setupKey: issued.plaintext } : {}),
     status: body.deliver === "show" ? "shown" : "sent",
-    expiresAt: expiresAt.toISOString(),
+    expiresAt: null,
+    reusable: true,
+    readable: minted.readable,
     sentTo: body.deliver === "email" ? contactEmail : null,
     workerInstallationId,
     installation: installationSummary(fresh)
@@ -298,7 +312,8 @@ export const ReplacePcSchema = z
  * rotated now (Cloudflare refuses, is not configured, or the tunnel predates
  * stored ids), the store is marked `tunnelRotationRequired` and no setup key
  * is issued until "Retry tunnel" succeeds. Then the installation goes back to
- * `awaiting_activation` so the next key redeems on a new PC.
+ * `awaiting_activation`: the store's reusable key activates the next PC (an
+ * older single-use key still open is cancelled).
  */
 export async function replaceStorePc(
   admin: InternalAdminActor,
@@ -327,39 +342,7 @@ export async function replaceStorePc(
     workerInstallationIds: [workerInstallationId],
     reason: "installation.revoke"
   });
-  await SetupKeyModel.updateMany(
-    { workerInstallationId, status: { $in: OPEN_KEY } },
-    { $set: { status: "revoked", revokedAt: new Date() } }
-  );
-  await WorkerInstallationModel.updateOne(
-    { workerInstallationId },
-    {
-      $set: { status: "awaiting_activation" },
-      $unset: {
-        workerCredentialId: 1,
-        activatedAt: 1,
-        firstBootstrapCompletedAt: 1,
-        bootstrapVersion: 1,
-        lastSeenAt: 1,
-        lanUrl: 1,
-        eulaAcceptanceId: 1,
-        platform: 1,
-        workerVersion: 1,
-        electronVersion: 1
-      }
-    }
-  );
-
-  let tunnelRotated = false;
-  let tunnelError: string | null = null;
-  if (ctx.store.tunnelUrl) {
-    const outcome = ctx.store.tunnelId ? await rotateStoreTunnel(storeId, String(ctx.store.tunnelId)) : null;
-    tunnelRotated = outcome?.status === "ok";
-    if (!tunnelRotated) {
-      tunnelError = outcome?.message ?? "The tunnel predates rotation support; Retry tunnel replaces it.";
-      await TenantStoreModel.updateOne({ storeId }, { $set: { tunnelRotationRequired: true } });
-    }
-  }
+  const { tunnelRotated, tunnelError } = await resetInstallation({ organizationId, storeId, workerInstallationId });
 
   await auditAdmin(admin, {
     organizationId,

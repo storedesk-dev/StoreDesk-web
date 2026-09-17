@@ -243,7 +243,19 @@ export type SetupKeyStatus =
 
 export interface StoreSetup {
   installation: StoreInstallationSummary | null;
-  setupKey: { keyId: string; status: SetupKeyStatus; expiresAt: string; createdAt?: string } | null;
+  setupKey: {
+    keyId: string;
+    status: SetupKeyStatus;
+    /** Null for a reusable key (never expires). */
+    expiresAt: string | null;
+    createdAt?: string | null;
+    /** Reusable: activates this store's PC again, on this PC or another, until rotated. */
+    reusable?: boolean;
+    /** A sealed copy exists, so "Show key" can read it. */
+    readable?: boolean;
+    lastRedeemedAt?: string | null;
+    redeemCount?: number | null;
+  } | null;
   organizationSlug: string;
   contactEmail?: string | null;
   tunnel: StoreTunnel;
@@ -256,10 +268,12 @@ export interface StoreSetup {
 }
 
 export interface IssuedSetupKey {
-  /** Present only for `deliver: "show"`; shown once. */
+  /** Present only for `deliver: "show"`. A reusable key can be shown again with "Show key". */
   setupKey?: string;
   keyId?: string;
-  expiresAt: string;
+  expiresAt: string | null;
+  reusable?: boolean;
+  readable?: boolean;
   status: "shown" | "sent";
   sentTo?: string | null;
 }
@@ -607,6 +621,11 @@ export const api = {
     request<StoreSetup>("GET", `${store(orgId, storeId)}/setup`),
   issueSetupKey: (orgId: string, storeId: string, deliver: "show" | "email") =>
     request<IssuedSetupKey>("POST", `${store(orgId, storeId)}/setup-keys`, { deliver }),
+  /** Audited `setup_key.reveal`; call only on an explicit click. */
+  revealSetupKey: (orgId: string, storeId: string) =>
+    request<{ keyId: string; setupKey: string; workerInstallationId: string }>("GET", `${store(orgId, storeId)}/setup-keys/current`),
+  rotateSetupKey: (orgId: string, storeId: string) =>
+    request<{ keyId: string; setupKey: string; readable: boolean; workerInstallationId: string }>("POST", `${store(orgId, storeId)}/setup-keys/rotate`, {}),
   replacePc: (orgId: string, storeId: string) =>
     request<{ installation: StoreInstallationSummary }>("POST", `${store(orgId, storeId)}/replace-pc`),
   retryTunnel: (orgId: string, storeId: string) =>
@@ -700,6 +719,8 @@ export const ADMIN_ROUTES = [
   "PUT    /api/v1/admin/organizations/{org}/stores/{store}/pos-credentials",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/setup",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/setup-keys",
+  "GET    /api/v1/admin/organizations/{org}/stores/{store}/setup-keys/current",
+  "POST   /api/v1/admin/organizations/{org}/stores/{store}/setup-keys/rotate",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/replace-pc",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/tunnel",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/support-codes",

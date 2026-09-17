@@ -30,7 +30,7 @@ export type SeedResult = {
   organizations: Array<{ organizationId: string; name: string; slug: string; licensing: string }>;
   stores: Array<{ storeId: string; organization: string; name: string; features: string; license: string }>;
   users: Array<{ email: string; kind: "managed" | "invite"; role: string; where: string; password?: string; invitationCode?: string }>;
-  setupKey: { store: string; key: string; expiresAt: string } | null;
+  setupKey: { store: string; key: string; expiresAt: string | null } | null;
 };
 
 function readablePassword(): string {

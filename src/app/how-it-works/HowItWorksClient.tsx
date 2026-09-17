@@ -53,7 +53,7 @@ const STEPS: Step[] = [
     label: "Install",
     icon: <KeyRound className="h-4 w-4" />,
     title: "Install on the back-office PC",
-    outcome: `Run the installer, paste the setup key from your email, and this PC is your store's. The key lasts ${PLANS.setupKeyHours} hours and works once.`,
+    outcome: `Run the installer, paste the setup key from your email, and this PC is your store's. Keep the key: it sets up this PC again, or a replacement PC.`,
     minutes: "about 10 minutes",
     href: DOCS.install
   },

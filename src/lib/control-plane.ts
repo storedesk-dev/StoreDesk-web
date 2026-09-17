@@ -25,7 +25,8 @@ import {
 } from "@/lib/control-plane-security";
 import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
 import { DEFAULT_ORG_ROLES } from "@/lib/roles";
-import { scheduleAppUserNotify } from "@/lib/store-notify";
+import { loadNotifyTargets, notifyInstallations, runAfterResponse, scheduleAppUserNotify, type NotifyTarget } from "@/lib/store-notify";
+import { rotateTunnelAfterReplace } from "@/lib/store-setup-key";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
 import { coverageFor, coveringLicense, licenseProblem } from "@/lib/licenses";
@@ -56,7 +57,13 @@ const REDEEMABLE = ["queued", "shown", "sent", "delivery_failed"];
  * single consent (license, privacy, background service) sends all three
  * acknowledgements as `true`. Other unknown fields are ignored.
  *
- * Safe re-redeem: the same key may be redeemed again within 15 minutes of its
+ * Reusable keys (every key issued since 2026-09-17, lib/store-setup-key.ts)
+ * never expire and are not used up: each redeem activates the key's
+ * installation on the calling PC. A PC that held it is replaced — its
+ * credential revoked in the transaction, a signed notify sent to it, and the
+ * tunnel secret rotated so the response carries a token it never had.
+ *
+ * Safe re-redeem (single-use keys): the same key may be redeemed again within 15 minutes of its
  * first redeem, for the installation it bound, while that installation's live
  * credential is the one this key issued — a PC that crashed or lost the answer
  * after the control plane committed. The first credential is revoked and a
@@ -106,6 +113,9 @@ const invalidKey = () => new ControlPlaneError(401, "SETUP_KEY_INVALID", "Setup 
 const keyConsumed = () => new ControlPlaneError(409, "SETUP_KEY_CONSUMED", "Setup key has been consumed");
 const alreadyBound = () => new ControlPlaneError(409, "INSTALLATION_ALREADY_BOUND", "Installation already bound");
 
+/** Installations a PC is serving: a reusable key redeemed for one replaces that PC. */
+const LIVE_INSTALLATION = ["active", "degraded", "updating", "rollback"];
+
 /** How long after its first redeem the same key may be redeemed again (safe re-redeem). */
 export const RE_REDEEM_WINDOW_MS = 15 * 60_000;
 
@@ -125,10 +135,18 @@ export async function redeemSetupKey(body: RedeemBody) {
   if (!key || !(await verifySecret(String(key.secretHash), parsed.secret))) {
     throw invalidKey();
   }
-  // A consumed key may come back within the window (safe re-redeem); the
-  // installation checks below decide whether this is that case.
-  const reRedeem = key.status === "consumed";
-  if (reRedeem) {
+  // A reusable key (lib/store-setup-key.ts) never expires and is never used
+  // up: it activates the installation again, on this PC or another, until an
+  // admin rotates it (a rotated key is revoked and answers 410).
+  const reusable = key.reusable === true;
+  // A consumed single-use key may come back within the window (safe
+  // re-redeem); the installation checks below decide whether this is that case.
+  const reRedeem = !reusable && key.status === "consumed";
+  if (reusable) {
+    if (!REDEEMABLE.includes(String(key.status))) {
+      throw new ControlPlaneError(410, "SETUP_KEY_EXPIRED", "Setup key has expired");
+    }
+  } else if (reRedeem) {
     const consumedAt = key.consumedAt ? new Date(key.consumedAt).getTime() : 0;
     if (!consumedAt || Date.now() - consumedAt > RE_REDEEM_WINDOW_MS) throw keyConsumed();
   } else if (
@@ -174,7 +192,25 @@ export async function redeemSetupKey(body: RedeemBody) {
     throw new ControlPlaneError(423, "STORE_SUSPENDED", STORE_MESSAGES.STORE_SUSPENDED);
   }
   let previousCredentialId: string | null = null;
-  if (reRedeem) {
+  // Reusable key: the PC that holds the installation now (if any) is replaced.
+  let replacedLivePc = false;
+  let replacedTargets: NotifyTarget[] = [];
+  if (reusable) {
+    // The key decides the installation; a PC that knew another installation is simply set up again.
+    previousCredentialId = installation.workerCredentialId ? String(installation.workerCredentialId) : null;
+    const current = previousCredentialId
+      ? ((await WorkerCredentialModel.findOne({ credentialId: previousCredentialId }).lean()) as Doc | null)
+      : null;
+    replacedLivePc = LIVE_INSTALLATION.includes(String(installation.status)) && current?.status === "active";
+    if (replacedLivePc) {
+      // Loaded before its credential is revoked: the notify is signed with that PC's relay key.
+      replacedTargets = await loadNotifyTargets({
+        organizationId: String(key.organizationId),
+        workerInstallationIds: [String(key.workerInstallationId)],
+        reason: "installation.revoke"
+      }).catch(() => []);
+    }
+  } else if (reRedeem) {
     // Only the installation this key bound, while the credential this key
     // issued is still its live one.
     if (body.workerInstallationId && body.workerInstallationId !== key.workerInstallationId) throw alreadyBound();
@@ -204,7 +240,13 @@ export async function redeemSetupKey(body: RedeemBody) {
   const eulaAcceptanceId = publicId("eula");
 
   try {
-    const consume = reRedeem
+    const consume = reusable
+      ? await SetupKeyModel.findOneAndUpdate(
+          { keyId: key.keyId, reusable: true, status: { $in: REDEEMABLE } },
+          { $set: { lastRedeemedAt: new Date() }, $min: { consumedAt: new Date() }, $inc: { attempts: 1, redeemCount: 1 } },
+          { returnDocument: "after", ...withSession(session) }
+        )
+      : reRedeem
       ? await SetupKeyModel.findOneAndUpdate(
           { keyId: key.keyId, status: "consumed", consumedAt: { $gte: new Date(Date.now() - RE_REDEEM_WINDOW_MS) } },
           { $inc: { attempts: 1 } },
@@ -266,17 +308,25 @@ export async function redeemSetupKey(body: RedeemBody) {
     );
 
     const bound = await WorkerInstallationModel.updateOne(
-      // A re-redeem replaces exactly the credential it found, so two at once can't both win.
-      { workerInstallationId: key.workerInstallationId, ...(reRedeem ? { workerCredentialId: previousCredentialId } : {}) },
+      // A re-redeem, or a reusable key, replaces exactly the credential it found (none: a missing
+      // one), so two at once can't both win.
       {
-        workerCredentialId: credential.credentialId,
-        eulaAcceptanceId,
-        status: "active",
-        ...(reRedeem ? {} : { activatedAt: new Date() }),
-        lastSeenAt: new Date(),
-        platform: body.installation.platform,
-        workerVersion: body.installation.workerVersion,
-        electronVersion: body.installation.electronVersion
+        workerInstallationId: key.workerInstallationId,
+        ...(reRedeem || reusable ? { workerCredentialId: previousCredentialId } : {})
+      },
+      {
+        $set: {
+          workerCredentialId: credential.credentialId,
+          eulaAcceptanceId,
+          status: "active",
+          ...(reRedeem ? {} : { activatedAt: new Date() }),
+          lastSeenAt: new Date(),
+          platform: body.installation.platform,
+          workerVersion: body.installation.workerVersion,
+          electronVersion: body.installation.electronVersion
+        },
+        // A new PC reports its own bootstrap and LAN address.
+        ...(reusable ? { $unset: { firstBootstrapCompletedAt: 1, bootstrapVersion: 1, lanUrl: 1 } } : {})
       },
       withSession(session)
     );
@@ -286,6 +336,27 @@ export async function redeemSetupKey(body: RedeemBody) {
   } catch (error) {
     await abortTransaction(session);
     throw error;
+  }
+
+  // A replaced PC can still serve the store's tunnel: rotate its secret so only
+  // this PC gets the new token (below). Also when an earlier rotation failed.
+  let tunnelRotated = false;
+  let tunnelError: string | null = null;
+  if (reusable && store.tunnelUrl && (replacedLivePc || store.tunnelRotationRequired === true)) {
+    ({ tunnelRotated, tunnelError } = await rotateTunnelAfterReplace(String(key.storeId)));
+    if (tunnelRotated) {
+      const fresh = (await TenantStoreModel.findOne({ storeId: key.storeId }).select("+cloudflareToken").lean()) as Doc | null;
+      if (fresh?.cloudflareToken) store.cloudflareToken = fresh.cloudflareToken;
+    }
+  }
+  if (replacedTargets.length) {
+    // The old PC pulls, is refused, and wipes its secrets (server fix 10).
+    runAfterResponse(() =>
+      notifyInstallations(
+        { organizationId: String(key.organizationId), workerInstallationIds: [String(key.workerInstallationId)], reason: "installation.revoke" },
+        { loadTargets: async () => replacedTargets }
+      )
+    );
   }
 
   // Audit is deliberately outside the transaction: a failed audit write must
@@ -303,7 +374,10 @@ export async function redeemSetupKey(body: RedeemBody) {
     metadata: {
       setupKeyId: key.keyId,
       workerCredentialId: credential.credentialId,
-      ...(reRedeem ? { previousCredentialId } : {}),
+      ...(reRedeem || (reusable && previousCredentialId) ? { previousCredentialId } : {}),
+      ...(reusable
+        ? { reusable: true, replacedPc: replacedLivePc, tunnelRotated, ...(tunnelError ? { tunnelRotationRequired: true, tunnelError } : {}) }
+        : {}),
       contactEmail: key.contactEmail
     }
   });

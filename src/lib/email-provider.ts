@@ -39,8 +39,15 @@ export function setupKeyEmailText(message: SetupKeyMessage): string {
     "  2. Run the installer and open StoreDesk.",
     "  3. When it asks for a setup key, paste the key above.",
     "",
-    `The key works once and expires ${formatExpiry(message.expiresAt)}.`,
-    "If it runs out before you get to it, just reply and we will send a new one.",
+    ...(message.expiresAt
+      ? [
+          `The key works once and expires ${formatExpiry(message.expiresAt)}.`,
+          "If it runs out before you get to it, just reply and we will send a new one."
+        ]
+      : [
+          "Keep the key: it does not expire. Use it again to set up StoreDesk on a new PC, or on this PC after Replace PC.",
+          "The new PC takes over and the old one stops working for the store."
+        ]),
     "",
     "Keep this email to yourself — anyone with the key can connect a computer to your store.",
     "",
@@ -58,7 +65,8 @@ export type SetupKeyMessage = {
   organizationName: string;
   storeName: string;
   setupKey: string;
-  expiresAt: Date;
+  /** Null for a reusable key, which never expires. */
+  expiresAt: Date | null;
 };
 
 export type InvitationMessage = {
