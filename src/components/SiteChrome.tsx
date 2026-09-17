@@ -320,6 +320,9 @@ export function SiteFooter() {
             <li>
               <Link href="/terms" className="text-[#A3AEBF] transition-colors hover:text-white">Terms</Link>
             </li>
+            <li>
+              <Link href="/delete-account" className="text-[#A3AEBF] transition-colors hover:text-white">Delete your account</Link>
+            </li>
           </ul>
         </div>
       </div>

@@ -215,7 +215,11 @@ export default function PrivacyPage() {
               You can turn off the Google Sheets export and phone access at any time in the desktop app. You can
               ask us for a copy of what your account holds, ask us to correct it, or ask us to close the account
               and delete it. Because your store data never reaches us, the only copy is on your PC, and deleting
-              it there deletes it.
+              it there deletes it.{" "}
+              <a href="/delete-account" className="font-semibold text-[#1A63F4] hover:underline">
+                How to have your account deleted
+              </a>
+              .
             </p>
             <p>
               The{" "}
