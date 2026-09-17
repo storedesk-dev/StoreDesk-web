@@ -135,16 +135,17 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       transactions: { enableExport: false, enableRefundView: false }
     }
   },
+  // The Deals pages stage register changes, so read-only Viewer does not get
+  // them (kept identical to lib/role-templates.ts).
   viewer: {
     label: "Viewer",
-    description: "Looks, doesn't change: products, prices, deals and transactions, read-only.",
-    electron: ["dashboard", "products", "priceBook", "deals", "transactions", "settings"],
+    description: "Looks, doesn't change: products, prices and transactions, read-only.",
+    electron: ["dashboard", "products", "priceBook", "transactions", "settings"],
     mobile: [
       "mobileDashboard",
       "mobileScanner",
       "mobileProductSearch",
       "mobilePriceBook",
-      "mobileDeals",
       "mobileTransactions",
       "mobileSettings"
     ],

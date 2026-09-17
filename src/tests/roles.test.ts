@@ -259,3 +259,42 @@ describe("newAccessItems (the console's New pages available)", () => {
     );
   });
 });
+
+/**
+ * The Viewer template is read-only. The Deals pages stage register changes
+ * (a deal staged there is sent to the register), so a role called "Viewer"
+ * must not carry them — on the server templates or in the admin console's
+ * copy of them.
+ */
+describe("the Viewer template is read-only", () => {
+  const enabledKeys = (pages: { key: string; enabled: boolean }[]) =>
+    pages.filter((page) => page.enabled).map((page) => page.key);
+
+  it("does not enable the deals pages, on either side", () => {
+    const viewer = ROLE_TEMPLATES.find((template) => template.templateId === "viewer")!;
+    expect(enabledKeys(viewer.accessKeys.electron.pages)).not.toContain("deals");
+    expect(enabledKeys(viewer.accessKeys.mobile.pages)).not.toContain("mobileDeals");
+
+    const console = templateAccessKeys("viewer");
+    expect(enabledKeys(console.electron.pages)).not.toContain("deals");
+    expect(enabledKeys(console.mobile.pages)).not.toContain("mobileDeals");
+  });
+
+  it("still lists them (so the console can offer them) and leaves the other templates alone", () => {
+    const viewer = ROLE_TEMPLATES.find((template) => template.templateId === "viewer")!;
+    expect(viewer.accessKeys.electron.pages.map((page) => page.key)).toContain("deals");
+    expect(viewer.accessKeys.mobile.pages.map((page) => page.key)).toContain("mobileDeals");
+
+    const manager = ROLE_TEMPLATES.find((template) => template.templateId === "store_manager")!;
+    expect(enabledKeys(manager.accessKeys.electron.pages)).toContain("deals");
+    expect(enabledKeys(manager.accessKeys.mobile.pages)).toContain("mobileDeals");
+  });
+
+  it("reads the same on both sides, page for page", () => {
+    const viewer = ROLE_TEMPLATES.find((template) => template.templateId === "viewer")!;
+    const console = templateAccessKeys("viewer");
+    for (const app of ["electron", "mobile"] as const) {
+      expect(enabledKeys(console[app].pages).sort()).toEqual(enabledKeys(viewer.accessKeys[app].pages).sort());
+    }
+  });
+});

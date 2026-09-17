@@ -71,16 +71,18 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       transactions: { enableExport: false, enableRefundView: false }
     }
   },
+  // Read-only means read-only: the Deals pages stage register changes, so a
+  // Viewer does not get them. (A saved role that already has them is left
+  // alone — templates only seed new roles.)
   viewer: {
     roleName: "Viewer",
-    description: "Looks, doesn't change: products, prices, deals and transactions, read-only.",
-    electron: ["dashboard", "products", "priceBook", "deals", "transactions", "settings"],
+    description: "Looks, doesn't change: products, prices and transactions, read-only.",
+    electron: ["dashboard", "products", "priceBook", "transactions", "settings"],
     mobile: [
       "mobileDashboard",
       "mobileScanner",
       "mobileProductSearch",
       "mobilePriceBook",
-      "mobileDeals",
       "mobileTransactions",
       "mobileSettings"
     ],
