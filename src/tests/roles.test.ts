@@ -103,6 +103,8 @@ describe("the Organization Admin role (org_admin)", () => {
         for (const flag of Object.keys(def.knownFeatureFlags)) expect(page?.featureFlags[flag], `${def.key}.${flag}`).toBe(true);
       }
     }
+    // A flag added after the role was saved (register writes from the phone) is on for the admin.
+    expect(admin.accessKeys.mobile.pages.find((page) => page.key === "mobilePriceBook")?.featureFlags.sendToRegister).toBe(true);
     expect(admin.accessKeys.mobile.pages).toContainEqual({ key: "mobilePos", enabled: true, featureFlags: { enableQuickSale: true } });
     expect(orgAdminRoleOutdated([old])).toBe(true);
     // Another role is never granted anything.
@@ -253,7 +255,7 @@ describe("newAccessItems (the console's New pages available)", () => {
     };
     const items = newAccessItems(stale);
     expect(items.map(({ app, pageKey, flag }) => `${app}.${pageKey}${flag ? `.${flag}` : ""}`).sort()).toEqual(
-      ["electron.deals", "mobile.mobileDeals", "mobile.mobilePriceBook.priceGroups"].sort()
+      ["electron.deals", "mobile.mobileDeals", "mobile.mobilePriceBook.priceGroups", "mobile.mobilePriceBook.sendToRegister"].sort()
     );
   });
 });
