@@ -14,7 +14,7 @@ import {
 import { ControlPlaneError } from "@/lib/control-plane-security";
 import { getPage, type StoreCapability } from "@/config/pages";
 import { normalizeRoles, toIsoOr, type OrgRole } from "@/lib/roles";
-import { lacksCapability, normalizeStoreSettings, type StoreCapabilities } from "@/lib/store-settings";
+import { normalizeStoreSettings, type StoreCapabilities } from "@/lib/store-settings";
 import { requireOrganization } from "@/lib/organizations";
 import { requireStore } from "@/lib/tenant-stores";
 import { ENTITLED_STATUSES, coverageIndex, expireLapsedLicenses } from "@/lib/licenses";
@@ -48,8 +48,9 @@ export function effectivePages(
     .map((page) => {
       const def = getPage(page.key);
       const requires = def?.app === app ? (def.requiresCapability ?? null) : null;
-      // Only an explicit "no" hides a page; not answered counts as present.
-      const hidden = requires && lacksCapability(capabilities, requires) ? requires : null;
+      // As both apps: a page that needs a capability shows only on a literal true (not answered or no hides it;
+      // store-desk-electron navModel.hasCapability, store-desk-mobile drawer_model.dart).
+      const hidden = requires && capabilities[requires] !== true ? requires : null;
       return { key: page.key, label: def?.label ?? page.key, requiresCapability: requires, hiddenBecause: hidden, allowed: !hidden };
     });
 }

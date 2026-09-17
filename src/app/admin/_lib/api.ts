@@ -199,7 +199,7 @@ export interface Store {
   createdAt?: string;
 }
 
-/** true / false once answered; null while not answered, which hides nothing. */
+/** true / false once answered; null while not answered (the apps show a fuel page only on true). */
 export type CapabilityAnswers = Record<StoreCapability, boolean | null>;
 
 export interface StoreSettings {

@@ -18,15 +18,12 @@ import { canonicalJson } from "@/lib/control-plane-security";
 
 /**
  * Each capability is true or false once answered, null while not answered
- * (a new store). Null takes nothing away: the store server and both apps
- * treat it as present (StoreCapabilitySet.Lacks is an explicit false only).
+ * (a new store). The store server treats null as present
+ * (StoreCapabilitySet.Lacks is an explicit false only); both apps show a
+ * capability's pages (fuel) only on a literal true, and so does the admin
+ * console's access preview (lib/admin-views.ts).
  */
 export type StoreCapabilities = Record<StoreCapability, boolean | null>;
-
-/** Hidden only on an explicit false: not answered (null) counts as present. */
-export function lacksCapability(capabilities: StoreCapabilities, capability: StoreCapability): boolean {
-  return capabilities[capability] === false;
-}
 
 export type GoogleSheetsSettings = {
   enabled: boolean;

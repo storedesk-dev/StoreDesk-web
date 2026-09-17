@@ -163,7 +163,7 @@ function SwitchGroup({ title, children }: { title: string; children: ReactNode }
   );
 }
 
-/** Yes / No, or not answered yet (null): a store's pages stay shown until someone says No. */
+/** Yes / No, or not answered yet (null). The apps show a capability's pages (fuel) only on Yes. */
 function AnswerRow({
   id,
   label,

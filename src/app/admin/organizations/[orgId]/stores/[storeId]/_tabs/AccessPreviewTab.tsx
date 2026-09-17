@@ -20,7 +20,7 @@ export function AccessPreviewTab({ orgId, storeId }: StoreTabProps) {
       <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
         <span>What each role gets at this store. This store has:</span>
         {caps.map(([cap, on]) => (
-          <Chip key={cap} tone={on === true ? "green" : on === false ? "gray" : "amber"} title={on === null ? "Not answered: its pages stay shown" : undefined}>
+          <Chip key={cap} tone={on === true ? "green" : on === false ? "gray" : "amber"} title={on === null ? "Not answered: its app pages stay hidden until Yes" : undefined}>
             {on === false ? "no " : ""}
             {CAPABILITY_LABEL[cap]}
             {on === null ? "?" : ""}

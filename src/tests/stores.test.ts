@@ -276,11 +276,13 @@ describe("GET …/stores/{store}/access-preview", () => {
       password: "password-1",
       assignments: [{ storeId: null, role: "org_admin" }]
     });
-    // Not answered hides nothing.
+    // Not answered stays null, and as in both apps a fuel page shows only on a literal true.
     const unanswered = await call(preview, request("GET", "/", { token: admin.token }), params);
     expect(unanswered.body.capabilities).toEqual({ lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null });
     const unansweredAdmins = unanswered.body.roles.find((role: { roleId: string }) => role.roleId === "org_admin");
-    expect(unansweredAdmins.electron.find((page: { key: string }) => page.key === "fuelPrices")).toMatchObject({ hiddenBecause: null, allowed: true });
+    expect(unansweredAdmins.electron.find((page: { key: string }) => page.key === "fuelPrices")).toMatchObject({ hiddenBecause: "fuel", allowed: false });
+    expect(unansweredAdmins.mobile.find((page: { key: string }) => page.key === "mobileFuelPrices")).toMatchObject({ hiddenBecause: "fuel", allowed: false });
+    expect(unansweredAdmins.electron.find((page: { key: string }) => page.key === "pos")).toMatchObject({ hiddenBecause: null, allowed: true });
 
     await updateStoreSettings(admin, organization.organizationId, store.storeId, { capabilities: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } }, 1);
     const before = await call(preview, request("GET", "/", { token: admin.token }), params);
