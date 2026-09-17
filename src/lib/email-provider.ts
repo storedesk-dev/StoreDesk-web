@@ -45,8 +45,10 @@ export function setupKeyEmailText(message: SetupKeyMessage): string {
           "If it runs out before you get to it, just reply and we will send a new one."
         ]
       : [
-          "Keep the key: it does not expire. Use it again to set up StoreDesk on a new PC, or on this PC after Replace PC.",
-          "The new PC takes over and the old one stops working for the store."
+          // 0.0.9: a redeem consumes the key and mints the next one in the same transaction
+          // (lib/store-setup-key.ts), so "keep the key and use it again" is no longer true.
+          "The key works until it is used. StoreDesk then makes a new one, so there is nothing to keep.",
+          "To set up another PC later, an organization admin reads the current key on the store PC, in StoreDesk Service → Replace PC. The new PC takes over and the old one stops working for the store."
         ]),
     "",
     "Keep this email to yourself — anyone with the key can connect a computer to your store.",

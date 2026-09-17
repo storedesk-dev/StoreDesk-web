@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { setupKeyEmailText } from "@/lib/email-provider";
 
 /**
  * Claims the site makes about the product, checked against the product.
@@ -99,5 +100,32 @@ describe("what the site calls things", () => {
         .replace(/^\s*\/\/.*$/gm, "");
       expect(text, `${file} shows a customer the word "Worker"`).not.toMatch(/\bWorker\b(?!s?["'`]|Id|Credential)/);
     }
+  });
+});
+
+describe("what the site says about the setup key", () => {
+  // 0.0.9: a redeem consumes the key and mints the next one in the same transaction
+  // (lib/store-setup-key.ts). Copy that told the owner to keep the key and use it again sent them
+  // back to a key that had already stopped working.
+  it("never tells the owner to keep the key and use it again", () => {
+    for (const file of [...pages, "src/lib/email-provider.ts"]) {
+      const text = rendered(file);
+      expect(text, `${file} tells the owner to keep the setup key`).not.toMatch(/Keep the key/i);
+      expect(text, `${file} says the setup key can be used again`).not.toMatch(/\bUse it again\b/i);
+    }
+  });
+
+  it("says the key works until it is used and that StoreDesk makes the next one", () => {
+    const email = setupKeyEmailText({
+      to: "owner@example.com",
+      recipientName: "Sam",
+      organizationName: "Org",
+      storeName: "Store",
+      setupKey: "SD-TEST",
+      expiresAt: null
+    });
+    expect(email).toMatch(/works until it is used/i);
+    expect(email).toMatch(/makes a new one/i);
+    expect(email).toMatch(/organization admin/i);
   });
 });
