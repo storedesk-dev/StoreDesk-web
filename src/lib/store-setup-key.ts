@@ -210,14 +210,21 @@ export async function workerSetupKey(worker: { organizationId: string; storeId: 
  * single-use keys are cancelled; the reusable key stays valid. When the tunnel
  * can't be rotated now the store is marked `tunnelRotationRequired`.
  */
-export async function resetInstallation(input: { organizationId: string; storeId: string; workerInstallationId: string }) {
+export async function resetInstallation(input: {
+  organizationId: string;
+  storeId: string;
+  workerInstallationId: string;
+  /** Reset only while this credential still holds the installation (a PC releasing itself). */
+  workerCredentialId?: string;
+}): Promise<{ reset: boolean; tunnelRotated: boolean; tunnelError: string | null }> {
   await connectDb();
-  await SetupKeyModel.updateMany(
-    { workerInstallationId: input.workerInstallationId, reusable: { $ne: true }, status: { $in: OPEN_KEY } },
-    { $set: { status: "revoked", revokedAt: new Date() } }
-  );
-  await WorkerInstallationModel.updateOne(
-    { organizationId: input.organizationId, storeId: input.storeId, workerInstallationId: input.workerInstallationId },
+  const reset = await WorkerInstallationModel.updateOne(
+    {
+      organizationId: input.organizationId,
+      storeId: input.storeId,
+      workerInstallationId: input.workerInstallationId,
+      ...(input.workerCredentialId ? { workerCredentialId: input.workerCredentialId } : {})
+    },
     {
       $set: { status: "awaiting_activation" },
       $unset: {
@@ -234,7 +241,13 @@ export async function resetInstallation(input: { organizationId: string; storeId
       }
     }
   );
-  return rotateTunnelAfterReplace(input.storeId);
+  // Another PC redeemed the key meanwhile: it holds the installation, and its tunnel token stays valid.
+  if (input.workerCredentialId && !reset.matchedCount) return { reset: false, tunnelRotated: false, tunnelError: null };
+  await SetupKeyModel.updateMany(
+    { workerInstallationId: input.workerInstallationId, reusable: { $ne: true }, status: { $in: OPEN_KEY } },
+    { $set: { status: "revoked", revokedAt: new Date() } }
+  );
+  return { reset: true, ...(await rotateTunnelAfterReplace(input.storeId)) };
 }
 
 /** Rotate the tunnel secret a replaced PC holds; on failure mark the store so "Retry tunnel" does it. */
@@ -259,11 +272,18 @@ export const ReleaseInstallationSchema = z.object({ confirm: z.literal("REPLACE_
  */
 export async function releaseInstallation(worker: { organizationId: string; storeId: string; workerInstallationId: string; credentialId: string }) {
   await connectDb();
+  // The calling PC's own credential only: a PC that redeemed the key since holds the installation
+  // with a newer credential, and this release must not cut it off.
   const revoked = await WorkerCredentialModel.updateMany(
-    { workerInstallationId: worker.workerInstallationId, organizationId: worker.organizationId, status: { $in: ["active", "overlap"] } },
+    {
+      credentialId: worker.credentialId,
+      workerInstallationId: worker.workerInstallationId,
+      organizationId: worker.organizationId,
+      status: { $in: ["active", "overlap"] }
+    },
     { $set: { status: "revoked", revokedAt: new Date() } }
   );
-  const { tunnelRotated, tunnelError } = await resetInstallation(worker);
+  const { reset, tunnelRotated, tunnelError } = await resetInstallation({ ...worker, workerCredentialId: worker.credentialId });
   const key = await SetupKeyModel.exists({
     workerInstallationId: worker.workerInstallationId,
     reusable: true,
@@ -280,6 +300,7 @@ export async function releaseInstallation(worker: { organizationId: string; stor
     targetId: worker.workerInstallationId,
     metadata: {
       credentialsRevoked: Number(revoked.modifiedCount ?? 0),
+      ...(reset ? {} : { replacedMeanwhile: true }),
       tunnelRotated,
       reusableKey: Boolean(key),
       ...(tunnelError ? { tunnelRotationRequired: true, tunnelError } : {})

@@ -339,4 +339,31 @@ describe("the store PC reads its key and gives its installation up", () => {
     expect(rotateCloudflareTunnel).toHaveBeenCalledTimes(1);
     expect((await lastAudit("setup_key.redeem"))?.metadata).toMatchObject({ replacedPc: false });
   });
+
+  it("a release that lands after another PC redeemed the key leaves that PC, its credential and its tunnel alone", async () => {
+    await giveStoreTunnel();
+    const { body } = await issue();
+    const oldPc = await redeemKey(body.setupKey);
+    // The old PC authenticated for its release; before the release runs, the new PC redeems the key.
+    const oldWorker = {
+      organizationId: params.organizationId,
+      storeId: params.storeId,
+      workerInstallationId: oldPc.body.workerInstallationId,
+      credentialId: oldPc.body.workerCredentialId
+    };
+    const newPc = await redeemKey(body.setupKey);
+    expect(newPc.status).toBe(201);
+    vi.mocked(rotateCloudflareTunnel).mockClear();
+
+    const { releaseInstallation } = await import("@/lib/store-setup-key");
+    expect(await releaseInstallation(oldWorker)).toMatchObject({ released: true, tunnelRotated: false });
+
+    expect(await WorkerCredentialModel.findOne({ credentialId: newPc.body.workerCredentialId }).lean()).toMatchObject({ status: "active" });
+    expect(await WorkerInstallationModel.findOne({ workerInstallationId: newPc.body.workerInstallationId }).lean()).toMatchObject({
+      status: "active",
+      workerCredentialId: newPc.body.workerCredentialId
+    });
+    expect(rotateCloudflareTunnel).not.toHaveBeenCalled();
+    expect((await lastAudit("installation.release"))?.metadata).toMatchObject({ credentialsRevoked: 0, replacedMeanwhile: true });
+  });
 });
