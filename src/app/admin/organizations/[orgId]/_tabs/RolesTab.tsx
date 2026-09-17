@@ -9,10 +9,12 @@ import { plural } from "../../../_lib/format";
 import {
   APPS,
   CAPABILITY_LABEL,
+  ORG_ADMIN_ROLE_ID,
   ROLE_TEMPLATES,
   countEnabled,
   editorAccessKeys,
   isRetired,
+  newAccessItems,
   roleFingerprint,
   templateAccessKeys
 } from "../../../_lib/registry";
@@ -90,8 +92,9 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
     });
   }
 
-  async function save() {
-    if (!selected || !draft) return;
+  async function save(toSave: Draft | null = draft) {
+    if (!selected || !toSave) return;
+    const draft = toSave;
     if (!draft.roleName.trim()) {
       toast("Give the role a name.", "error");
       return;
@@ -120,6 +123,21 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
   }
 
   const selectedUsers = selected ? userCount(selected) : undefined;
+  const isAdminRole = selected?.roleId === ORG_ADMIN_ROLE_ID;
+  const newItems = selected && !isAdminRole ? newAccessItems(selected.accessKeys) : [];
+
+  /** Save the role with the new pages and flags stored as off, so they stop showing as new. */
+  function keepNewOff() {
+    if (!selected || !draft) return;
+    const accessKeys = structuredClone(draft.accessKeys);
+    for (const item of newItems) {
+      const page = accessKeys[item.app].pages.find((entry) => entry.key === item.pageKey);
+      if (!page) continue;
+      if (item.flag) page.featureFlags[item.flag] = false;
+      else page.enabled = false;
+    }
+    void save({ ...draft, accessKeys });
+  }
 
   return (
     <div className="space-y-4">
@@ -156,6 +174,9 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
                   )}
                 >
                   {role.roleName} <span className="font-normal text-slate-500 sd-num">(v{role.version})</span>
+                  {role.roleId !== ORG_ADMIN_ROLE_ID && newAccessItems(role.accessKeys).length > 0 ? (
+                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-800">New pages</span>
+                  ) : null}
                   {hasDraft ? <span className="ml-1 text-amber-600" aria-label="unsaved changes">•</span> : null}
                 </button>
               );
@@ -180,6 +201,27 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
                 </Button>
               </header>
 
+              {isAdminRole ? (
+                <div className="px-4 pt-3">
+                  <Notice tone="blue">Always has every page and feature, including pages added later.</Notice>
+                </div>
+              ) : newItems.length > 0 ? (
+                <div className="px-4 pt-3">
+                  <Notice tone="amber">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        <strong>New pages available</strong>, not given to this role:{" "}
+                        {newItems.map((item) => `${item.label} (${item.app === "electron" ? "Desktop" : "Phone"})`).join(", ")}. Turn on
+                        the ones it needs and save.
+                      </span>
+                      <Button variant="ghost" size="sm" disabled={saving} onClick={keepNewOff}>
+                        Keep them off
+                      </Button>
+                    </div>
+                  </Notice>
+                </div>
+              ) : null}
+
               <div className="grid gap-0 md:grid-cols-2 md:divide-x md:divide-slate-100">
                 {APPS.map((app) => (
                   <AppColumn
@@ -191,6 +233,7 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
                       update({ ...draft, accessKeys: { ...draft.accessKeys, [app.key]: { pages } } })
                     }
                     enabledCount={countEnabled(draft.accessKeys, app.key)}
+                    allLocked={isAdminRole}
                   />
                 ))}
               </div>
@@ -200,7 +243,7 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
                 <Button variant="ghost" disabled={!dirty || saving} onClick={() => discard(selected.roleId)}>
                   Discard
                 </Button>
-                <Button variant="primary" busy={saving} disabled={!dirty} onClick={save}>
+                <Button variant="primary" busy={saving} disabled={!dirty} onClick={() => void save()}>
                   Save role
                 </Button>
               </footer>
@@ -257,13 +300,16 @@ function AppColumn({
   label,
   pages,
   onChange,
-  enabledCount
+  enabledCount,
+  allLocked = false
 }: {
   app: App;
   label: string;
   pages: RolePage[];
   onChange: (pages: RolePage[]) => void;
   enabledCount: number;
+  /** Organization Admin: every page and flag is on and can't be changed. */
+  allLocked?: boolean;
 }) {
   const set = (key: string, patch: Partial<RolePage>) =>
     onChange(pages.map((p) => (p.key === key ? { ...p, ...patch } : p)));
@@ -283,7 +329,7 @@ function AppColumn({
         {shown.map((page) => {
           const def = getPage(page.key);
           const unknown = !def || def.app !== app;
-          const locked = Boolean(def?.alwaysEnabled);
+          const locked = allLocked || Boolean(def?.alwaysEnabled);
           const flags = def ? Object.entries(def.knownFeatureFlags) : [];
           const id = `pg-${app}-${page.key}`;
           return (
@@ -303,7 +349,7 @@ function AppColumn({
                     <label htmlFor={id} className="text-sm font-semibold">
                       {def?.label ?? page.key}
                     </label>
-                    {locked ? (
+                    {locked && !allLocked ? (
                       <Chip tone="gray">
                         <Lock className="h-3 w-3" aria-hidden /> Always on
                       </Chip>
@@ -326,7 +372,8 @@ function AppColumn({
                               id={fid}
                               type="checkbox"
                               className="h-3.5 w-3.5 accent-[#1A63F4]"
-                              checked={page.featureFlags[flagKey] ?? flag.default}
+                              checked={allLocked || (page.featureFlags[flagKey] ?? flag.default)}
+                              disabled={allLocked}
                               onChange={(e) => set(page.key, { featureFlags: { ...page.featureFlags, [flagKey]: e.target.checked } })}
                             />
                             {flag.label}

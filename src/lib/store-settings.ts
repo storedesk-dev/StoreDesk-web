@@ -16,7 +16,17 @@ import { canonicalJson } from "@/lib/control-plane-security";
  * edge route, see lib/store-sheets.ts).
  */
 
-export type StoreCapabilities = Record<StoreCapability, boolean>;
+/**
+ * Each capability is true or false once answered, null while not answered
+ * (a new store). Null takes nothing away: the store server and both apps
+ * treat it as present (StoreCapabilitySet.Lacks is an explicit false only).
+ */
+export type StoreCapabilities = Record<StoreCapability, boolean | null>;
+
+/** Hidden only on an explicit false: not answered (null) counts as present. */
+export function lacksCapability(capabilities: StoreCapabilities, capability: StoreCapability): boolean {
+  return capabilities[capability] === false;
+}
 
 export type GoogleSheetsSettings = {
   enabled: boolean;
@@ -38,7 +48,7 @@ export type StoreSettings = {
 
 export function defaultStoreSettings(): StoreSettings {
   return {
-    capabilities: { lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false },
+    capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
     lottery: { setupMode: null },
     integrations: {
       googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
@@ -51,6 +61,8 @@ export function defaultStoreSettings(): StoreSettings {
 type Loose = Record<string, unknown>;
 const record = (value: unknown): Loose =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Loose) : {};
+/** A capability answer: a stored boolean as it is; anything else (missing, null, odd) is not answered. */
+const answer = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
 const text = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
@@ -81,12 +93,12 @@ export function normalizeStoreSettings(raw: unknown): StoreSettings {
   const timeZone = text(source.timeZone);
   return {
     capabilities: {
-      lottery: capabilities.lottery === true,
-      coam: capabilities.coam === true,
-      fuel: capabilities.fuel === true,
-      ebt: capabilities.ebt === true,
-      moneyOrder: capabilities.moneyOrder === true,
-      prepaidGift: capabilities.prepaidGift === true
+      lottery: answer(capabilities.lottery),
+      coam: answer(capabilities.coam),
+      fuel: answer(capabilities.fuel),
+      ebt: answer(capabilities.ebt),
+      moneyOrder: answer(capabilities.moneyOrder),
+      prepaidGift: answer(capabilities.prepaidGift)
     },
     lottery: { setupMode: null },
     integrations: {
@@ -133,7 +145,15 @@ export const StoreSettingsUpdateSchema = z
   .object({
     settingsVersion: z.number().int().min(1).optional(),
     capabilities: z
-      .object({ lottery: z.boolean(), coam: z.boolean(), fuel: z.boolean(), ebt: z.boolean(), moneyOrder: z.boolean(), prepaidGift: z.boolean() })
+      // null puts a capability back to "not answered".
+      .object({
+        lottery: z.boolean().nullable(),
+        coam: z.boolean().nullable(),
+        fuel: z.boolean().nullable(),
+        ebt: z.boolean().nullable(),
+        moneyOrder: z.boolean().nullable(),
+        prepaidGift: z.boolean().nullable()
+      })
       .strict()
       .optional(),
     lottery: z.object({ setupMode: z.null() }).strict().optional(),

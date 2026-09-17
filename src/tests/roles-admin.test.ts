@@ -167,3 +167,85 @@ describe("DELETE …/roles/{roleId}", () => {
     expect((await call(remove, request("DELETE", "/", { token: admin.token }), { organizationId, roleId: "store_manager" })).status).toBe(404);
   });
 });
+
+describe("the Organization Admin role", () => {
+  /** A copy stored before Deals and price groups existed: 10 pages per app, no `deals`, no `priceGroups`. */
+  async function storeOldAdminRole(version: number) {
+    const { OrganizationModel } = await import("@/models/ControlPlane");
+    const org = (await OrganizationModel.findOne({ organizationId }).lean()) as { roles: Array<Record<string, unknown>> };
+    const old = (app: "electron" | "mobile") =>
+      ALL_PAGES.filter((page) => page.app === app && !page.retired && page.key !== "deals" && page.key !== "mobileDeals")
+        .slice(0, 10)
+        .map((page) => ({ key: page.key, enabled: true, featureFlags: page.key.toLowerCase().includes("pricebook") ? {} : { x: true } }));
+    const roles = org.roles.map((role) =>
+      role.roleId === "org_admin"
+        ? { ...role, version, accessKeys: { electron: { pages: old("electron") }, mobile: { pages: old("mobile") } } }
+        : role
+    );
+    await OrganizationModel.updateOne({ organizationId }, { $set: { roles } });
+    return OrganizationModel;
+  }
+
+  const every = (app: "electron" | "mobile") => ALL_PAGES.filter((page) => page.app === app && !page.retired);
+
+  it("reads with every registered page and flag, one version up, and stores that so stores re-sync", async () => {
+    const OrganizationModel = await storeOldAdminRole(3);
+    const res = await call(list, request("GET", "/", { token: admin.token }), { organizationId });
+    const role = res.body.roles.find((entry: { roleId: string }) => entry.roleId === "org_admin");
+    expect(role.version).toBe(4);
+    for (const app of ["electron", "mobile"] as const) {
+      for (const def of every(app)) {
+        const page = role.accessKeys[app].pages.find((entry: { key: string }) => entry.key === def.key);
+        expect(page, `${app}.${def.key}`).toMatchObject({ enabled: true });
+        for (const flag of Object.keys(def.knownFeatureFlags)) expect(page.featureFlags[flag], `${def.key}.${flag}`).toBe(true);
+      }
+    }
+    expect(role.accessKeys.electron.pages.map((page: { key: string }) => page.key)).toContain("deals");
+    expect(role.accessKeys.mobile.pages.find((page: { key: string }) => page.key === "mobilePriceBook").featureFlags.priceGroups).toBe(true);
+
+    // Stored at the version it read at; reading again does not bump it further.
+    const stored = (await OrganizationModel.findOne({ organizationId }).lean()) as { roles: Array<{ roleId: string; version: number }> };
+    expect(stored.roles.find((entry) => entry.roleId === "org_admin")?.version).toBe(4);
+    const again = await call(list, request("GET", "/", { token: admin.token }), { organizationId });
+    expect(again.body.roles.find((entry: { roleId: string }) => entry.roleId === "org_admin")).toEqual(role);
+  });
+
+  it("never grants new pages to another role", async () => {
+    const { OrganizationModel } = await import("@/models/ControlPlane");
+    const org = (await OrganizationModel.findOne({ organizationId }).lean()) as { roles: Array<Record<string, unknown>> };
+    const viewer = findTemplate("viewer")!.accessKeys;
+    const withoutDeals = {
+      electron: { pages: viewer.electron.pages.filter((page) => page.key !== "deals") },
+      mobile: { pages: viewer.mobile.pages.filter((page) => page.key !== "mobileDeals") }
+    };
+    const roles = org.roles.map((role) => (role.roleId === "viewer" ? { ...role, version: 2, accessKeys: withoutDeals } : role));
+    await OrganizationModel.updateOne({ organizationId }, { $set: { roles } });
+
+    const res = await call(list, request("GET", "/", { token: admin.token }), { organizationId });
+    const role = res.body.roles.find((entry: { roleId: string }) => entry.roleId === "viewer");
+    expect(role.version).toBe(2);
+    expect(role.accessKeys).toEqual(withoutDeals);
+  });
+
+  it("keeps every page whatever an edit sends, from the admin or a store", async () => {
+    const off = {
+      electron: { pages: every("electron").map((page) => ({ key: page.key, enabled: false, featureFlags: {} })) },
+      mobile: { pages: [] }
+    };
+    const res = await call(save, request("PUT", "/", { token: admin.token, body: { baseVersion: 1, roleName: "Owner", accessKeys: off } }), {
+      organizationId,
+      roleId: "org_admin"
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.role).toMatchObject({ roleName: "Owner", version: 2 });
+    expect(res.body.role.accessKeys.electron.pages.every((page: { enabled: boolean }) => page.enabled)).toBe(true);
+    expect(res.body.role.accessKeys.mobile.pages).toHaveLength(every("mobile").length);
+
+    const edge = await updateRoleFromEdge(organizationId, "org_admin", { baseVersion: 2, roleName: "Owner", accessKeys: off });
+    expect(edge.status).toBe("ok");
+    if (edge.status === "ok") {
+      expect(edge.role.version).toBe(3);
+      expect(edge.role.accessKeys.mobile.pages.map((page) => page.key)).toContain("mobileDeals");
+    }
+  });
+});

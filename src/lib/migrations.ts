@@ -153,6 +153,41 @@ export async function migrateLicensingModes(): Promise<ModeMigrationReport> {
   return report;
 }
 
+export type CapabilityDefaultsReport = {
+  stores: number;
+  /** Every capability false and settings never saved (settingsVersion 1): the old default, not an answer. */
+  looksUntouched: number;
+  /** At least one capability not answered (missing or null): read as present. */
+  notAnswered: number;
+  /** Every capability true or false, saved at least once. */
+  answered: number;
+};
+
+const CAPABILITY_KEYS = ["lottery", "coam", "fuel", "ebt", "moneyOrder", "prepaidGift"] as const;
+
+/**
+ * Report only: stores used to be created with every capability false, which
+ * hid fuel (report mapping, the fuel pages) at stores that sell it. New stores
+ * start "not answered" (null). Stored answers are never changed here: a false
+ * that an admin saved and a false that was only the old default look the same
+ * except for settingsVersion, so the admin confirms them on the store's
+ * Features tab (which flags those stores).
+ */
+export async function reportCapabilityDefaults(): Promise<CapabilityDefaultsReport> {
+  const report: CapabilityDefaultsReport = { stores: 0, looksUntouched: 0, notAnswered: 0, answered: 0 };
+  const stores = (await TenantStoreModel.find({}).select("settings.capabilities settingsVersion").lean()) as Doc[];
+  for (const store of stores) {
+    report.stores += 1;
+    const caps = ((store.settings as Doc | undefined)?.capabilities ?? {}) as Doc;
+    const values = CAPABILITY_KEYS.map((key) => caps[key]);
+    const version = typeof store.settingsVersion === "number" ? store.settingsVersion : 1;
+    if (values.some((value) => typeof value !== "boolean")) report.notAnswered += 1;
+    else if (version <= 1 && values.every((value) => value === false)) report.looksUntouched += 1;
+    else report.answered += 1;
+  }
+  return report;
+}
+
 export async function runMigrations(): Promise<void> {
   const subscriptions = await migrateSubscriptionsToLicenses();
   if (Object.values(subscriptions).some((count) => count > 0)) {
@@ -161,5 +196,9 @@ export async function runMigrations(): Promise<void> {
   const modes = await migrateLicensingModes();
   if (Object.values(modes).some((count) => count > 0)) {
     console.info(`[migrate] licensing modes: ${JSON.stringify(modes)}`);
+  }
+  const capabilities = await reportCapabilityDefaults();
+  if (capabilities.looksUntouched > 0) {
+    console.info(`[migrate] store capabilities (report only, nothing changed): ${JSON.stringify(capabilities)}`);
   }
 }

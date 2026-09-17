@@ -13,17 +13,20 @@ export interface StoreTabProps {
   refreshStore: () => void;
 }
 
+const answer = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+
 /** Fills anything a partial settings document leaves out, so the forms always have values. */
 export function withDefaults(s: Partial<StoreSettings> | null | undefined): StoreSettings {
   const gs = s?.integrations?.googleSheets;
   return {
+    // Not answered stays null: it is not a "no".
     capabilities: {
-      fuel: Boolean(s?.capabilities?.fuel),
-      lottery: Boolean(s?.capabilities?.lottery),
-      coam: Boolean(s?.capabilities?.coam),
-      ebt: Boolean(s?.capabilities?.ebt),
-      moneyOrder: Boolean(s?.capabilities?.moneyOrder),
-      prepaidGift: Boolean(s?.capabilities?.prepaidGift)
+      fuel: answer(s?.capabilities?.fuel),
+      lottery: answer(s?.capabilities?.lottery),
+      coam: answer(s?.capabilities?.coam),
+      ebt: answer(s?.capabilities?.ebt),
+      moneyOrder: answer(s?.capabilities?.moneyOrder),
+      prepaidGift: answer(s?.capabilities?.prepaidGift)
     },
     lottery: { setupMode: null },
     integrations: {

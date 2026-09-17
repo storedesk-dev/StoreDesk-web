@@ -2,6 +2,7 @@ import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import { OrganizationModel } from "@/models/ControlPlane";
 import { ControlPlaneError } from "@/lib/control-plane-security";
+import { ALL_PAGES } from "@/config/pages";
 
 /**
  * Organization roles: one list per organization in `Organization.roles`, held
@@ -137,14 +138,80 @@ export function normalizeAccessKeys(raw: unknown): RoleAccessKeys {
   };
 }
 
+// ── Organization Admin: every page, always ───────────────────────────────────
+
+/** The role that always has every page and every feature flag of both apps. */
+export const ORG_ADMIN_ROLE_ID = "org_admin";
+
+const APPS = ["electron", "mobile"] as const;
+
+/**
+ * Every registered page of both apps, enabled, with every known flag true:
+ * what the Organization Admin role resolves to. Stored flags the registry does
+ * not know are kept; stored pages the registry does not offer (retired, or
+ * named by a newer store build) are kept as stored, after the registry's.
+ */
+export function orgAdminAccessKeys(stored: RoleAccessKeys): RoleAccessKeys {
+  const build = (app: (typeof APPS)[number]): RolePage[] => {
+    const byKey = new Map(stored[app].pages.map((page) => [page.key, page]));
+    const offered = ALL_PAGES.filter((page) => page.app === app && !page.retired);
+    const full = offered.map((def) => {
+      const featureFlags: Record<string, boolean> = { ...(byKey.get(def.key)?.featureFlags ?? {}) };
+      for (const flag of Object.keys(def.knownFeatureFlags)) featureFlags[flag] = true;
+      return { key: def.key, enabled: true, featureFlags };
+    });
+    const offeredKeys = new Set(offered.map((page) => page.key));
+    return [...full, ...stored[app].pages.filter((page) => !offeredKeys.has(page.key))];
+  };
+  return { electron: { pages: build("electron") }, mobile: { pages: build("mobile") } };
+}
+
+/** Access keys compared regardless of page and flag order. */
+function sameAccess(a: RoleAccessKeys, b: RoleAccessKeys): boolean {
+  const canon = (keys: RoleAccessKeys) =>
+    JSON.stringify(
+      APPS.map((app) =>
+        [...keys[app].pages]
+          .sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0))
+          .map((page) => [
+            page.key,
+            page.enabled,
+            Object.keys(page.featureFlags)
+              .sort()
+              .map((flag) => [flag, page.featureFlags[flag]])
+          ])
+      )
+    );
+  return canon(a) === canon(b);
+}
+
+/**
+ * The Organization Admin role with every registered page and flag. When that
+ * differs from what is stored (a page or flag added since it was saved), the
+ * role reads one version higher, so every store takes the new pages at its
+ * next sync; `changed` says so. Any other role is returned as it is: new pages
+ * are never granted to it automatically (the admin console lists them).
+ */
+export function resolveOrgAdminRole(role: OrgRole): { role: OrgRole; changed: boolean } {
+  if (role.roleId !== ORG_ADMIN_ROLE_ID) return { role, changed: false };
+  const accessKeys = orgAdminAccessKeys(role.accessKeys);
+  if (sameAccess(accessKeys, role.accessKeys)) return { role, changed: false };
+  return { role: { ...role, version: role.version + 1, accessKeys }, changed: true };
+}
+
 /**
  * Stored roles (Mixed, possibly written by an older build) to the versioned
  * shape. No stored roles means the defaults. Missing version reads as 1;
  * missing `updatedAt` reads as `fallbackUpdatedAt` (the organization's
  * creation time), which keeps the access-sync hash stable.
+ *
+ * The Organization Admin role always reads with every registered page and flag
+ * (resolveOrgAdminRole); a stored copy missing some reads at its version + 1.
+ * The defaults are not stored, so they read at version 1 either way.
  */
 export function normalizeRoles(raw: unknown, fallbackUpdatedAt: string): OrgRole[] {
-  const source: unknown[] = Array.isArray(raw) && raw.length > 0 ? raw : DEFAULT_ORG_ROLES;
+  const stored = Array.isArray(raw) && raw.length > 0;
+  const source: unknown[] = stored ? (raw as unknown[]) : DEFAULT_ORG_ROLES;
   const seen = new Set<string>();
   const roles: OrgRole[] = [];
   for (const entry of source) {
@@ -153,16 +220,29 @@ export function normalizeRoles(raw: unknown, fallbackUpdatedAt: string): OrgRole
     if (typeof role.roleId !== "string" || !role.roleId.trim() || seen.has(role.roleId)) continue;
     seen.add(role.roleId);
     const version = role.version;
-    roles.push({
+    const normalized: OrgRole = {
       roleId: role.roleId,
       roleName:
         typeof role.roleName === "string" && role.roleName.trim() ? role.roleName : role.roleId,
       version: typeof version === "number" && Number.isInteger(version) && version >= 1 ? version : 1,
       updatedAt: toIsoOr(role.updatedAt, fallbackUpdatedAt),
       accessKeys: normalizeAccessKeys(role.accessKeys)
-    });
+    };
+    const resolved = resolveOrgAdminRole(normalized).role;
+    roles.push(stored ? resolved : { ...resolved, version: normalized.version });
   }
   return roles;
+}
+
+/** The stored Organization Admin role lacks a registered page or flag: the stored copy is behind. */
+export function orgAdminRoleOutdated(raw: unknown): boolean {
+  if (!Array.isArray(raw)) return false;
+  const entry = raw.find(
+    (role) => Boolean(role) && typeof role === "object" && (role as Record<string, unknown>).roleId === ORG_ADMIN_ROLE_ID
+  ) as Record<string, unknown> | undefined;
+  if (!entry) return false;
+  const accessKeys = normalizeAccessKeys(entry.accessKeys);
+  return !sameAccess(orgAdminAccessKeys(accessKeys), accessKeys);
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
@@ -172,7 +252,7 @@ export function normalizeRoles(raw: unknown, fallbackUpdatedAt: string): OrgRole
 
 const WRITE_ATTEMPTS = 4;
 
-type OrganizationRecord = Record<string, unknown> & { roles?: unknown; updatedAt?: unknown };
+export type OrganizationRecord = Record<string, unknown> & { roles?: unknown; updatedAt?: unknown };
 
 async function loadOrganization(organizationId: string): Promise<OrganizationRecord | null> {
   await connectDb();
@@ -200,9 +280,24 @@ function busy(): ControlPlaneError {
   return new ControlPlaneError(503, "ROLES_BUSY", "Roles changed while saving; try again", true);
 }
 
+/**
+ * The organization's roles as read, first storing the Organization Admin role
+ * with the pages it reads with (at the version it reads at) when the stored
+ * copy is behind the registry. Best effort: a lost compare-and-set leaves it
+ * for the next read, and every read resolves it the same way meanwhile, so the
+ * version a store sees never goes back.
+ */
+export async function rolesPersistingOrgAdmin(organizationId: string, org: OrganizationRecord): Promise<OrgRole[]> {
+  const roles = storedRoles(org);
+  if (orgAdminRoleOutdated(org.roles)) {
+    await compareAndSetRoles(organizationId, org.updatedAt, roles).catch(() => false);
+  }
+  return roles;
+}
+
 export async function readOrganizationRoles(organizationId: string): Promise<OrgRole[] | null> {
   const org = await loadOrganization(organizationId);
-  return org ? storedRoles(org) : null;
+  return org ? rolesPersistingOrgAdmin(organizationId, org) : null;
 }
 
 export type EdgeRoleUpdateOutcome =
@@ -236,6 +331,11 @@ export function unknownPageKeys(
   return unknown;
 }
 
+function accessKeysToStore(roleId: string, accessKeys: RoleAccessKeys): RoleAccessKeys {
+  const normalized = normalizeAccessKeys(accessKeys);
+  return roleId === ORG_ADMIN_ROLE_ID ? orgAdminAccessKeys(normalized) : normalized;
+}
+
 export type RoleCreateOutcome = { status: "ok"; role: OrgRole } | { status: "exists" } | { status: "not_found" };
 
 export async function createRole(
@@ -253,7 +353,7 @@ export async function createRole(
     const role: OrgRole = {
       roleId: input.roleId,
       roleName: input.roleName,
-      accessKeys: normalizeAccessKeys(input.accessKeys),
+      accessKeys: accessKeysToStore(input.roleId, input.accessKeys),
       version: 1,
       updatedAt: new Date().toISOString()
     };
@@ -315,7 +415,8 @@ export async function updateRoleFromEdge(
     const role: OrgRole = {
       roleId,
       roleName: update.roleName,
-      accessKeys: normalizeAccessKeys(update.accessKeys),
+      // The Organization Admin keeps every page whatever an edit sends.
+      accessKeys: accessKeysToStore(roleId, update.accessKeys),
       version: current.version + 1,
       updatedAt: new Date().toISOString()
     };

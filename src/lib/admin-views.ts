@@ -14,7 +14,7 @@ import {
 import { ControlPlaneError } from "@/lib/control-plane-security";
 import { getPage, type StoreCapability } from "@/config/pages";
 import { normalizeRoles, toIsoOr, type OrgRole } from "@/lib/roles";
-import { normalizeStoreSettings } from "@/lib/store-settings";
+import { lacksCapability, normalizeStoreSettings, type StoreCapabilities } from "@/lib/store-settings";
 import { requireOrganization } from "@/lib/organizations";
 import { requireStore } from "@/lib/tenant-stores";
 import { ENTITLED_STATUSES, coverageIndex, expireLapsedLicenses } from "@/lib/licenses";
@@ -41,14 +41,15 @@ export type PreviewPage = {
 export function effectivePages(
   role: OrgRole,
   app: "electron" | "mobile",
-  capabilities: Record<StoreCapability, boolean>
+  capabilities: StoreCapabilities
 ): PreviewPage[] {
   return role.accessKeys[app].pages
     .filter((page) => page.enabled)
     .map((page) => {
       const def = getPage(page.key);
       const requires = def?.app === app ? (def.requiresCapability ?? null) : null;
-      const hidden = requires && !capabilities[requires] ? requires : null;
+      // Only an explicit "no" hides a page; not answered counts as present.
+      const hidden = requires && lacksCapability(capabilities, requires) ? requires : null;
       return { key: page.key, label: def?.label ?? page.key, requiresCapability: requires, hiddenBecause: hidden, allowed: !hidden };
     });
 }

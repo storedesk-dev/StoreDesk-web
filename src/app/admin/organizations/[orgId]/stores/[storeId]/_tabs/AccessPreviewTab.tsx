@@ -13,16 +13,17 @@ export function AccessPreviewTab({ orgId, storeId }: StoreTabProps) {
   if (loading && !data) return <Spinner />;
   if (!data) return null;
 
-  const caps = Object.entries(data.capabilities) as Array<[keyof typeof CAPABILITY_LABEL, boolean]>;
+  const caps = Object.entries(data.capabilities) as Array<[keyof typeof CAPABILITY_LABEL, boolean | null]>;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
         <span>What each role gets at this store. This store has:</span>
         {caps.map(([cap, on]) => (
-          <Chip key={cap} tone={on ? "green" : "gray"}>
-            {on ? "" : "no "}
+          <Chip key={cap} tone={on === true ? "green" : on === false ? "gray" : "amber"} title={on === null ? "Not answered: its pages stay shown" : undefined}>
+            {on === false ? "no " : ""}
             {CAPABILITY_LABEL[cap]}
+            {on === null ? "?" : ""}
           </Chip>
         ))}
         <Link href="?tab=features" className="font-semibold text-[#0E43D8] hover:underline">
