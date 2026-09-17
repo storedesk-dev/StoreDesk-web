@@ -229,7 +229,8 @@ export const ALL_PAGES: PageDefinition[] = [
     filePath: "lib/features/price_book/price_book_screen.dart",
     defaultEnabled: true,
     knownFeatureFlags: {
-      priceGroups: { label: "Price Groups", description: "View price groups and mass-update price through a group on mobile.", default: true }
+      priceGroups: { label: "Price Groups", description: "View price groups and mass-update price through a group on mobile.", default: true },
+      sendToRegister: { label: "Send to register", description: "Preview and send staged price book and deal changes to the register from the phone (always previewed and confirmed).", default: false }
     }
   },
   {
