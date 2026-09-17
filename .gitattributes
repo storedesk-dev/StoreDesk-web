@@ -1,0 +1,5 @@
+# LF in the working tree on every OS, as store-desk-server and store-desk-electron do. A Windows
+# checkout with core.autocrlf=true writes CRLF, and the page-registry mirror is written with LF by
+# scripts/generate-pages-registry.mjs: its drift check compares the bytes, so a CRLF checkout failed
+# the check (and the parent's pre-commit hook) with nothing actually out of date.
+* text=auto eol=lf
