@@ -129,13 +129,15 @@ LicenseSchema.index(
  */
 const StoreSettingsSchema = new Schema(
   {
+    // true / false once the owner or an admin answers; null until then ("not
+    // answered"), which every consumer reads as present (StoreCapabilitySet).
     capabilities: {
-      lottery: { type: Boolean, default: false },
-      coam: { type: Boolean, default: false },
-      fuel: { type: Boolean, default: false },
-      ebt: { type: Boolean, default: false },
-      moneyOrder: { type: Boolean, default: false },
-      prepaidGift: { type: Boolean, default: false }
+      lottery: { type: Boolean, default: null },
+      coam: { type: Boolean, default: null },
+      fuel: { type: Boolean, default: null },
+      ebt: { type: Boolean, default: null },
+      moneyOrder: { type: Boolean, default: null },
+      prepaidGift: { type: Boolean, default: null }
     },
     lottery: {
       // The recording choices are "Coming soon"; null until one ships.

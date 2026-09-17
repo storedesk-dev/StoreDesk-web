@@ -84,7 +84,7 @@ describe("POST …/stores", () => {
       timeZone: "America/Chicago",
       status: "active",
       settingsVersion: 1,
-      capabilities: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false },
+      capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
       installation: null
     });
     expect(res.body.store.tunnel).toMatchObject({ status: "not_configured", url: null });
@@ -276,6 +276,13 @@ describe("GET …/stores/{store}/access-preview", () => {
       password: "password-1",
       assignments: [{ storeId: null, role: "org_admin" }]
     });
+    // Not answered hides nothing.
+    const unanswered = await call(preview, request("GET", "/", { token: admin.token }), params);
+    expect(unanswered.body.capabilities).toEqual({ lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null });
+    const unansweredAdmins = unanswered.body.roles.find((role: { roleId: string }) => role.roleId === "org_admin");
+    expect(unansweredAdmins.electron.find((page: { key: string }) => page.key === "fuelPrices")).toMatchObject({ hiddenBecause: null, allowed: true });
+
+    await updateStoreSettings(admin, organization.organizationId, store.storeId, { capabilities: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } }, 1);
     const before = await call(preview, request("GET", "/", { token: admin.token }), params);
     expect(before.status).toBe(200);
     expect(before.body.capabilities).toEqual({ lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false });
@@ -291,7 +298,7 @@ describe("GET …/stores/{store}/access-preview", () => {
     const cashier = before.body.roles.find((role: { roleId: string }) => role.roleId === "cashier");
     expect(cashier.electron.map((page: { key: string }) => page.key)).not.toContain("fuelPrices");
 
-    await updateStoreSettings(admin, organization.organizationId, store.storeId, { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } }, 1);
+    await updateStoreSettings(admin, organization.organizationId, store.storeId, { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } }, 2);
     const after = await call(preview, request("GET", "/", { token: admin.token }), params);
     const adminsAfter = after.body.roles.find((role: { roleId: string }) => role.roleId === "org_admin");
     expect(adminsAfter.electron.find((page: { key: string }) => page.key === "fuelPrices").allowed).toBe(true);

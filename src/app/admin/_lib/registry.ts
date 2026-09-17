@@ -176,6 +176,42 @@ export function templateAccessKeys(template: RoleTemplate): RoleAccessKeys {
   return { electron: { pages: build("electron") }, mobile: { pages: build("mobile") } };
 }
 
+/** The role that always has every page and flag (the control plane resolves it; lib/roles.ts). */
+export const ORG_ADMIN_ROLE_ID = "org_admin";
+
+export interface NewAccessItem {
+  app: App;
+  pageKey: string;
+  /** Set for a flag added to a page the role already lists. */
+  flag?: string;
+  label: string;
+}
+
+/**
+ * Pages and flags added to the registry since this role was saved: a page the
+ * stored role does not list, or a flag its stored page does not carry. A store
+ * denies them until the role is saved with them on (a flag must be literally
+ * true), so the console points them out instead of granting them.
+ */
+export function newAccessItems(accessKeys: RoleAccessKeys): NewAccessItem[] {
+  const items: NewAccessItem[] = [];
+  for (const { key: app } of APPS) {
+    const byKey = new Map(accessKeys[app].pages.map((page) => [page.key, page]));
+    for (const def of pagesFor(app)) {
+      const stored = byKey.get(def.key);
+      if (!stored) {
+        if (!def.alwaysEnabled) items.push({ app, pageKey: def.key, label: def.label });
+        continue;
+      }
+      if (!stored.enabled) continue;
+      for (const [flag, flagDef] of Object.entries(def.knownFeatureFlags)) {
+        if (!(flag in stored.featureFlags)) items.push({ app, pageKey: def.key, flag, label: `${def.label}: ${flagDef.label}` });
+      }
+    }
+  }
+  return items;
+}
+
 /** Enabled pages the editor shows (a stored retired page is not counted). */
 export function countEnabled(accessKeys: RoleAccessKeys, app: App): number {
   return accessKeys[app].pages.filter((page) => page.enabled && !isRetired(app, page.key)).length;

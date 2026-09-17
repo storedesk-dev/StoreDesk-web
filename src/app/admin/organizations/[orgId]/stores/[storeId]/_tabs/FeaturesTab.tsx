@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import type { StoreCapability } from "@/config/pages";
-import { Button, Card, Chip, ErrorBanner, Spinner, Switch } from "../../../../../_components/ui";
+import { Button, Card, Chip, ErrorBanner, Notice, Spinner, Switch, cx } from "../../../../../_components/ui";
 import { useStoreSettings, type StoreTabProps } from "./shared";
 
 /**
@@ -27,11 +27,12 @@ const LOTTERY_MODES = [
   "Online and instant sales from the lottery terminal report"
 ];
 
-type Draft = { caps: Record<StoreCapability, boolean>; googleSheets: boolean };
+type Answer = boolean | null;
+type Draft = { caps: Record<StoreCapability, Answer>; googleSheets: boolean };
 
 export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const settings = useStoreSettings(orgId, storeId);
-  const [draft, setDraft] = useState<Draft>({ caps: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false }, googleSheets: false });
+  const [draft, setDraft] = useState<Draft>({ caps: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null }, googleSheets: false });
   const lotteryNote = useId();
 
   const saved: Draft | null = settings.data
@@ -50,6 +51,8 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   if (settings.error && !settings.data) return <ErrorBanner error={settings.error} onRetry={settings.reload} />;
   if (!settings.data || !saved) return <Spinner />;
 
+  // Every answer "no" and settings never saved: the old default, not the owner's answer.
+  const looksUntouched = settings.data.settingsVersion === 1 && FEATURES.every((f) => saved.caps[f.key] === false);
   const dirty = FEATURES.some((f) => draft.caps[f.key] !== saved.caps[f.key]) || draft.googleSheets !== saved.googleSheets;
 
   function save() {
@@ -74,17 +77,22 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
           save();
         }}
       >
+        {looksUntouched ? (
+          <div className="mb-3">
+            <Notice tone="amber">All set to No and never saved, so likely old defaults. Check each one and save.</Notice>
+          </div>
+        ) : null}
         <SwitchGroup title="Store features">
           {FEATURES.map((f) => (
             <li key={f.key} className="py-3">
-              <SwitchRow
+              <AnswerRow
                 id={`feat-${f.key}`}
                 label={f.label}
                 description={f.description}
-                checked={draft.caps[f.key]}
+                value={draft.caps[f.key]}
                 onChange={(v) => setDraft((d) => ({ ...d, caps: { ...d.caps, [f.key]: v } }))}
               />
-              {f.key === "lottery" && draft.caps.lottery ? (
+              {f.key === "lottery" && draft.caps.lottery === true ? (
                 <fieldset disabled aria-describedby={lotteryNote} className="ml-12 mt-3 rounded-md border border-slate-200 bg-slate-50/70 p-3">
                   <legend className="flex items-center gap-2 px-1 text-[13px] font-semibold text-slate-700">
                     Lottery setup <Chip tone="blue">Coming soon</Chip>
@@ -152,6 +160,54 @@ function SwitchGroup({ title, children }: { title: string; children: ReactNode }
       </h3>
       <ul className="divide-y divide-slate-100">{children}</ul>
     </section>
+  );
+}
+
+/** Yes / No, or not answered yet (null): a store's pages stay shown until someone says No. */
+function AnswerRow({
+  id,
+  label,
+  description,
+  value,
+  onChange
+}: {
+  id: string;
+  label: string;
+  description: string;
+  value: Answer;
+  onChange: (value: boolean) => void;
+}) {
+  const descId = `${id}-desc`;
+  const option = (answer: boolean, text: string) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={value === answer}
+      onClick={() => onChange(answer)}
+      className={cx(
+        "px-3 py-1 text-[13px] font-semibold first:rounded-l-md last:rounded-r-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A63F4]",
+        value === answer ? "bg-[#1A63F4] text-white" : "bg-white text-slate-700 hover:bg-slate-50"
+      )}
+    >
+      {text}
+    </button>
+  );
+  return (
+    <div className="flex items-start gap-3">
+      <div role="radiogroup" id={id} aria-label={label} aria-describedby={descId} className="flex shrink-0 divide-x divide-slate-200 rounded-md border border-slate-200">
+        {option(true, "Yes")}
+        {option(false, "No")}
+      </div>
+      <div>
+        <p className="flex items-center gap-2 text-sm font-semibold">
+          {label}
+          {value === null ? <Chip tone="amber">Not answered</Chip> : null}
+        </p>
+        <p id={descId} className="text-[13px] text-slate-500">
+          {description}
+        </p>
+      </div>
+    </div>
   );
 }
 

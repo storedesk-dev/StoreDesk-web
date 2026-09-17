@@ -199,8 +199,11 @@ export interface Store {
   createdAt?: string;
 }
 
+/** true / false once answered; null while not answered, which hides nothing. */
+export type CapabilityAnswers = Record<StoreCapability, boolean | null>;
+
 export interface StoreSettings {
-  capabilities: Record<StoreCapability, boolean>;
+  capabilities: CapabilityAnswers;
   lottery: { setupMode: null };
   integrations: {
     googleSheets: {
@@ -281,7 +284,7 @@ export interface PreviewPage {
 }
 
 export interface AccessPreview {
-  capabilities: Record<StoreCapability, boolean>;
+  capabilities: CapabilityAnswers;
   roles: Array<{
     roleId: string;
     roleName: string;

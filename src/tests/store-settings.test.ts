@@ -46,12 +46,12 @@ function put(body: unknown, headers: Record<string, string> = {}) {
 }
 
 describe("GET …/settings", () => {
-  it("answers the defaults at version 1, with the Google account when it is known", async () => {
+  it("answers the defaults at version 1, every capability not answered, with the Google account when it is known", async () => {
     const res = await call(getSettings, request("GET", "/", { token: admin.token }), params);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       settings: {
-        capabilities: { lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false },
+        capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
         lottery: { setupMode: null },
         integrations: {
           googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
@@ -69,7 +69,7 @@ describe("GET …/settings", () => {
     await TenantStoreModel.collection.updateOne({ storeId: params.storeId }, { $unset: { settings: 1, settingsVersion: 1 } });
     const res = await call(getSettings, request("GET", "/", { token: admin.token }), params);
     expect(res.body.settingsVersion).toBe(1);
-    expect(res.body.settings.capabilities.fuel).toBe(false);
+    expect(res.body.settings.capabilities.fuel).toBeNull();
     const saved = await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } } });
     expect(saved.status).toBe(200);
     expect(saved.body.settingsVersion).toBe(2);
@@ -77,6 +77,16 @@ describe("GET …/settings", () => {
 });
 
 describe("PUT …/settings", () => {
+  it("keeps explicit answers and puts one back to not answered with null", async () => {
+    const answered = await put({ settingsVersion: 1, settings: { capabilities: { fuel: false, lottery: true, coam: null, ebt: false, moneyOrder: null, prepaidGift: null } } });
+    expect(answered.status).toBe(200);
+    expect(answered.body.settings.capabilities).toEqual({ fuel: false, lottery: true, coam: null, ebt: false, moneyOrder: null, prepaidGift: null });
+    const reset = await put({ settingsVersion: 2, settings: { capabilities: { fuel: null, lottery: true, coam: null, ebt: false, moneyOrder: null, prepaidGift: null } } });
+    expect(reset.body.settings.capabilities.fuel).toBeNull();
+    const read = await call(getSettings, request("GET", "/", { token: admin.token }), params);
+    expect(read.body.settings.capabilities).toEqual({ fuel: null, lottery: true, coam: null, ebt: false, moneyOrder: null, prepaidGift: null });
+  });
+
   it("saves features on top of the version read, audits and notifies the store", async () => {
     const res = await put({ settingsVersion: 1, settings: { capabilities: { fuel: true, lottery: true, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } } });
     expect(res.status).toBe(200);
@@ -143,7 +153,7 @@ describe("PUT …/settings", () => {
 
   it("writes nothing for an update that changes nothing", async () => {
     vi.mocked(scheduleNotify).mockClear();
-    const res = await put({ settingsVersion: 1, settings: { capabilities: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } } });
+    const res = await put({ settingsVersion: 1, settings: { capabilities: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null } } });
     expect(res.status).toBe(200);
     expect(res.body.settingsVersion).toBe(1);
     expect(await AuditEventModel.countDocuments({ action: "store.settings.update" })).toBe(0);
@@ -179,7 +189,8 @@ describe("what the store receives, and suspension (P12)", () => {
     const first = await pull(pc.token);
     expect(first.status).toBe(200);
     expect(first.body.store).toMatchObject({
-      capabilities: { lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false },
+      // Not answered: the store server reads null as present, so nothing is hidden.
+      capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
       settingsVersion: 1,
       settings: { lottery: { setupMode: null }, timeZone: null }
     });
@@ -213,5 +224,25 @@ describe("what the store receives, and suspension (P12)", () => {
 
     await updateOrganization(admin, params.organizationId, { status: "active" });
     expect((await pull(pc.token)).status).toBe(200);
+  });
+});
+
+describe("capability defaults report (nothing is changed)", () => {
+  it("counts stores whose all-false answers were never saved, and leaves every stored value as it is", async () => {
+    const { reportCapabilityDefaults } = await import("@/lib/migrations");
+    const allFalse = { lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false };
+    // A store an older build created: every capability false by default, settings never saved.
+    await TenantStoreModel.collection.updateOne({ storeId: params.storeId }, { $set: { "settings.capabilities": allFalse, settingsVersion: 1 } });
+
+    expect(await reportCapabilityDefaults()).toEqual({ stores: 1, looksUntouched: 1, notAnswered: 0, answered: 0 });
+    const stored = (await TenantStoreModel.collection.findOne({ storeId: params.storeId })) as { settings: { capabilities: unknown } } | null;
+    expect(stored?.settings.capabilities).toEqual(allFalse);
+
+    // The same answers saved by an admin are answers.
+    await TenantStoreModel.collection.updateOne({ storeId: params.storeId }, { $set: { settingsVersion: 2 } });
+    expect(await reportCapabilityDefaults()).toMatchObject({ looksUntouched: 0, answered: 1 });
+
+    await TenantStoreModel.collection.updateOne({ storeId: params.storeId }, { $set: { "settings.capabilities.fuel": null } });
+    expect(await reportCapabilityDefaults()).toMatchObject({ looksUntouched: 0, notAnswered: 1 });
   });
 });

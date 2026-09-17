@@ -73,7 +73,7 @@ describe("seedDevData", () => {
     expect(seed.organizations.map((entry) => entry.slug)).toEqual(["example-retail", "corner-mart"]);
     expect(normalizeStoreSettings(main.settings).capabilities).toEqual({ fuel: true, lottery: true, coam: false, ebt: true, moneyOrder: true, prepaidGift: false });
     expect(normalizeStoreSettings(main.settings).integrations.googleSheets).toMatchObject({ enabled: true, spreadsheetId: null });
-    expect(normalizeStoreSettings(elm.settings).capabilities).toEqual({ fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false });
+    expect(normalizeStoreSettings(elm.settings).capabilities).toEqual({ fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null });
     expect((await TenantStoreModel.find({}).lean()).every((store) => store.tunnelStatus === "not_configured" && !store.tunnelUrl)).toBe(true);
 
     const users = await AppUserModel.find({}).lean();

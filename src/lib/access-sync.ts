@@ -13,7 +13,7 @@ import {
   safeJson,
   sha256
 } from "@/lib/control-plane-security";
-import { normalizeRoles, toIsoOr, type OrgRole } from "@/lib/roles";
+import { rolesPersistingOrgAdmin, toIsoOr, type OrgRole } from "@/lib/roles";
 import { coveringLicense } from "@/lib/licenses";
 import {
   normalizeStoreSettings,
@@ -294,7 +294,8 @@ export async function loadAccessSync(worker: {
     organization,
     store,
     subscription,
-    roles: normalizeRoles(organization.roles, toIsoOr(organization.createdAt, EPOCH)),
+    // The Organization Admin role, when behind the registry, is stored at its new version first.
+    roles: await rolesPersistingOrgAdmin(organizationId, organization),
     users,
     generatedAt: new Date()
   });
