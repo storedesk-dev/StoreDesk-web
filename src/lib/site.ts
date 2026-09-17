@@ -10,8 +10,8 @@
 
 export const SITE = {
   name: "StoreDesk",
-  email: "storedesk.dev@gmail.com",
-  supportEmail: "storedesk.dev@gmail.com",
+  email: "developer@storedesk.net",
+  supportEmail: "developer@storedesk.net",
   domain: "storedesk.net",
   tagline: "Back-office software for convenience stores and gas stations",
   /** One sentence, used as the meta description and the hero subhead. */

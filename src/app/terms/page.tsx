@@ -68,8 +68,13 @@ export default function TermsPage() {
               While your plan is current, you may install and use StoreDesk in the stores your licence covers.
               A licence begins with a {PLANS.trialDays}-day trial and then runs as a {PLANS.standardDays}-day
               plan. By default an organisation licence covers up to {PLANS.defaultMaxStores} stores with{" "}
-              {PLANS.defaultMaxWorkers} store PC each; a single store can hold its own licence instead. Pricing
-              and any different limits are whatever we have agreed with you in writing.
+              {PLANS.defaultMaxWorkers} store PC each; a single store can hold its own licence instead. Any
+              different limits are whatever we have agreed with you in writing.
+            </p>
+            <p>
+              StoreDesk does not charge for the software today, so there is nothing to pay, cancel or refund. If
+              that ever changes, we will tell you the price and give you notice before anything is charged, and
+              you will be free to stop using StoreDesk instead.
             </p>
             <p>
               The licence is for running the software in your own stores. It does not include reselling it,
@@ -88,7 +93,8 @@ export default function TermsPage() {
                 Accounts: who you create, what screens you give them, and removing people when they leave.
               </li>
               <li>
-                Your setup key: it lasts {PLANS.setupKeyHours} hours and works once. Treat it like a password.
+                Your setup key: it works until a PC is set up with it, and StoreDesk then makes the next one.
+                An organization admin can read the current key any time. Treat it like a password.
               </li>
               <li>The accuracy of what you type in, in particular supplier costs and sales tax settings.</li>
             </ul>

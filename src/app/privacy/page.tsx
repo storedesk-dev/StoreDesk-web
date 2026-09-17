@@ -152,7 +152,7 @@ export default function PrivacyPage() {
                 [
                   "Google Sheets export",
                   "Google",
-                  "Your daily sales totals, written to a spreadsheet in a Google account you own and control."
+                  "Your daily sales totals, written to a spreadsheet in a Google account you own and control. Your store PC writes them through StoreDesk's export identity, which you share the sheet with and can unshare at any time. Nobody signs in to it, and the totals are not copied to us."
                 ]
               ]}
             />
@@ -200,8 +200,8 @@ export default function PrivacyPage() {
                 account is open, and the audit log is kept with it.
               </li>
               <li>
-                <span className="font-semibold text-[var(--foreground)]">Setup keys</span> expire after{" "}
-                {PLANS.setupKeyHours} hours and can be used once.
+                <span className="font-semibold text-[var(--foreground)]">A setup key</span> is used by the PC it
+                sets up, and a new one replaces it. The used one is kept only as a record that it was used.
               </li>
               <li>
                 <span className="font-semibold text-[var(--foreground)]">Email</span> you send us is kept in our
