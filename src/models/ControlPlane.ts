@@ -184,6 +184,15 @@ const TenantStoreSchema = new Schema(
     /** Cloudflare ids saved when provisioning succeeded; delete and rotate go by these, never by name. */
     tunnelId: { type: String },
     tunnelDnsRecordId: { type: String },
+    /**
+     * An internal admin allowed the *next* activation to replace the PC that
+     * is running now (lib/store-setup-key.ts, `allowPcReplacement`). Without
+     * it, a setup key redeemed while a PC is live is refused
+     * `PC_ALREADY_ACTIVE`: a key somebody once saw must not silently take the
+     * store over. Set for 24 h, spent by the activation that uses it.
+     */
+    replacementAllowedUntil: Date,
+    replacementAllowedByAdminId: { type: String },
     /** The PC was replaced and the tunnel secret is not rotated yet: no setup key until it is. */
     tunnelRotationRequired: { type: Boolean },
     tunnelRotatedAt: Date,
@@ -313,7 +322,8 @@ const SetupKeySchema = new Schema(
     deliveryError: String,
     deliveryReason: { type: String, required: true },
     idempotencyKey: { type: String, required: true },
-    createdByAdminId: id
+    /** Absent on the successor a redeem mints: no admin issued it, the activation did. */
+    createdByAdminId: { type: String, trim: true }
   },
   timestamps
 );

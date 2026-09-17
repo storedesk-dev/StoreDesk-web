@@ -69,6 +69,15 @@ export type SetupKeyMessage = {
   expiresAt: Date | null;
 };
 
+export type InstallationReplacedMessage = {
+  to: string;
+  organizationName: string;
+  storeName: string;
+  /** "activation": a setup key was redeemed on another PC. "admin": StoreDesk replaced it from the console. */
+  by: "activation" | "admin";
+  at: Date;
+};
+
 export type InvitationMessage = {
   to: string;
   recipientName: string;
@@ -102,6 +111,31 @@ export function invitationEmailText(message: InvitationMessage): string {
   ].join("\n");
 }
 
+/**
+ * The organization owner is told every time a store's PC is replaced, because
+ * a replacement moves the whole store to another computer. Plain, short, and
+ * carrying no key: it says what happened, where, when, and what to do if it
+ * was not them.
+ */
+export function installationReplacedEmailText(message: InstallationReplacedMessage): string {
+  return [
+    `The StoreDesk PC for ${message.storeName} was replaced.`,
+    "",
+    `Organization: ${message.organizationName}`,
+    `Store: ${message.storeName}`,
+    `When: ${formatExpiry(message.at)}`,
+    message.by === "admin"
+      ? "Replaced by StoreDesk support, at your organization's request."
+      : "A setup key was used to set StoreDesk up on a computer, and that computer took the store over.",
+    "",
+    "The old PC no longer works for this store: it can no longer sign anyone in or reach the register.",
+    "",
+    `If this was not you or someone you asked, write to ${SITE.supportEmail} straight away and we will rotate the store's setup key.`,
+    "",
+    "— StoreDesk"
+  ].join("\n");
+}
+
 export type DeliveryResult = {
   provider: string;
   messageId: string;
@@ -110,6 +144,7 @@ export type DeliveryResult = {
 export interface EmailProvider {
   sendSetupKey(message: SetupKeyMessage): Promise<DeliveryResult>;
   sendInvitation(message: InvitationMessage): Promise<DeliveryResult>;
+  sendInstallationReplaced(message: InstallationReplacedMessage): Promise<DeliveryResult>;
 }
 
 class ResendEmailProvider implements EmailProvider {
@@ -158,6 +193,15 @@ class ResendEmailProvider implements EmailProvider {
       "Email provider rejected the invitation"
     );
   }
+
+  sendInstallationReplaced(message: InstallationReplacedMessage): Promise<DeliveryResult> {
+    return this.send(
+      message.to,
+      `The StoreDesk PC for ${message.storeName} was replaced`,
+      installationReplacedEmailText(message),
+      "Email provider rejected the replacement notice"
+    );
+  }
 }
 
 class UnconfiguredEmailProvider implements EmailProvider {
@@ -166,6 +210,10 @@ class UnconfiguredEmailProvider implements EmailProvider {
   }
 
   async sendInvitation(): Promise<DeliveryResult> {
+    throw new Error("Email provider is not configured");
+  }
+
+  async sendInstallationReplaced(): Promise<DeliveryResult> {
     throw new Error("Email provider is not configured");
   }
 }

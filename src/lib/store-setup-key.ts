@@ -1,9 +1,18 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
-import { SetupKeyModel, TenantStoreModel, WorkerCredentialModel, WorkerInstallationModel } from "@/models/ControlPlane";
+import {
+  OrganizationModel,
+  SetupKeyModel,
+  TenantStoreModel,
+  UserAssignmentModel,
+  WorkerCredentialModel,
+  WorkerInstallationModel
+} from "@/models/ControlPlane";
 import { ControlPlaneError, enforceRateLimit, hashSecret, issueSetupKey, publicId } from "@/lib/control-plane-security";
-import { auditAdmin, writeAudit } from "@/lib/audit";
+import { auditAdmin, writeAudit, type AuditInput } from "@/lib/audit";
 import { isStoreSecretConfigured, openStoreSecret, sealStoreSecret } from "@/lib/store-secrets";
+import { getEmailProvider, isEmailConfigured } from "@/lib/email-provider";
+import { ORG_ADMIN_ROLE_ID } from "@/lib/roles";
 import { requireStore } from "@/lib/tenant-stores";
 import { rotateStoreTunnel } from "@/lib/tunnel";
 import { SITE } from "@/lib/site";
@@ -15,19 +24,30 @@ import type { InternalAdminActor } from "@/lib/admin-auth";
  * on the same PC and it works, or a different PC and it works."
  *
  * - One reusable key per installation, open until rotated. It never expires
- *   and redeeming it does not use it up (lib/control-plane.ts, redeem).
+ *   and can be read back at any time, so the owner never has to keep it.
+ * - **Every successful redeem rotates it** (lib/control-plane.ts, redeem): the
+ *   key that was shown is consumed and the next one is minted in the same
+ *   transaction. The PC that just activated, and an admin, can read the new
+ *   key straight away, so the owner's flow is unchanged — but a key somebody
+ *   saw once stops working the moment it is used.
  * - Its secret is argon2id-hashed like every key, and also sealed with
  *   STORE_SECRET_KEY so it can be read again: by an internal admin (audited
  *   `setup_key.reveal`, rate-limited) and by the store's own PC with its
- *   worker credential, for the desktop's "Replace PC" (audited, actor worker).
- * - Redeeming it on a PC while another PC holds the installation replaces that
- *   PC: its credential is revoked in the redeem transaction and the tunnel
- *   secret rotated after it.
+ *   worker credential, for the desktop's "Replace PC". Reading it on the store
+ *   PC needs an **organization admin** signed in, not merely the StoreDesk
+ *   Service page (audited, actor worker, `metadata.appUserId`).
+ * - Redeeming it on a PC while another PC is live **no longer replaces that PC
+ *   silently**. The installation must have released itself (Replace PC ran, so
+ *   it is `awaiting_activation`), or an internal admin must have allowed the
+ *   next activation to replace it (`allowPcReplacement`, 24 h, audited).
+ *   Otherwise the redeem is refused with `PC_ALREADY_ACTIVE`.
  * - A PC can give the installation up itself (`releaseInstallation`): its
  *   credential is revoked, the tunnel secret rotated and the installation goes
  *   back to `awaiting_activation`; the key stays valid.
  * - Rotating the key (admin) revokes it and issues a new one; the PC that is
  *   running keeps working.
+ * - The organization owner is e-mailed whenever an installation is replaced
+ *   (`notifyOwnerOfReplacement`), and the notice is audited either way.
  */
 
 type Doc = Record<string, unknown>;
@@ -37,6 +57,51 @@ export const OPEN_KEY = ["queued", "shown", "sent", "delivery_failed"];
 
 export const SETUP_KEY_NOT_FOUND = "SETUP_KEY_NOT_FOUND";
 export const SETUP_KEY_NOT_READABLE = "SETUP_KEY_NOT_READABLE";
+
+export type PreparedKey = {
+  keyId: string;
+  plaintext: string;
+  readable: boolean;
+  /** The row to insert — separately, so a redeem can write it inside its own transaction. */
+  doc: Record<string, unknown>;
+};
+
+/**
+ * A reusable key, issued, argon2id-hashed and sealed, but not stored yet. The
+ * hashing is deliberately done by the caller *before* it opens a transaction:
+ * argon2id takes long enough that hashing inside one would hold it open.
+ */
+export async function prepareReusableKey(input: {
+  organizationId: string;
+  storeId: string;
+  workerInstallationId: string;
+  contactEmail: string;
+  status: "shown" | "sent";
+  deliveryReason: string;
+  adminId?: string;
+}): Promise<PreparedKey> {
+  const issued = issueSetupKey();
+  const readable = isStoreSecretConfigured();
+  return {
+    keyId: issued.keyId,
+    plaintext: issued.plaintext,
+    readable,
+    doc: {
+      organizationId: input.organizationId,
+      storeId: input.storeId,
+      workerInstallationId: input.workerInstallationId,
+      keyId: issued.keyId,
+      secretHash: await hashSecret(issued.secret),
+      reusable: true,
+      ...(readable ? { sealedSecret: sealStoreSecret(issued.plaintext) } : {}),
+      contactEmail: input.contactEmail,
+      status: input.status,
+      deliveryReason: input.deliveryReason,
+      idempotencyKey: publicId("idem"),
+      ...(input.adminId ? { createdByAdminId: input.adminId } : {})
+    }
+  };
+}
 
 /** Mint a reusable key for an installation. Earlier open keys of that installation are revoked first. */
 export async function mintReusableKey(input: {
@@ -53,23 +118,9 @@ export async function mintReusableKey(input: {
     { workerInstallationId: input.workerInstallationId, status: { $in: OPEN_KEY } },
     { $set: { status: "revoked", revokedAt: new Date() } }
   );
-  const issued = issueSetupKey();
-  const readable = isStoreSecretConfigured();
-  const record = await SetupKeyModel.create({
-    organizationId: input.organizationId,
-    storeId: input.storeId,
-    workerInstallationId: input.workerInstallationId,
-    keyId: issued.keyId,
-    secretHash: await hashSecret(issued.secret),
-    reusable: true,
-    ...(readable ? { sealedSecret: sealStoreSecret(issued.plaintext) } : {}),
-    contactEmail: input.contactEmail,
-    status: input.status,
-    deliveryReason: input.deliveryReason,
-    idempotencyKey: publicId("idem"),
-    createdByAdminId: input.adminId
-  });
-  return { record, keyId: issued.keyId, plaintext: issued.plaintext, readable };
+  const prepared = await prepareReusableKey(input);
+  const record = await SetupKeyModel.create(prepared.doc);
+  return { record, keyId: prepared.keyId, plaintext: prepared.plaintext, readable: prepared.readable };
 }
 
 /** The installation's open reusable key with its sealed secret, newest first. */
@@ -171,13 +222,48 @@ export async function rotateStoreSetupKey(
   return { keyId: minted.keyId, setupKey: minted.plaintext, readable: minted.readable, workerInstallationId };
 }
 
+export const NOT_ORG_ADMIN = "NOT_ORG_ADMIN";
+
+/** The header the store PC names the signed-in app user in (a GET has no body). */
+export const APP_USER_HEADER = "x-storedesk-app-user";
+
+/**
+ * Whether this app user is an organization admin of `organizationId` — the
+ * owner-level check. An assignment with no `storeId` covers every store of the
+ * organization; a store-scoped one must name this store.
+ */
+export async function isOrganizationAdmin(appUserId: string, organizationId: string, storeId: string): Promise<boolean> {
+  await connectDb();
+  const assignment = await UserAssignmentModel.findOne({
+    appUserId,
+    organizationId,
+    status: "active",
+    role: ORG_ADMIN_ROLE_ID,
+    $or: [{ storeId }, { storeId: null }, { storeId: { $exists: false } }]
+  }).lean();
+  return Boolean(assignment);
+}
+
 /**
  * `GET /api/v1/edge/setup-key` (worker credential): the calling installation's
  * own reusable key, for the desktop's "Replace PC". Store-facing messages;
- * 10 a minute per installation; audited with the worker as actor.
+ * 10 a minute per installation; audited with the worker as actor and the
+ * person who asked in `metadata.appUserId`.
+ *
+ * The worker credential alone is not enough. The key lets its holder take the
+ * store over, so the store PC must name the signed-in app user, and that user
+ * must be an **organization admin** — the store PC's own `manageWorker` page
+ * check is a role a store manager can have.
  */
-export async function workerSetupKey(worker: { organizationId: string; storeId: string; workerInstallationId: string; credentialId: string }) {
+export async function workerSetupKey(
+  worker: { organizationId: string; storeId: string; workerInstallationId: string; credentialId: string },
+  appUserId?: string | null
+) {
   enforceRateLimit(`setup-key-worker:${worker.workerInstallationId}`, { limit: 10, windowMs: 60_000, code: "RATE_LIMITED" });
+  const actor = appUserId?.trim();
+  if (!actor || !(await isOrganizationAdmin(actor, worker.organizationId, worker.storeId))) {
+    throw new ControlPlaneError(403, NOT_ORG_ADMIN, "Only an organization admin can read this store's setup key.");
+  }
   const key = await openReusableKey({
     organizationId: worker.organizationId,
     storeId: worker.storeId,
@@ -198,9 +284,127 @@ export async function workerSetupKey(worker: { organizationId: string; storeId: 
     actorId: worker.credentialId,
     action: "setup_key.reveal",
     targetType: "setup_key",
-    targetId: String(key.keyId)
+    targetId: String(key.keyId),
+    metadata: { appUserId: actor }
   });
   return { keyId: String(key.keyId), setupKey };
+}
+
+// ── "Allow the next activation to replace the running PC" ────────────────────
+
+/** How long an admin's approval of a replacement stays good. */
+export const REPLACEMENT_APPROVAL_MS = 24 * 60 * 60 * 1000;
+
+export const PC_ALREADY_ACTIVE = "PC_ALREADY_ACTIVE";
+
+/** What the setup wizard shows when a key is redeemed against a PC that is still running. */
+export const PC_ALREADY_ACTIVE_MESSAGE =
+  "This store already has an active PC. Use Replace PC on it, or ask an admin to allow a replacement.";
+
+export function pcAlreadyActive(): ControlPlaneError {
+  return new ControlPlaneError(409, PC_ALREADY_ACTIVE, PC_ALREADY_ACTIVE_MESSAGE);
+}
+
+/**
+ * `POST …/stores/:storeId/replacement-approval` (internal admin): let the next
+ * activation replace the PC that is running now. Expires in 24 hours, is used
+ * up by the activation that takes it, and is audited.
+ */
+export async function allowPcReplacement(admin: InternalAdminActor, organizationId: string, storeId: string) {
+  await requireStore(organizationId, storeId);
+  const allowedUntil = new Date(Date.now() + REPLACEMENT_APPROVAL_MS);
+  await TenantStoreModel.updateOne(
+    { organizationId, storeId },
+    { $set: { replacementAllowedUntil: allowedUntil, replacementAllowedByAdminId: admin.adminId } }
+  );
+  await auditAdmin(admin, {
+    organizationId,
+    storeId,
+    action: "installation.replacement_allowed",
+    targetType: "store",
+    targetId: storeId,
+    metadata: { allowedUntil: allowedUntil.toISOString(), expiresInMs: REPLACEMENT_APPROVAL_MS }
+  });
+  return { allowed: true, allowedUntil: allowedUntil.toISOString() };
+}
+
+/** The store's live replacement approval, or null. */
+export async function replacementApproval(storeId: string): Promise<{ allowedUntil: Date; adminId: string | null } | null> {
+  await connectDb();
+  const store = (await TenantStoreModel.findOne({ storeId }).lean()) as Doc | null;
+  const until = store?.replacementAllowedUntil ? new Date(String(store.replacementAllowedUntil)) : null;
+  if (!until || Number.isNaN(until.getTime()) || until.getTime() <= Date.now()) return null;
+  return { allowedUntil: until, adminId: store?.replacementAllowedByAdminId ? String(store.replacementAllowedByAdminId) : null };
+}
+
+/** Spend the approval: it allows the *next* activation, not every later one. */
+export async function clearReplacementApproval(storeId: string): Promise<void> {
+  await connectDb();
+  await TenantStoreModel.updateOne(
+    { storeId },
+    { $unset: { replacementAllowedUntil: 1, replacementAllowedByAdminId: 1 } }
+  );
+}
+
+// ── Telling the organization owner ───────────────────────────────────────────
+
+/**
+ * E-mail the organization owner that a store's PC was replaced, and audit the
+ * notice either way (`installation.replaced_notice`) so there is a record even
+ * where e-mail is not configured. Best effort: a replacement is never undone
+ * because a message could not be sent.
+ */
+export async function notifyOwnerOfReplacement(input: {
+  organizationId: string;
+  storeId: string;
+  workerInstallationId: string;
+  /** "activation" (a setup key redeemed on another PC) or "admin" (Replace PC in the console). */
+  by: "activation" | "admin";
+  actorType: AuditInput["actorType"];
+  actorId: string;
+  appUserId?: string | null;
+}): Promise<void> {
+  await connectDb();
+  const [org, store] = (await Promise.all([
+    OrganizationModel.findOne({ organizationId: input.organizationId }).lean(),
+    TenantStoreModel.findOne({ storeId: input.storeId }).lean()
+  ])) as [Doc | null, Doc | null];
+  const to = String(org?.billingEmail ?? store?.contactEmail ?? "").trim();
+  const organizationName = String(org?.name ?? "your organization");
+  const storeName = String(store?.name ?? input.storeId);
+
+  let delivered = false;
+  let error: string | null = null;
+  if (!to) {
+    error = "the organization has no owner e-mail address";
+  } else if (!isEmailConfigured()) {
+    error = "e-mail is not configured on this deployment";
+  } else {
+    try {
+      await getEmailProvider().sendInstallationReplaced({ to, organizationName, storeName, by: input.by, at: new Date() });
+      delivered = true;
+    } catch (failure) {
+      error = (failure instanceof Error ? failure.message : "delivery failed").slice(0, 300);
+    }
+  }
+
+  await writeAudit({
+    organizationId: input.organizationId,
+    storeId: input.storeId,
+    workerInstallationId: input.workerInstallationId,
+    actorType: input.actorType,
+    actorId: input.actorId,
+    action: "installation.replaced_notice",
+    targetType: "worker_installation",
+    targetId: input.workerInstallationId,
+    metadata: {
+      by: input.by,
+      notifiedOwner: delivered,
+      ...(to ? { sentTo: to } : {}),
+      ...(error ? { deliveryError: error } : {}),
+      ...(input.appUserId ? { appUserId: input.appUserId } : {})
+    }
+  });
 }
 
 /**
@@ -261,16 +465,25 @@ export async function rotateTunnelAfterReplace(storeId: string): Promise<{ tunne
   return { tunnelRotated: false, tunnelError };
 }
 
-export const ReleaseInstallationSchema = z.object({ confirm: z.literal("REPLACE_PC") }).strict();
+export const ReleaseInstallationSchema = z
+  .object({
+    confirm: z.literal("REPLACE_PC"),
+    /** Who pressed Replace PC on the store PC; stored as the actor of the release. */
+    appUserId: z.string().trim().min(1).max(80).optional()
+  })
+  .strict();
 
 /**
  * `POST /api/v1/edge/installation/release` (worker credential): the store PC
  * gives its installation up ("Replace PC" in the desktop app). Its credential
  * is revoked (so this call works once), the tunnel secret rotated and the
  * installation reset; the store's reusable key stays valid for the next PC.
- * No secret in the answer.
+ * No secret in the answer. `appUserId` names the person, not just the PC.
  */
-export async function releaseInstallation(worker: { organizationId: string; storeId: string; workerInstallationId: string; credentialId: string }) {
+export async function releaseInstallation(
+  worker: { organizationId: string; storeId: string; workerInstallationId: string; credentialId: string },
+  appUserId?: string | null
+) {
   await connectDb();
   // The calling PC's own credential only: a PC that redeemed the key since holds the installation
   // with a newer credential, and this release must not cut it off.
@@ -303,6 +516,7 @@ export async function releaseInstallation(worker: { organizationId: string; stor
       ...(reset ? {} : { replacedMeanwhile: true }),
       tunnelRotated,
       reusableKey: Boolean(key),
+      ...(appUserId ? { appUserId } : {}),
       ...(tunnelError ? { tunnelRotationRequired: true, tunnelError } : {})
     }
   });

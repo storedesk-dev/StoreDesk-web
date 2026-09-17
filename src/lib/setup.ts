@@ -6,7 +6,7 @@ import { auditAdmin } from "@/lib/audit";
 import { optionalEmail } from "@/lib/http";
 import { getEmailProvider, isEmailConfigured } from "@/lib/email-provider";
 import { SITE } from "@/lib/site";
-import { mintReusableKey, OPEN_KEY, resetInstallation } from "@/lib/store-setup-key";
+import { mintReusableKey, notifyOwnerOfReplacement, OPEN_KEY, resetInstallation } from "@/lib/store-setup-key";
 import { requireOrganization } from "@/lib/organizations";
 import { installationSummary, requireStore } from "@/lib/tenant-stores";
 import { coverageFor, expireLapsedLicenses, licenseProblem, licenseSummary } from "@/lib/licenses";
@@ -358,6 +358,16 @@ export async function replaceStorePc(
       ...(tunnelError ? { tunnelRotationRequired: true, tunnelError } : {})
     }
   });
+  // The organization owner hears about every replacement, including this one.
+  await notifyOwnerOfReplacement({
+    organizationId,
+    storeId,
+    workerInstallationId,
+    by: "admin",
+    actorType: "internal_admin",
+    actorId: admin.adminId
+  }).catch(() => undefined);
+
   const [fresh, store] = await Promise.all([
     WorkerInstallationModel.findOne({ workerInstallationId }).lean(),
     requireStore(organizationId, storeId)

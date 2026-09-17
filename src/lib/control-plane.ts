@@ -26,7 +26,14 @@ import {
 import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
 import { DEFAULT_ORG_ROLES } from "@/lib/roles";
 import { loadNotifyTargets, notifyInstallations, runAfterResponse, scheduleAppUserNotify, type NotifyTarget } from "@/lib/store-notify";
-import { rotateTunnelAfterReplace } from "@/lib/store-setup-key";
+import {
+  clearReplacementApproval,
+  notifyOwnerOfReplacement,
+  pcAlreadyActive,
+  prepareReusableKey,
+  replacementApproval,
+  rotateTunnelAfterReplace
+} from "@/lib/store-setup-key";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
 import { coverageFor, coveringLicense, licenseProblem } from "@/lib/licenses";
@@ -58,10 +65,23 @@ const REDEEMABLE = ["queued", "shown", "sent", "delivery_failed"];
  * acknowledgements as `true`. Other unknown fields are ignored.
  *
  * Reusable keys (every key issued since 2026-09-17, lib/store-setup-key.ts)
- * never expire and are not used up: each redeem activates the key's
- * installation on the calling PC. A PC that held it is replaced — its
- * credential revoked in the transaction, a signed notify sent to it, and the
- * tunnel secret rotated so the response carries a token it never had.
+ * never expire, and each redeem activates the key's installation on the
+ * calling PC.
+ *
+ * **Every successful redeem rotates the key.** The key that was shown is
+ * consumed and the next reusable key is minted in the same transaction, so a
+ * key somebody saw once cannot be kept and used later. The PC that just
+ * activated reads the new key with its worker credential
+ * (`GET /api/v1/edge/setup-key`), and an admin reads it in the console — the
+ * owner's flow (read key → Replace PC → activate) is unchanged.
+ *
+ * **A live PC is not replaced silently.** Redeeming while the installation is
+ * live is refused `409 PC_ALREADY_ACTIVE` unless that PC released itself
+ * (Replace PC ran, so the installation is `awaiting_activation`) or an admin
+ * allowed the next activation to replace it. When the replacement does happen,
+ * the old credential is revoked in the transaction, a signed notify is sent to
+ * that PC, the tunnel secret is rotated so the response carries a token it
+ * never had, and the organization owner is e-mailed.
  *
  * Safe re-redeem (single-use keys): the same key may be redeemed again within 15 minutes of its
  * first redeem, for the installation it bound, while that installation's live
@@ -143,6 +163,15 @@ export async function redeemSetupKey(body: RedeemBody) {
   // re-redeem); the installation checks below decide whether this is that case.
   const reRedeem = !reusable && key.status === "consumed";
   if (reusable) {
+    // A reusable key is rotated by the redeem that spends it, so a second
+    // redeem of the *same* key is a key somebody kept — never an expiry.
+    if (key.status === "consumed") {
+      throw new ControlPlaneError(
+        409,
+        "SETUP_KEY_ROTATED",
+        "This setup key has already been used. Read the store's current setup key and use that one."
+      );
+    }
     if (!REDEEMABLE.includes(String(key.status))) {
       throw new ControlPlaneError(410, "SETUP_KEY_EXPIRED", "Setup key has expired");
     }
@@ -194,6 +223,7 @@ export async function redeemSetupKey(body: RedeemBody) {
   let previousCredentialId: string | null = null;
   // Reusable key: the PC that holds the installation now (if any) is replaced.
   let replacedLivePc = false;
+  let approvedByAdminId: string | null = null;
   let replacedTargets: NotifyTarget[] = [];
   if (reusable) {
     // The key decides the installation; a PC that knew another installation is simply set up again.
@@ -203,6 +233,13 @@ export async function redeemSetupKey(body: RedeemBody) {
       : null;
     replacedLivePc = LIVE_INSTALLATION.includes(String(installation.status)) && current?.status === "active";
     if (replacedLivePc) {
+      // A live PC is replaced only deliberately: either it released itself
+      // (then it is `awaiting_activation` and we are not here), or an admin
+      // allowed this replacement. Otherwise anyone who once saw a key could
+      // take the store over.
+      const approval = await replacementApproval(String(key.storeId));
+      if (!approval) throw pcAlreadyActive();
+      approvedByAdminId = approval.adminId;
       // Loaded before its credential is revoked: the notify is signed with that PC's relay key.
       replacedTargets = await loadNotifyTargets({
         organizationId: String(key.organizationId),
@@ -229,6 +266,20 @@ export async function redeemSetupKey(body: RedeemBody) {
     throw alreadyBound();
   }
 
+  // The key this redeem replaces. Issued and argon2id-hashed *before* the
+  // transaction opens: hashing inside one would hold it open for as long as
+  // argon2id takes.
+  const nextKey = reusable
+    ? await prepareReusableKey({
+        organizationId: String(key.organizationId),
+        storeId: String(key.storeId),
+        workerInstallationId: String(key.workerInstallationId),
+        contactEmail: String(key.contactEmail),
+        status: "shown",
+        deliveryReason: "activation_rotate"
+      })
+    : null;
+
   // ── Atomic activation ────────────────────────────────────────────────────
   // Everything from here commits together or not at all, so a failure never
   // leaves the key burned with no credential issued.
@@ -243,7 +294,12 @@ export async function redeemSetupKey(body: RedeemBody) {
     const consume = reusable
       ? await SetupKeyModel.findOneAndUpdate(
           { keyId: key.keyId, reusable: true, status: { $in: REDEEMABLE } },
-          { $set: { lastRedeemedAt: new Date() }, $min: { consumedAt: new Date() }, $inc: { attempts: 1, redeemCount: 1 } },
+          {
+            // Spent: the successor minted below is the store's key from now on.
+            $set: { status: "consumed", lastRedeemedAt: new Date() },
+            $min: { consumedAt: new Date() },
+            $inc: { attempts: 1, redeemCount: 1 }
+          },
           { returnDocument: "after", ...withSession(session) }
         )
       : reRedeem
@@ -258,6 +314,11 @@ export async function redeemSetupKey(body: RedeemBody) {
           { returnDocument: "after", ...withSession(session) }
         );
     if (!consume) throw keyConsumed();
+
+    // The next key, in the same transaction: the store is never without one.
+    if (nextKey) {
+      await SetupKeyModel.create([nextKey.doc], withSession(session));
+    }
 
     await EulaAcceptanceModel.create(
       [
@@ -338,6 +399,11 @@ export async function redeemSetupKey(body: RedeemBody) {
     throw error;
   }
 
+  // The approval allowed *this* activation, not every later one.
+  if (replacedLivePc) {
+    await clearReplacementApproval(String(key.storeId)).catch(() => undefined);
+  }
+
   // A replaced PC can still serve the store's tunnel: rotate its secret so only
   // this PC gets the new token (below). Also when an earlier rotation failed.
   let tunnelRotated = false;
@@ -376,11 +442,32 @@ export async function redeemSetupKey(body: RedeemBody) {
       workerCredentialId: credential.credentialId,
       ...(reRedeem || (reusable && previousCredentialId) ? { previousCredentialId } : {}),
       ...(reusable
-        ? { reusable: true, replacedPc: replacedLivePc, tunnelRotated, ...(tunnelError ? { tunnelRotationRequired: true, tunnelError } : {}) }
+        ? {
+            reusable: true,
+            replacedPc: replacedLivePc,
+            // The key is rotated by the redeem that spends it.
+            rotatedToKeyId: nextKey?.keyId ?? null,
+            nextKeyReadable: nextKey?.readable ?? null,
+            ...(replacedLivePc ? { approvedByAdminId } : {}),
+            tunnelRotated,
+            ...(tunnelError ? { tunnelRotationRequired: true, tunnelError } : {})
+          }
         : {}),
       contactEmail: key.contactEmail
     }
   });
+
+  // The organization owner hears about every replacement, even one it asked for.
+  if (replacedLivePc) {
+    await notifyOwnerOfReplacement({
+      organizationId: String(key.organizationId),
+      storeId: String(key.storeId),
+      workerInstallationId: String(key.workerInstallationId),
+      by: "activation",
+      actorType: "system",
+      actorId: "setup_flow"
+    }).catch(() => undefined);
+  }
 
   // The tunnel token and URL live on the Store, not the Installation.
   return {

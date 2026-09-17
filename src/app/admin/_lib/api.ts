@@ -628,6 +628,13 @@ export const api = {
     request<{ keyId: string; setupKey: string; readable: boolean; workerInstallationId: string }>("POST", `${store(orgId, storeId)}/setup-keys/rotate`, {}),
   replacePc: (orgId: string, storeId: string) =>
     request<{ installation: StoreInstallationSummary }>("POST", `${store(orgId, storeId)}/replace-pc`),
+  /**
+   * Let the next activation with this store's setup key take over from the PC
+   * that is running now. Expires in 24 h, used up by that activation, audited
+   * `installation.replacement_allowed`.
+   */
+  allowPcReplacement: (orgId: string, storeId: string) =>
+    request<{ allowed: true; allowedUntil: string }>("POST", `${store(orgId, storeId)}/replacement-approval`),
   retryTunnel: (orgId: string, storeId: string) =>
     request<{ tunnel: StoreTunnel }>("POST", `${store(orgId, storeId)}/tunnel`),
 
@@ -722,6 +729,7 @@ export const ADMIN_ROUTES = [
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/setup-keys/current",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/setup-keys/rotate",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/replace-pc",
+  "POST   /api/v1/admin/organizations/{org}/stores/{store}/replacement-approval",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/tunnel",
   "GET    /api/v1/admin/organizations/{org}/stores/{store}/support-codes",
   "POST   /api/v1/admin/organizations/{org}/stores/{store}/support-codes",

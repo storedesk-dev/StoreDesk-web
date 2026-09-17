@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Eye, KeyRound, Mail, RefreshCw, Replace, RotateCw } from "lucide-react";
+import { Eye, KeyRound, Mail, RefreshCw, Replace, RotateCw, ShieldCheck } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
 import { api, errorMessage, type IssuedSetupKey, type SetupKeyStatus } from "../../../../../_lib/api";
 import { formatDateTime, relativeTime } from "../../../../../_lib/format";
@@ -41,6 +41,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
   const [revealing, setRevealing] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [allowing, setAllowing] = useState(false);
 
   if (error && !data) return <ErrorBanner error={error} onRetry={reload} />;
   if (loading && !data) return <Spinner />;
@@ -97,6 +98,24 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
       toast(errorMessage(e, "Couldn't create the tunnel."), "error");
     } finally {
       setRetrying(false);
+    }
+  }
+
+  /**
+   * A setup key no longer replaces a running PC on its own. The normal path is
+   * Replace PC on the store PC itself; this is the recovery path when that PC
+   * is dead, stolen or unreachable. Good for one activation, 24 hours.
+   */
+  async function allowReplacement() {
+    setAllowing(true);
+    try {
+      const res = await api.allowPcReplacement(orgId, storeId);
+      toast(`The next activation may replace this PC (until ${formatDateTime(res.allowedUntil)})`, "success");
+      void reload();
+    } catch (e) {
+      toast(errorMessage(e, "Couldn't allow a replacement."), "error");
+    } finally {
+      setAllowing(false);
     }
   }
 
@@ -173,12 +192,24 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
           <Button icon={<RotateCw className="h-4 w-4" />} disabled={!data.installation} onClick={() => setRotating(true)}>
             Rotate key
           </Button>
+          <Button
+            icon={<ShieldCheck className="h-4 w-4" />}
+            busy={allowing}
+            disabled={!active || allowing}
+            title="Let one activation take over from the PC that is running now (24 hours)"
+            onClick={allowReplacement}
+          >
+            Allow a replacement
+          </Button>
           <Button variant="danger-ghost" icon={<Replace className="h-4 w-4" />} disabled={!data.installation} onClick={() => setReplacing(true)}>
             Replace this PC
           </Button>
         </div>
         {active ? (
-          <p className="mt-2 text-[13px] text-slate-500">This store&apos;s PC is active. The setup key moves StoreDesk to another PC: the new PC takes over.</p>
+          <p className="mt-2 text-[13px] text-slate-500">
+            This store&apos;s PC is active, so the setup key alone will not move StoreDesk to another PC. Use Replace PC on the store PC
+            itself, or allow a replacement here for one activation.
+          </p>
         ) : data.setupKey && ["shown", "sent", "queued"].includes(data.setupKey.status) ? (
           <p className="mt-2 text-[13px] text-slate-500">Issuing a new key cancels the earlier unused one.</p>
         ) : null}
