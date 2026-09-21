@@ -143,6 +143,133 @@ export interface LotteryClaim {
 }
 
 /**
+ * Give this PC the store's lottery installation: revoke whatever credential the installation had,
+ * issue a new one, and name the PC. Shared by the two ways in — a setup key, or the store's own
+ * StoreDesk Service vouching for it — because everything after "which store, and may it?" is the same.
+ */
+async function claimInstallation(input: {
+  organizationId: string;
+  storeId: string;
+  workerInstallationId: string;
+  deviceName: string;
+  appVersion?: string;
+  keyId: string | null;
+  via: "setup_key" | "storedesk_service";
+  actorId: string;
+}) {
+  const { organizationId, storeId, workerInstallationId } = input;
+  const installation = (await WorkerInstallationModel.findOne({ workerInstallationId }).lean()) as Doc | null;
+  if (!installation) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Installation not found");
+
+  const previous = (await WorkerCredentialModel.findOne({ workerInstallationId, status: "active" }).lean()) as Doc | null;
+  const replacedPc = previous !== null && LIVE.includes(String(installation.status));
+
+  const credential = issueWorkerCredential();
+  const now = new Date();
+
+  if (previous) {
+    await WorkerCredentialModel.updateOne(
+      { credentialId: previous.credentialId },
+      { $set: { status: "revoked", revokedAt: now } }
+    );
+  }
+  await WorkerCredentialModel.create({
+    credentialId: credential.credentialId,
+    secretHash: await hashSecret(credential.secret),
+    // Stored because every credential has one, and never returned: the lottery app makes its own
+    // sessions locally and has no use for it.
+    relayKey: issueRelayKey(),
+    keyId: input.keyId ?? `vouched_${input.workerInstallationId}`,
+    organizationId,
+    storeId,
+    workerInstallationId,
+    status: "active",
+    issuedAt: now
+  });
+  await WorkerInstallationModel.updateOne(
+    { workerInstallationId },
+    {
+      $set: {
+        status: "active",
+        workerCredentialId: credential.credentialId,
+        activatedAt: now,
+        workerName: input.deviceName,
+        ...(input.appVersion ? { workerVersion: input.appVersion } : {})
+      }
+    }
+  );
+
+  await writeAudit({
+    organizationId,
+    storeId,
+    workerInstallationId,
+    actorType: "system",
+    actorId: input.actorId,
+    action: replacedPc ? "lottery.installation.move" : "lottery.installation.claim",
+    targetType: "worker_installation",
+    targetId: workerInstallationId,
+    metadata: { deviceName: input.deviceName, replacedPc, via: input.via }
+  });
+
+  return { credential, replacedPc };
+}
+
+/**
+ * The store's StoreDesk Service vouches for this PC, so nobody types anything.
+ *
+ * A store that already runs StoreDesk has proved who it is once: its service holds a worker
+ * credential for exactly one store. When the lottery app finds that service and it answers for the
+ * same store, a setup key would only be ceremony. The key path stays for a lottery-only store, which
+ * has no service to vouch for it.
+ *
+ * The caller is the service, not the app: the credential never leaves the service's process, and the
+ * service's own routes are behind its session gate, so a signed-in person is what starts this.
+ */
+export async function claimLotteryForWorker(
+  worker: { organizationId: string; storeId: string; workerInstallationId: string },
+  input: { deviceName: string; appVersion?: string }
+) {
+  await connectDb();
+  const { store, coverage } = await loadStore(worker.organizationId, worker.storeId);
+  const workerInstallationId = await installationFor(
+    worker.organizationId,
+    worker.storeId,
+    String(store.contactEmail ?? "lottery@storedesk.invalid")
+  );
+
+  const { credential, replacedPc } = await claimInstallation({
+    organizationId: worker.organizationId,
+    storeId: worker.storeId,
+    workerInstallationId,
+    deviceName: input.deviceName,
+    ...(input.appVersion ? { appVersion: input.appVersion } : {}),
+    keyId: null,
+    via: "storedesk_service",
+    actorId: worker.workerInstallationId
+  });
+
+  return {
+    contractVersion: CONTRACT_VERSION,
+    workerCredential: credential.plaintext,
+    workerCredentialId: credential.credentialId,
+    organizationId: worker.organizationId,
+    storeId: worker.storeId,
+    workerInstallationId,
+    replacedPc,
+    store: {
+      name: String(store.name),
+      storeNumber: store.storeNumber ? String(store.storeNumber) : null,
+      timeZone: normalizeStoreSettings(store.settings).timeZone
+    },
+    licence: {
+      number: coverage.license ? String(coverage.license.licenseNumber) : null,
+      scope: coverage.license ? String(coverage.license.scope) : null,
+      status: coverage.license ? String(coverage.license.status) : null
+    }
+  };
+}
+
+/**
  * Claim this PC for the store the key belongs to.
  *
  * A PC that already holds the store is replaced: the person was shown which PC that is and chose to
@@ -176,62 +303,17 @@ export async function redeemLotterySetupKey(input: LotteryClaim) {
   // Re-checked at claim, not only at issue: a licence can lapse or the switch can go off in between.
   const { store, coverage } = await loadStore(organizationId, storeId);
 
-  const previous = (await WorkerCredentialModel.findOne({
+  const { credential, replacedPc } = await claimInstallation({
+    organizationId,
+    storeId,
     workerInstallationId,
-    status: "active"
-  }).lean()) as Doc | null;
-  const replacedPc = previous !== null && LIVE.includes(String(installation.status));
-
-  const credential = issueWorkerCredential();
-  const now = new Date();
-
-  if (previous) {
-    await WorkerCredentialModel.updateOne(
-      { credentialId: previous.credentialId },
-      { $set: { status: "revoked", revokedAt: now } }
-    );
-  }
-  await WorkerCredentialModel.create({
-    credentialId: credential.credentialId,
-    secretHash: await hashSecret(credential.secret),
-    // Stored because every credential has one, and never returned: the lottery app makes its own
-    // sessions locally and has no use for it.
-    relayKey: issueRelayKey(),
+    deviceName: input.deviceName,
+    ...(input.appVersion ? { appVersion: input.appVersion } : {}),
     keyId,
-    organizationId,
-    storeId,
-    workerInstallationId,
-    status: "active",
-    issuedAt: now
+    via: "setup_key",
+    actorId: "setup_flow"
   });
-  await WorkerInstallationModel.updateOne(
-    { workerInstallationId },
-    {
-      $set: {
-        status: "active",
-        workerCredentialId: credential.credentialId,
-        activatedAt: now,
-        workerName: input.deviceName,
-        ...(input.appVersion ? { workerVersion: input.appVersion } : {})
-      }
-    }
-  );
-  await SetupKeyModel.updateOne(
-    { keyId },
-    { $set: { lastRedeemedAt: now }, $inc: { redeemCount: 1 } }
-  );
-
-  await writeAudit({
-    organizationId,
-    storeId,
-    workerInstallationId,
-    actorType: "system",
-    actorId: "setup_flow",
-    action: replacedPc ? "lottery.installation.move" : "lottery.installation.claim",
-    targetType: "worker_installation",
-    targetId: workerInstallationId,
-    metadata: { deviceName: input.deviceName, replacedPc }
-  });
+  await SetupKeyModel.updateOne({ keyId }, { $set: { lastRedeemedAt: new Date() }, $inc: { redeemCount: 1 } });
 
   return {
     contractVersion: CONTRACT_VERSION,

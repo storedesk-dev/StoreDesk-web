@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setupMemoryMongo } from "./helpers/mongo";
-import { call, createAdmin, lastAudit, request, seedOrganization } from "./helpers/api";
+import { activatePc, call, createAdmin, lastAudit, request, seedOrganization } from "./helpers/api";
 import { LicenseModel, SetupKeyModel, WorkerCredentialModel, WorkerInstallationModel } from "@/models/ControlPlane";
 import { getStoreSettings, updateStoreSettings } from "@/lib/tenant-stores";
 import {
@@ -9,6 +9,7 @@ import {
   POST as issueLotteryKey
 } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/lottery/setup-keys/route";
 import { POST as claim } from "@/app/api/v1/lottery/setup-keys/redeem/route";
+import { POST as vouchedClaim } from "@/app/api/v1/edge/lottery/claim/route";
 import { POST as issueStoreDeskKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => ({
@@ -188,5 +189,68 @@ describe("claiming a PC with the key", () => {
     await redeem(key, "TWO");
     const row = await SetupKeyModel.findOne({ storeId: params.storeId }).lean();
     expect(row?.redeemCount).toBe(2);
+  });
+});
+
+describe("a store that already runs StoreDesk types nothing", () => {
+  it("claims the lottery PC on its own service's word, with no setup key", async () => {
+    await enableLottery();
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const res = await call(
+      vouchedClaim,
+      request("POST", "/", { token: pc.token, body: { deviceName: "COUNTER-PC" } }),
+      {}
+    );
+    expect(res.status).toBe(201);
+    expect(res.body.workerCredential).toMatch(/^wcred_[a-f0-9]{32}\./);
+    expect(res.body.storeId).toBe(params.storeId);
+    expect(res.body.replacedPc).toBe(false);
+    expect(await SetupKeyModel.countDocuments({ storeId: params.storeId })).toBe(0);
+  });
+
+  it("gives the lottery PC its own installation, separate from the StoreDesk one", async () => {
+    await enableLottery();
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const res = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: { deviceName: "COUNTER-PC" } }), {});
+    expect(res.body.workerInstallationId).not.toBe(pc.workerInstallationId);
+    const lottery = await WorkerInstallationModel.findOne({ storeId: params.storeId, product: "lottery" }).lean();
+    expect(lottery).toMatchObject({ status: "active", workerName: "COUNTER-PC" });
+    const storedesk = await WorkerInstallationModel.findOne({ workerInstallationId: pc.workerInstallationId }).lean();
+    expect(storedesk?.status).toBe("active");
+  });
+
+  it("never hands the lottery PC a tunnel token or a relay key either", async () => {
+    await enableLottery();
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const res = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: { deviceName: "COUNTER-PC" } }), {});
+    const text = JSON.stringify(res.body);
+    expect(text).not.toContain("relayKey");
+    expect(text).not.toContain("cloudflareToken");
+    expect(text).not.toContain("tunnelUrl");
+  });
+
+  it("still refuses a store that is not switched on for the app", async () => {
+    await enableLottery(false);
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const res = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: { deviceName: "COUNTER-PC" } }), {});
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("LOTTERY_APP_DISABLED");
+  });
+
+  it("refuses anyone without the store's credential", async () => {
+    await enableLottery();
+    const res = await call(vouchedClaim, request("POST", "/", { body: { deviceName: "COUNTER-PC" } }), {});
+    expect(res.status).toBe(401);
+  });
+
+  it("moves the setup when a second PC is vouched for", async () => {
+    await enableLottery();
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const first = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: { deviceName: "OLD-PC" } }), {});
+    const second = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: { deviceName: "NEW-PC" } }), {});
+    expect(second.body.replacedPc).toBe(true);
+    const old = await WorkerCredentialModel.findOne({ credentialId: first.body.workerCredentialId }).lean();
+    expect(old?.status).toBe("revoked");
+    expect(await lastAudit("lottery.installation.move")).toMatchObject({ metadata: { via: "storedesk_service" } });
   });
 });
