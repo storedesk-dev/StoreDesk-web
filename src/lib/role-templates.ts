@@ -59,8 +59,8 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       "mobileReports",
       "mobileSettings"
     ],
-    // Everything in the lottery app, including correcting a day already closed.
-    lottery: ["lottery", "lotteryClose", "lotteryCorrect", "lotteryReports"],
+    // Everything in the lottery app, including correcting a closed shift and its settings.
+    lottery: ["lottery", "lotteryClose", "lotteryCorrect", "lotteryReports", "lotterySettings"],
     // Report mapping is a section inside Settings.
     flags: { settings: { reportMapping: true } }
   },

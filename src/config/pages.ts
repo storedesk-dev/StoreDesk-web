@@ -333,9 +333,19 @@ export const ALL_PAGES: PageDefinition[] = [
   {
     key: "lotteryReports",
     label: "Lottery reports",
-    description: "The closed days, which price points earn their rack space, what to order, and the link to StoreDesk.",
+    description: "Shift reports, the daily report, best sellers, which price points earn their rack space, what to order, and the link to StoreDesk.",
     app: "lottery",
     filePath: "src/pages/Reports.tsx",
+    defaultEnabled: false,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
+    key: "lotterySettings",
+    label: "Lottery settings",
+    description: "Slots, commission, the settlement rule, auto-settle, where a new pack starts, and the idle lock.",
+    app: "lottery",
+    filePath: "src/pages/Settings.tsx",
     defaultEnabled: false,
     requiresCapability: "lottery",
     knownFeatureFlags: {}

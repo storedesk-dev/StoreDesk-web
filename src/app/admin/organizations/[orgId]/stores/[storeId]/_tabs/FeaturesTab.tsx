@@ -21,19 +21,12 @@ const FEATURES: Array<{ key: StoreCapability; label: string; description: string
   { key: "prepaidGift", label: "Sells prepaid and gift cards", description: "One bucket for phone cards, prepaid cards and gift cards." }
 ];
 
-const LOTTERY_MODES = [
-  "Daily totals from the Google Sheet",
-  "Scratch-off inventory by pack",
-  "Online and instant sales from the lottery terminal report"
-];
-
 type Answer = boolean | null;
 type Draft = { caps: Record<StoreCapability, Answer>; googleSheets: boolean; lotteryApp: boolean };
 
 export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const settings = useStoreSettings(orgId, storeId);
   const [draft, setDraft] = useState<Draft>({ caps: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null }, googleSheets: false, lotteryApp: false });
-  const lotteryNote = useId();
 
   const saved: Draft | null = settings.data
     ? {
@@ -112,24 +105,6 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
                     onChange={(v) => setDraft((d) => ({ ...d, lotteryApp: v }))}
                   />
                 </div>
-              ) : null}
-              {f.key === "lottery" && draft.caps.lottery === true ? (
-                <fieldset disabled aria-describedby={lotteryNote} className="ml-12 mt-3 rounded-md border border-slate-200 bg-slate-50/70 p-3">
-                  <legend className="flex items-center gap-2 px-1 text-[13px] font-semibold text-slate-700">
-                    Lottery setup <Chip tone="blue">Coming soon</Chip>
-                  </legend>
-                  <p id={lotteryNote} className="mb-2 text-xs text-slate-500">
-                    How lottery gets recorded. These choices open in a later release.
-                  </p>
-                  <div className="space-y-1.5">
-                    {LOTTERY_MODES.map((mode, i) => (
-                      <label key={mode} className="flex cursor-not-allowed items-center gap-2 text-sm text-slate-500">
-                        <input type="radio" name="lottery-mode" value={i} className="h-4 w-4" disabled />
-                        {mode}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
               ) : null}
             </li>
           ))}

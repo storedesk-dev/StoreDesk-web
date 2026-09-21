@@ -267,6 +267,14 @@ export interface StoreSetup {
   keyBlockedCode?: string | null;
 }
 
+export interface LotteryPc {
+  workerInstallationId: string;
+  status: string;
+  deviceName: string | null;
+  activatedAt: string | null;
+  hasOpenKey: boolean;
+}
+
 export interface IssuedSetupKey {
   /** Present only for `deliver: "show"`. A reusable key can be shown again with "Show key". */
   setupKey?: string;
@@ -627,6 +635,12 @@ export const api = {
     request<StoreSetup>("GET", `${store(orgId, storeId)}/setup`),
   issueSetupKey: (orgId: string, storeId: string, deliver: "show" | "email") =>
     request<IssuedSetupKey>("POST", `${store(orgId, storeId)}/setup-keys`, { deliver }),
+  /** The store's StoreDesk Lottery PC, if one is set up. */
+  getLotteryPc: (orgId: string, storeId: string) =>
+    request<{ installation: LotteryPc | null }>("GET", `${store(orgId, storeId)}/lottery/setup-keys`),
+  /** Audited `lottery.setup_key.issue`. The key is in this answer only. */
+  issueLotterySetupKey: (orgId: string, storeId: string) =>
+    request<{ setupKey: string; keyId: string; storeName: string }>("POST", `${store(orgId, storeId)}/lottery/setup-keys`, {}),
   /** Audited `setup_key.reveal`; call only on an explicit click. */
   revealSetupKey: (orgId: string, storeId: string) =>
     request<{ keyId: string; setupKey: string; workerInstallationId: string }>("GET", `${store(orgId, storeId)}/setup-keys/current`),

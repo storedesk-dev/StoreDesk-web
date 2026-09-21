@@ -20,6 +20,7 @@ import {
 import { PcChip, RemoteChip, TunnelChip } from "../../../../../_components/status";
 import type { StoreTabProps } from "./shared";
 import { SupportCodeCard } from "./SupportCodeCard";
+import { LotteryPcCard } from "./LotteryPcCard";
 
 const KEY_STATUS: Record<SetupKeyStatus, string> = {
   queued: "being sent",
@@ -243,6 +244,8 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
       </Card>
 
       <SupportCodeCard orgId={orgId} storeId={storeId} />
+
+      <LotteryPcCard orgId={orgId} storeId={storeId} />
 
       <Card title="Phones" description="Phones reach the store PC through StoreDesk's secure tunnel.">
         <DefinitionList
