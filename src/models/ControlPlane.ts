@@ -141,7 +141,11 @@ const StoreSettingsSchema = new Schema(
     },
     lottery: {
       // The recording choices are "Coming soon"; null until one ships.
-      setupMode: { type: String, default: null }
+      setupMode: { type: String, default: null },
+      // Whether this store may run the StoreDesk Lottery app. Separate from the `lottery`
+      // capability, which only says the store sells lottery: a store can sell it and keep its
+      // own book. Only a store with this on can set a lottery PC up.
+      appEnabled: { type: Boolean, default: false }
     },
     integrations: {
       googleSheets: {

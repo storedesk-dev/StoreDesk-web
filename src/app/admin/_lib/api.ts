@@ -204,7 +204,7 @@ export type CapabilityAnswers = Record<StoreCapability, boolean | null>;
 
 export interface StoreSettings {
   capabilities: CapabilityAnswers;
-  lottery: { setupMode: null };
+  lottery: { setupMode: null; appEnabled: boolean };
   integrations: {
     googleSheets: {
       /** The admin's switch; the only field the admin saves. */

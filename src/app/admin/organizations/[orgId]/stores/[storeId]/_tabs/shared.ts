@@ -28,7 +28,7 @@ export function withDefaults(s: Partial<StoreSettings> | null | undefined): Stor
       moneyOrder: answer(s?.capabilities?.moneyOrder),
       prepaidGift: answer(s?.capabilities?.prepaidGift)
     },
-    lottery: { setupMode: null },
+    lottery: { setupMode: null, appEnabled: Boolean(s?.lottery?.appEnabled) },
     integrations: {
       googleSheets: {
         enabled: Boolean(gs?.enabled),

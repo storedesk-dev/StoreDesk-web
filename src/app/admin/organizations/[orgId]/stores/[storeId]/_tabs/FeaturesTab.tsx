@@ -28,22 +28,27 @@ const LOTTERY_MODES = [
 ];
 
 type Answer = boolean | null;
-type Draft = { caps: Record<StoreCapability, Answer>; googleSheets: boolean };
+type Draft = { caps: Record<StoreCapability, Answer>; googleSheets: boolean; lotteryApp: boolean };
 
 export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const settings = useStoreSettings(orgId, storeId);
-  const [draft, setDraft] = useState<Draft>({ caps: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null }, googleSheets: false });
+  const [draft, setDraft] = useState<Draft>({ caps: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null }, googleSheets: false, lotteryApp: false });
   const lotteryNote = useId();
 
   const saved: Draft | null = settings.data
-    ? { caps: settings.data.settings.capabilities, googleSheets: settings.data.settings.integrations.googleSheets.enabled }
+    ? {
+        caps: settings.data.settings.capabilities,
+        googleSheets: settings.data.settings.integrations.googleSheets.enabled,
+        lotteryApp: settings.data.settings.lottery.appEnabled
+      }
     : null;
 
   useEffect(() => {
     if (settings.data) {
       setDraft({
         caps: settings.data.settings.capabilities,
-        googleSheets: settings.data.settings.integrations.googleSheets.enabled
+        googleSheets: settings.data.settings.integrations.googleSheets.enabled,
+        lotteryApp: settings.data.settings.lottery.appEnabled
       });
     }
   }, [settings.data]);
@@ -53,13 +58,18 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
 
   // Every answer "no" and settings never saved: the old default, not the owner's answer.
   const looksUntouched = settings.data.settingsVersion === 1 && FEATURES.every((f) => saved.caps[f.key] === false);
-  const dirty = FEATURES.some((f) => draft.caps[f.key] !== saved.caps[f.key]) || draft.googleSheets !== saved.googleSheets;
+  const dirty =
+    FEATURES.some((f) => draft.caps[f.key] !== saved.caps[f.key]) ||
+    draft.googleSheets !== saved.googleSheets ||
+    draft.lotteryApp !== saved.lotteryApp;
 
   function save() {
     void settings.save(
       (s) => ({
         ...s,
         capabilities: draft.caps,
+        // Switched off with the capability: a store that does not sell lottery cannot run the app.
+        lottery: { ...s.lottery, appEnabled: draft.caps.lottery === true && draft.lotteryApp },
         integrations: { ...s.integrations, googleSheets: { ...s.integrations.googleSheets, enabled: draft.googleSheets } }
       }),
       "Features saved"
@@ -92,6 +102,17 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
                 value={draft.caps[f.key]}
                 onChange={(v) => setDraft((d) => ({ ...d, caps: { ...d.caps, [f.key]: v } }))}
               />
+              {f.key === "lottery" && draft.caps.lottery === true ? (
+                <div className="ml-12 mt-3">
+                  <SwitchRow
+                    id="lottery-app"
+                    label="StoreDesk Lottery app"
+                    description="Let this store set a PC up for the lottery app: the rack, the shift close and its reports."
+                    checked={draft.lotteryApp}
+                    onChange={(v) => setDraft((d) => ({ ...d, lotteryApp: v }))}
+                  />
+                </div>
+              ) : null}
               {f.key === "lottery" && draft.caps.lottery === true ? (
                 <fieldset disabled aria-describedby={lotteryNote} className="ml-12 mt-3 rounded-md border border-slate-200 bg-slate-50/70 p-3">
                   <legend className="flex items-center gap-2 px-1 text-[13px] font-semibold text-slate-700">

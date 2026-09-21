@@ -52,7 +52,7 @@ describe("GET …/settings", () => {
     expect(res.body).toEqual({
       settings: {
         capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
-        lottery: { setupMode: null },
+        lottery: { setupMode: null, appEnabled: false },
         integrations: {
           googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
           gtc: { status: "coming_soon" }
@@ -96,6 +96,34 @@ describe("PUT …/settings", () => {
     expect(audit).toMatchObject({ storeId: params.storeId, actorId: admin.adminId });
     expect(audit?.metadata).toMatchObject({ changed: ["capabilities"], settingsVersion: 2 });
     expect(scheduleNotify).toHaveBeenCalledWith({ ...params, reason: "store.settings.update" });
+  });
+
+  it("switches the lottery app on for a store, separately from whether it sells lottery", async () => {
+    const res = await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true } } });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.lottery).toEqual({ setupMode: null, appEnabled: true });
+    // The capability is untouched: selling lottery and running the app are two different answers.
+    expect(res.body.settings.capabilities.lottery).toBeNull();
+    const audit = await lastAudit("store.settings.update");
+    expect(audit?.metadata).toMatchObject({ changed: ["lottery"] });
+  });
+
+  it("keeps the lottery app switch across an unrelated save", async () => {
+    await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true } } });
+    const later = await put({ settingsVersion: 2, settings: { timeZone: "America/New_York" } });
+    expect(later.body.settings.lottery.appEnabled).toBe(true);
+  });
+
+  it("turns the lottery app back off", async () => {
+    await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true } } });
+    const off = await put({ settingsVersion: 2, settings: { lottery: { appEnabled: false } } });
+    expect(off.body.settings.lottery.appEnabled).toBe(false);
+  });
+
+  it("refuses an unknown key in the lottery section", async () => {
+    const res = await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true, rackSize: 50 } } });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("REQUEST_INVALID");
   });
 
   it("answers 409 SETTINGS_VERSION_CONFLICT with the current settings for a stale version", async () => {
@@ -192,7 +220,7 @@ describe("what the store receives, and suspension (P12)", () => {
       // Not answered: the store server reads null as present, so nothing is hidden.
       capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
       settingsVersion: 1,
-      settings: { lottery: { setupMode: null }, timeZone: null }
+      settings: { lottery: { setupMode: null, appEnabled: false }, timeZone: null }
     });
     expect(first.body.store.settings.integrations.gtc).toEqual({ status: "coming_soon" });
 

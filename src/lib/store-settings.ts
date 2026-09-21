@@ -35,7 +35,7 @@ export type GoogleSheetsSettings = {
 
 export type StoreSettings = {
   capabilities: StoreCapabilities;
-  lottery: { setupMode: null };
+  lottery: { setupMode: null; appEnabled: boolean };
   integrations: {
     googleSheets: GoogleSheetsSettings;
     gtc: { status: "coming_soon" };
@@ -46,7 +46,7 @@ export type StoreSettings = {
 export function defaultStoreSettings(): StoreSettings {
   return {
     capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
-    lottery: { setupMode: null },
+    lottery: { setupMode: null, appEnabled: false },
     integrations: {
       googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
       gtc: { status: "coming_soon" }
@@ -97,7 +97,7 @@ export function normalizeStoreSettings(raw: unknown): StoreSettings {
       moneyOrder: answer(capabilities.moneyOrder),
       prepaidGift: answer(capabilities.prepaidGift)
     },
-    lottery: { setupMode: null },
+    lottery: { setupMode: null, appEnabled: record(source.lottery).appEnabled === true },
     integrations: {
       googleSheets: {
         enabled: sheets.enabled === true,
@@ -153,7 +153,7 @@ export const StoreSettingsUpdateSchema = z
       })
       .strict()
       .optional(),
-    lottery: z.object({ setupMode: z.null() }).strict().optional(),
+    lottery: z.object({ setupMode: z.null().optional(), appEnabled: z.boolean().optional() }).strict().optional(),
     integrations: z
       .object({
         googleSheets: z
@@ -188,7 +188,12 @@ export function applySettingsUpdate(
 ): { settings: StoreSettings; changed: string[] } {
   const next: StoreSettings = normalizeStoreSettings(current);
   if (update.capabilities) next.capabilities = { ...update.capabilities };
-  if (update.lottery) next.lottery = { setupMode: null };
+  if (update.lottery) {
+    next.lottery = {
+      setupMode: null,
+      appEnabled: update.lottery.appEnabled ?? next.lottery.appEnabled
+    };
+  }
   const sheets = update.integrations?.googleSheets;
   // The switch only: the sheet the store PC reported is kept as it is.
   if (sheets) next.integrations.googleSheets = { ...next.integrations.googleSheets, enabled: sheets.enabled };
