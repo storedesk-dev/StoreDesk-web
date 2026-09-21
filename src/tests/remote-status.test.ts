@@ -201,9 +201,21 @@ describe("where it shows", () => {
         storeNumber: "42",
         tunnelUrl: "https://cf-lookup-down.tunnels.example",
         setup: expect.stringMatching(/^(active|awaiting_activation|none)$/),
+        // For the lottery app's store picker: states and a date, never a PC name or a licence number.
+        lottery: { hasLottery: false, appEnabled: false, pc: null },
+        licence: { covered: true, status: "active" },
         remote: { status: "offline", since: "2026-09-12T20:14:00.000Z" }
       },
-      { storeId: noTunnel.storeId, name: "Store 90", storeNumber: null, tunnelUrl: null, setup: "none", remote: { status: "unknown", since: null } }
+      {
+        storeId: noTunnel.storeId,
+        name: "Store 90",
+        storeNumber: null,
+        tunnelUrl: null,
+        setup: "none",
+        lottery: { hasLottery: false, appEnabled: false, pc: null },
+        licence: { covered: true, status: "active" },
+        remote: { status: "unknown", since: null }
+      }
     ]);
     const text = JSON.stringify(res.body);
     expect(text).not.toContain("192.168.");

@@ -23,7 +23,8 @@ import {
   verifySecret,
   enforceRateLimit
 } from "@/lib/control-plane-security";
-import { productFilter, STOREDESK } from "@/lib/products";
+import { LOTTERY, productFilter, STOREDESK } from "@/lib/products";
+import { normalizeStoreSettings } from "@/lib/store-settings";
 import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
 import { DEFAULT_ORG_ROLES } from "@/lib/roles";
 import { loadNotifyTargets, notifyInstallations, runAfterResponse, scheduleAppUserNotify, type NotifyTarget } from "@/lib/store-notify";
@@ -37,7 +38,7 @@ import {
 } from "@/lib/store-setup-key";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
-import { coverageFor, coveringLicense, licenseProblem } from "@/lib/licenses";
+import { coverageFor, coveringLicense, coveringLicenses, licenseProblem } from "@/lib/licenses";
 import { remoteStatuses } from "@/lib/remote-status";
 
 /**
@@ -715,6 +716,40 @@ export async function lookupOrganization(rawSlug: string) {
     if (mine.includes("awaiting_activation")) return "awaiting_activation";
     return "none";
   };
+
+  // The lottery app's first screen needs the same list, for its own product: whether the store sells
+  // lottery, whether it is switched on for the app, whether a PC already holds its setup, and whether
+  // a licence covers it. This route is public, so it answers with states and dates and never with a
+  // store's PC name, its licence number or anything a caller could not already learn from the tag.
+  const [lotteryPcs, licenses] = (await Promise.all([
+    WorkerInstallationModel.find({ storeId: { $in: storeIds }, ...productFilter(LOTTERY) })
+      .select({ storeId: 1, status: 1, activatedAt: 1, createdAt: 1 })
+      .sort({ createdAt: -1 })
+      .lean(),
+    coveringLicenses(stores)
+  ])) as [Doc[], Map<string, Doc>];
+
+  const isoDate = (value: unknown): string | null => {
+    const date = value instanceof Date ? value : value ? new Date(String(value)) : null;
+    return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
+  };
+
+  const lotteryOf = (store: Doc) => {
+    const settings = normalizeStoreSettings(store.settings);
+    const pc = lotteryPcs.find(
+      (row) => String(row.storeId) === String(store.storeId) && LIVE_INSTALLATION.includes(String(row.status))
+    );
+    return {
+      hasLottery: settings.capabilities.lottery === true,
+      appEnabled: settings.lottery.appEnabled === true,
+      pc: pc ? { claimedAt: isoDate(pc.activatedAt ?? pc.createdAt) } : null
+    };
+  };
+
+  const licenceOf = (store: Doc) => {
+    const license = licenses.get(String(store.storeId)) ?? null;
+    return { covered: license !== null, status: license ? String(license.status) : null };
+  };
   return {
     contractVersion: CONTRACT_VERSION,
     organization: { slug: String(org.slug), name: String(org.name) },
@@ -724,6 +759,8 @@ export async function lookupOrganization(rawSlug: string) {
       storeNumber: store.storeNumber ? String(store.storeNumber) : null,
       tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null,
       setup: setupOf(String(store.storeId)),
+      lottery: lotteryOf(store),
+      licence: licenceOf(store),
       remote: remote.get(String(store.storeId)) ?? { status: "unknown" as const, since: null }
     }))
   };

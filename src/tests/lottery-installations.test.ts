@@ -6,7 +6,7 @@ import { WorkerInstallationModel } from "@/models/ControlPlane";
 import { publicId } from "@/lib/control-plane-security";
 import { getStoreSetup } from "@/lib/setup";
 import { lookupOrganization } from "@/lib/control-plane";
-import { listStores } from "@/lib/tenant-stores";
+import { listStores, updateStoreSettings } from "@/lib/tenant-stores";
 import { POST as issueSetupKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => ({
@@ -108,5 +108,52 @@ describe("installations written before the lottery app existed", () => {
     expect(setup.installations).toHaveLength(1);
     const lookup = await lookupOrganization("example-retail");
     expect(lookup.stores[0]?.setup).toBe("active");
+  });
+});
+
+describe("the org-tag lookup tells the lottery app what it needs", () => {
+  it("says a store sells lottery, is switched on for the app, and is licensed", async () => {
+    await updateStoreSettings(
+      admin,
+      organizationId,
+      storeId,
+      { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null }, lottery: { appEnabled: true } },
+      1
+    );
+    const lookup = await lookupOrganization("example-retail");
+    expect(lookup.stores[0]?.lottery).toEqual({ hasLottery: true, appEnabled: true, pc: null });
+    expect(lookup.stores[0]?.licence).toEqual({ covered: true, status: "active" });
+  });
+
+  it("separates selling lottery from being switched on for the app", async () => {
+    await updateStoreSettings(
+      admin,
+      organizationId,
+      storeId,
+      { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null } },
+      1
+    );
+    const lookup = await lookupOrganization("example-retail");
+    expect(lookup.stores[0]?.lottery).toMatchObject({ hasLottery: true, appEnabled: false });
+  });
+
+  it("reports the PC that already holds the store, by date and never by name", async () => {
+    await addLotteryPc();
+    const lookup = await lookupOrganization("example-retail");
+    const pc = lookup.stores[0]?.lottery.pc;
+    expect(pc?.claimedAt).toEqual(expect.any(String));
+    expect(JSON.stringify(lookup)).not.toContain("Counter PC");
+  });
+
+  it("ignores a lottery PC that is no longer live", async () => {
+    await addLotteryPc("awaiting_activation");
+    const lookup = await lookupOrganization("example-retail");
+    expect(lookup.stores[0]?.lottery.pc).toBeNull();
+  });
+
+  it("never leaks a licence number, only whether one covers the store and its status", async () => {
+    const lookup = await lookupOrganization("example-retail");
+    expect(lookup.stores[0]?.licence.covered).toBe(true);
+    expect(JSON.stringify(lookup)).not.toMatch(/SD-(ORG|STR)-/);
   });
 });
