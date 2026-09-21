@@ -12,7 +12,7 @@ import {
   WorkerInstallationModel
 } from "@/models/ControlPlane";
 import { ControlPlaneError } from "@/lib/control-plane-security";
-import { getPage, type StoreCapability } from "@/config/pages";
+import { getPage, type App, type StoreCapability } from "@/config/pages";
 import { normalizeRoles, toIsoOr, type OrgRole } from "@/lib/roles";
 import { normalizeStoreSettings, type StoreCapabilities } from "@/lib/store-settings";
 import { requireOrganization } from "@/lib/organizations";
@@ -40,10 +40,11 @@ export type PreviewPage = {
 /** The pages a role grants in one app, each marked allowed or hidden at this store. */
 export function effectivePages(
   role: OrgRole,
-  app: "electron" | "mobile",
+  app: App,
   capabilities: StoreCapabilities
 ): PreviewPage[] {
-  return role.accessKeys[app].pages
+  // A role stored before an app existed has no block for it, and grants nothing there.
+  return (role.accessKeys[app]?.pages ?? [])
     .filter((page) => page.enabled)
     .map((page) => {
       const def = getPage(page.key);
@@ -80,7 +81,8 @@ export async function accessPreview(organizationId: string, storeId: string) {
       version: role.version,
       userCount: users.get(role.roleId)?.size ?? 0,
       electron: effectivePages(role, "electron", capabilities),
-      mobile: effectivePages(role, "mobile", capabilities)
+      mobile: effectivePages(role, "mobile", capabilities),
+      lottery: effectivePages(role, "lottery", capabilities)
     }))
   };
 }

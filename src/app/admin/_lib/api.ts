@@ -304,6 +304,7 @@ export interface AccessPreview {
     roleName: string;
     electron: PreviewPage[];
     mobile: PreviewPage[];
+    lottery: PreviewPage[];
   }>;
 }
 
@@ -316,6 +317,11 @@ export interface RolePage {
 export interface RoleAccessKeys {
   electron: { pages: RolePage[] };
   mobile: { pages: RolePage[] };
+  /**
+   * StoreDesk Lottery's pages. Its own app: separate installer, separate PC. Optional because a
+   * role stored before that app existed has no such block; the editor fills one in.
+   */
+  lottery?: { pages: RolePage[] };
 }
 
 export interface Role {

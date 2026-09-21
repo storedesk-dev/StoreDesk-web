@@ -70,7 +70,9 @@ describe("normalizeRoles", () => {
     expect(role.roleName).toBe("odd");
     expect(role.accessKeys).toEqual({
       electron: { pages: [{ key: "pos", enabled: false, featureFlags: { a: true } }] },
-      mobile: { pages: [] }
+      mobile: { pages: [] },
+      // A role stored before StoreDesk Lottery existed reads with an empty block, never a granted one.
+      lottery: { pages: [] }
     });
   });
 });
@@ -113,7 +115,11 @@ describe("the Organization Admin role (org_admin)", () => {
 
   it("keeps its version when it already has everything, whatever the order", () => {
     const full = orgAdminAccessKeys(normalizeAccessKeys(old.accessKeys));
-    const reversed = { electron: { pages: [...full.electron.pages].reverse() }, mobile: { pages: [...full.mobile.pages].reverse() } };
+    const reversed = {
+      electron: { pages: [...full.electron.pages].reverse() },
+      mobile: { pages: [...full.mobile.pages].reverse() },
+      lottery: { pages: [...(full.lottery?.pages ?? [])].reverse() }
+    };
     const [admin] = normalizeRoles([{ ...old, accessKeys: reversed }], CREATED);
     expect(admin.version).toBe(5);
     expect(admin.accessKeys).toEqual(reversed);
@@ -251,7 +257,8 @@ describe("newAccessItems (the console's New pages available)", () => {
         pages: viewer.mobile.pages
           .filter((page) => page.key !== "mobileDeals")
           .map((page) => (page.key === "mobilePriceBook" ? { ...page, featureFlags: {} } : page))
-      }
+      },
+      lottery: viewer.lottery ?? { pages: [] }
     };
     const items = newAccessItems(stale);
     expect(items.map(({ app, pageKey, flag }) => `${app}.${pageKey}${flag ? `.${flag}` : ""}`).sort()).toEqual(

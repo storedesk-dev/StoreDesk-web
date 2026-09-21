@@ -216,7 +216,10 @@ describe("the Organization Admin role", () => {
     const viewer = findTemplate("viewer")!.accessKeys;
     const withoutDeals = {
       electron: { pages: viewer.electron.pages.filter((page) => page.key !== "deals") },
-      mobile: { pages: viewer.mobile.pages.filter((page) => page.key !== "mobileDeals") }
+      mobile: { pages: viewer.mobile.pages.filter((page) => page.key !== "mobileDeals") },
+      // A role stored before StoreDesk Lottery existed reads back with an empty block — which is
+      // the point of this test: an app being added grants nobody anything.
+      lottery: { pages: [] }
     };
     const roles = org.roles.map((role) => (role.roleId === "viewer" ? { ...role, version: 2, accessKeys: withoutDeals } : role));
     await OrganizationModel.updateOne({ organizationId }, { $set: { roles } });

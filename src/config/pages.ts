@@ -1,12 +1,12 @@
 /**
  * GENERATED FILE — DO NOT EDIT.
  *
- * Source:    shared/pages-registry.ts (electron + mobile)
+ * Source:    shared/pages-registry.ts (electron + mobile + lottery)
  * Regenerate: node scripts/generate-pages-registry.mjs
  * Verify:     node scripts/generate-pages-registry.mjs --check
  */
 
-export type App = "electron" | "mobile";
+export type App = "electron" | "mobile" | "lottery";
 
 export type StoreCapability = "lottery" | "coam" | "fuel" | "ebt" | "moneyOrder" | "prepaidGift";
 
@@ -298,6 +298,46 @@ export const ALL_PAGES: PageDefinition[] = [
     filePath: "lib/features/settings/settings_screen.dart",
     defaultEnabled: true,
     alwaysEnabled: true,
+    knownFeatureFlags: {}
+  },
+  {
+    key: "lottery",
+    label: "Rack",
+    description: "The rack as it stands: every slot, what is in it, and how far through each pack is.",
+    app: "lottery",
+    filePath: "src/pages/Rack.tsx",
+    defaultEnabled: true,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
+    key: "lotteryClose",
+    label: "Close the shift",
+    description: "Scan every slot, type the three online figures, and close the day.",
+    app: "lottery",
+    filePath: "src/pages/Close.tsx",
+    defaultEnabled: true,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
+    key: "lotteryCorrect",
+    label: "Correct a closed day",
+    description: "Reopen a day already closed and put a wrong number right. The correction is kept with who made it.",
+    app: "lottery",
+    filePath: "src/pages/Close.tsx",
+    defaultEnabled: false,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
+    key: "lotteryReports",
+    label: "Lottery reports",
+    description: "The closed days, which price points earn their rack space, what to order, and the link to StoreDesk.",
+    app: "lottery",
+    filePath: "src/pages/Reports.tsx",
+    defaultEnabled: false,
+    requiresCapability: "lottery",
     knownFeatureFlags: {}
   }
 ];

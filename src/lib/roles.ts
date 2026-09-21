@@ -2,7 +2,7 @@ import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import { OrganizationModel } from "@/models/ControlPlane";
 import { ControlPlaneError } from "@/lib/control-plane-security";
-import { ALL_PAGES } from "@/config/pages";
+import { ALL_PAGES, type App } from "@/config/pages";
 
 /**
  * Organization roles: one list per organization in `Organization.roles`, held
@@ -57,7 +57,17 @@ export const DEFAULT_ORG_ROLES = [
 ];
 
 export type RolePage = { key: string; enabled: boolean; featureFlags: Record<string, boolean> };
-export type RoleAccessKeys = { electron: { pages: RolePage[] }; mobile: { pages: RolePage[] } };
+/**
+ * One block per app. StoreDesk Lottery is its own: separate installer, separate PC.
+ *
+ * `lottery` is optional because every role stored before that app existed has no such block, and a
+ * reader must cope with that rather than crash on it. Everything written here fills it in.
+ */
+export type RoleAccessKeys = {
+  electron: { pages: RolePage[] };
+  mobile: { pages: RolePage[] };
+  lottery?: { pages: RolePage[] };
+};
 export type OrgRole = {
   roleId: string;
   roleName: string;
@@ -86,7 +96,11 @@ const AppPagesSchema = z
 
 export const RoleAccessKeysSchema = z.object({
   electron: AppPagesSchema.default({ pages: [] }),
-  mobile: AppPagesSchema.default({ pages: [] })
+  mobile: AppPagesSchema.default({ pages: [] }),
+  // Roles saved before StoreDesk Lottery existed carry no block at all, and a save from an older
+  // build still sends none. Optional, not defaulted, so the type says so — and nobody gains a
+  // lottery page by an app being added.
+  lottery: AppPagesSchema.optional()
 });
 
 const RoleNameSchema = z.string().trim().min(1).max(80);
@@ -134,7 +148,8 @@ export function normalizeAccessKeys(raw: unknown): RoleAccessKeys {
   const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
     electron: { pages: normalizePages(source.electron) },
-    mobile: { pages: normalizePages(source.mobile) }
+    mobile: { pages: normalizePages(source.mobile) },
+    lottery: { pages: normalizePages(source.lottery) }
   };
 }
 
@@ -143,7 +158,7 @@ export function normalizeAccessKeys(raw: unknown): RoleAccessKeys {
 /** The role that always has every page and every feature flag of both apps. */
 export const ORG_ADMIN_ROLE_ID = "org_admin";
 
-const APPS = ["electron", "mobile"] as const;
+const APPS = ["electron", "mobile", "lottery"] as const;
 
 /**
  * Every registered page of both apps, enabled, with every known flag true:
@@ -153,7 +168,7 @@ const APPS = ["electron", "mobile"] as const;
  */
 export function orgAdminAccessKeys(stored: RoleAccessKeys): RoleAccessKeys {
   const build = (app: (typeof APPS)[number]): RolePage[] => {
-    const byKey = new Map(stored[app].pages.map((page) => [page.key, page]));
+    const byKey = new Map((stored[app]?.pages ?? []).map((page) => [page.key, page]));
     const offered = ALL_PAGES.filter((page) => page.app === app && !page.retired);
     const full = offered.map((def) => {
       const featureFlags: Record<string, boolean> = { ...(byKey.get(def.key)?.featureFlags ?? {}) };
@@ -161,9 +176,9 @@ export function orgAdminAccessKeys(stored: RoleAccessKeys): RoleAccessKeys {
       return { key: def.key, enabled: true, featureFlags };
     });
     const offeredKeys = new Set(offered.map((page) => page.key));
-    return [...full, ...stored[app].pages.filter((page) => !offeredKeys.has(page.key))];
+    return [...full, ...(stored[app]?.pages ?? []).filter((page) => !offeredKeys.has(page.key))];
   };
-  return { electron: { pages: build("electron") }, mobile: { pages: build("mobile") } };
+  return { electron: { pages: build("electron") }, mobile: { pages: build("mobile") }, lottery: { pages: build("lottery") } };
 }
 
 /** Access keys compared regardless of page and flag order. */
@@ -171,7 +186,7 @@ function sameAccess(a: RoleAccessKeys, b: RoleAccessKeys): boolean {
   const canon = (keys: RoleAccessKeys) =>
     JSON.stringify(
       APPS.map((app) =>
-        [...keys[app].pages]
+        [...(keys[app]?.pages ?? [])]
           .sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0))
           .map((page) => [
             page.key,
@@ -319,12 +334,12 @@ export const AdminRoleUpdateSchema = EdgeRoleUpdateSchema;
  */
 export function unknownPageKeys(
   accessKeys: RoleAccessKeys,
-  registry: Array<{ key: string; app: "electron" | "mobile" }>
+  registry: Array<{ key: string; app: App }>
 ): string[] {
   const known = new Set(registry.map((page) => `${page.app}:${page.key}`));
   const unknown: string[] = [];
-  for (const app of ["electron", "mobile"] as const) {
-    for (const page of accessKeys[app].pages) {
+  for (const app of APPS) {
+    for (const page of accessKeys[app]?.pages ?? []) {
       if (!known.has(`${app}:${page.key}`)) unknown.push(`${app}.${page.key}`);
     }
   }

@@ -15,6 +15,7 @@ type TemplateDef = {
   /** Pages switched on; "*" is every page. Always-on pages are on regardless. */
   electron: string[] | "*";
   mobile: string[] | "*";
+  lottery: string[] | "*";
   /** Flag overrides by page key; otherwise the registry default. */
   flags?: Record<string, Record<string, boolean>>;
   /** Every flag on. */
@@ -27,6 +28,7 @@ const DEFINITIONS: Record<string, TemplateDef> = {
     description: "Every page and every feature, including users and the store server.",
     electron: "*",
     mobile: "*",
+    lottery: "*",
     allFlags: true
   },
   store_manager: {
@@ -57,6 +59,8 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       "mobileReports",
       "mobileSettings"
     ],
+    // Everything in the lottery app, including correcting a day already closed.
+    lottery: ["lottery", "lotteryClose", "lotteryCorrect", "lotteryReports"],
     // Report mapping is a section inside Settings.
     flags: { settings: { reportMapping: true } }
   },
@@ -65,6 +69,9 @@ const DEFINITIONS: Record<string, TemplateDef> = {
     description: "Rings up sales and looks items up. No refunds, discounts or voids.",
     electron: ["pos", "dashboard", "products", "transactions", "settings"],
     mobile: ["mobileDashboard", "mobileScanner", "mobileProductSearch", "mobileSettings"],
+    // A cashier closes the till, which is the whole job at the counter. Correcting a day already
+    // closed is a manager's, and the reports are the owner's.
+    lottery: ["lottery", "lotteryClose"],
     flags: {
       pos: { enableRefunds: false, enableDiscounts: false, enableVoidTransaction: false, enableCashDrawer: true },
       products: { enableBulkImport: false, enableBarcodeGeneration: false },
@@ -86,6 +93,8 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       "mobileTransactions",
       "mobileSettings"
     ],
+    // Looks, doesn't change: the rack as it stands, and nothing that closes or corrects a day.
+    lottery: ["lottery"],
     flags: {
       products: { enableBulkImport: false, enableBarcodeGeneration: false },
       priceBook: { priceGroups: false },
@@ -122,7 +131,11 @@ export const ROLE_TEMPLATES: RoleTemplate[] = Object.entries(DEFINITIONS).map(([
   roleId: templateId,
   roleName: def.roleName,
   description: def.description,
-  accessKeys: { electron: { pages: build("electron", def) }, mobile: { pages: build("mobile", def) } }
+  accessKeys: {
+    electron: { pages: build("electron", def) },
+    mobile: { pages: build("mobile", def) },
+    lottery: { pages: build("lottery", def) }
+  }
 }));
 
 export const TEMPLATE_IDS = ["org_admin", "store_manager", "cashier", "viewer", "blank"] as const;

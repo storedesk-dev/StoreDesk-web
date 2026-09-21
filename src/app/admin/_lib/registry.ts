@@ -11,7 +11,8 @@ import type { RoleAccessKeys, RolePage, RoleTemplate } from "./api";
 
 export const APPS: Array<{ key: App; label: string }> = [
   { key: "electron", label: "Desktop" },
-  { key: "mobile", label: "Phone" }
+  { key: "mobile", label: "Phone" },
+  { key: "lottery", label: "Lottery" }
 ];
 
 export const CAPABILITY_LABEL: Record<StoreCapability, string> = {
@@ -68,7 +69,10 @@ export function editorPages(app: App, stored: RolePage[]): RolePage[] {
 export function editorAccessKeys(accessKeys: RoleAccessKeys | undefined): RoleAccessKeys {
   return {
     electron: { pages: editorPages("electron", accessKeys?.electron.pages ?? []) },
-    mobile: { pages: editorPages("mobile", accessKeys?.mobile.pages ?? []) }
+    mobile: { pages: editorPages("mobile", accessKeys?.mobile.pages ?? []) },
+    // A role saved before StoreDesk Lottery existed has no block at all; it starts empty and the
+    // editor lists every lottery page, off.
+    lottery: { pages: editorPages("lottery", accessKeys?.lottery?.pages ?? []) }
   };
 }
 
@@ -80,6 +84,7 @@ interface TemplateDef {
   /** Pages switched on; `"*"` means every page. */
   electron: string[] | "*";
   mobile: string[] | "*";
+  lottery: string[] | "*";
   /** Flag overrides, by page key; otherwise the registry defaults. `"*": true` turns every flag on. */
   flags?: Record<string, Record<string, boolean>>;
   allFlags?: boolean;
@@ -91,6 +96,7 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
     description: "Every page and every feature, including users and the store server.",
     electron: "*",
     mobile: "*",
+    lottery: "*",
     allFlags: true
   },
   store_manager: {
@@ -121,6 +127,8 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       "mobileReports",
       "mobileSettings"
     ],
+    // Everything in the lottery app, including correcting a day already closed.
+    lottery: ["lottery", "lotteryClose", "lotteryCorrect", "lotteryReports"],
     // Report mapping is a section inside Settings.
     flags: { settings: { reportMapping: true } }
   },
@@ -129,6 +137,9 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
     description: "Rings up sales and looks items up. No refunds, discounts or voids.",
     electron: ["pos", "dashboard", "products", "transactions", "settings"],
     mobile: ["mobileDashboard", "mobileScanner", "mobileProductSearch", "mobileSettings"],
+    // A cashier closes the till, which is the whole job at the counter. Correcting a day already
+    // closed is a manager's, and the reports are the owner's.
+    lottery: ["lottery", "lotteryClose"],
     flags: {
       pos: { enableRefunds: false, enableDiscounts: false, enableVoidTransaction: false, enableCashDrawer: true },
       products: { enableBulkImport: false, enableBarcodeGeneration: false },
@@ -149,6 +160,8 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       "mobileTransactions",
       "mobileSettings"
     ],
+    // Looks, doesn't change: the rack as it stands, and nothing that closes or corrects a day.
+    lottery: ["lottery"],
     flags: {
       products: { enableBulkImport: false, enableBarcodeGeneration: false },
       priceBook: { priceGroups: false },
@@ -174,7 +187,7 @@ export function templateAccessKeys(template: RoleTemplate): RoleAccessKeys {
         : { ...defaultFlags(def), ...(t.flags?.[def.key] ?? {}) };
       return { key: def.key, enabled, featureFlags: flags };
     });
-  return { electron: { pages: build("electron") }, mobile: { pages: build("mobile") } };
+  return { electron: { pages: build("electron") }, mobile: { pages: build("mobile") }, lottery: { pages: build("lottery") } };
 }
 
 /** The role that always has every page and flag (the control plane resolves it; lib/roles.ts). */
@@ -197,7 +210,7 @@ export interface NewAccessItem {
 export function newAccessItems(accessKeys: RoleAccessKeys): NewAccessItem[] {
   const items: NewAccessItem[] = [];
   for (const { key: app } of APPS) {
-    const byKey = new Map(accessKeys[app].pages.map((page) => [page.key, page]));
+    const byKey = new Map((accessKeys[app]?.pages ?? []).map((page) => [page.key, page]));
     for (const def of pagesFor(app)) {
       const stored = byKey.get(def.key);
       if (!stored) {
@@ -215,7 +228,7 @@ export function newAccessItems(accessKeys: RoleAccessKeys): NewAccessItem[] {
 
 /** Enabled pages the editor shows (a stored retired page is not counted). */
 export function countEnabled(accessKeys: RoleAccessKeys, app: App): number {
-  return accessKeys[app].pages.filter((page) => page.enabled && !isRetired(app, page.key)).length;
+  return (accessKeys[app]?.pages ?? []).filter((page) => page.enabled && !isRetired(app, page.key)).length;
 }
 
 /** Canonical string for dirty-checking an edited role. */

@@ -131,7 +131,7 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
     if (!selected || !draft) return;
     const accessKeys = structuredClone(draft.accessKeys);
     for (const item of newItems) {
-      const page = accessKeys[item.app].pages.find((entry) => entry.key === item.pageKey);
+      const page = accessKeys[item.app]?.pages.find((entry) => entry.key === item.pageKey);
       if (!page) continue;
       if (item.flag) page.featureFlags[item.flag] = false;
       else page.enabled = false;
@@ -228,7 +228,7 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
                     key={app.key}
                     app={app.key}
                     label={app.label}
-                    pages={draft.accessKeys[app.key].pages}
+                    pages={draft.accessKeys[app.key]?.pages ?? []}
                     onChange={(pages) =>
                       update({ ...draft, accessKeys: { ...draft.accessKeys, [app.key]: { pages } } })
                     }
