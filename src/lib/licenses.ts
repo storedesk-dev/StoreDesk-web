@@ -3,6 +3,7 @@ import { z } from "zod";
 import { abortTransaction, commitTransaction, connectDb, startTransaction, withSession } from "@/lib/db";
 import { LicenseModel, OrganizationModel, TenantStoreModel, WorkerInstallationModel } from "@/models/ControlPlane";
 import { ControlPlaneError, publicId } from "@/lib/control-plane-security";
+import { productFilter, STOREDESK } from "@/lib/products";
 import { auditAdmin } from "@/lib/audit";
 import { notFound } from "@/lib/http";
 import { scheduleNotify } from "@/lib/store-notify";
@@ -590,7 +591,14 @@ export async function updateLicense(admin: InternalAdminActor, organizationId: s
   if (body.maxPcsPerStore !== undefined) {
     if (covered.length) {
       const busiest = (await WorkerInstallationModel.aggregate([
-        { $match: { organizationId, storeId: { $in: covered.map((store) => store.storeId) } } },
+        {
+          $match: {
+            organizationId,
+            storeId: { $in: covered.map((store) => store.storeId) },
+            // A lottery PC never counts against maxPcsPerStore.
+            ...productFilter(STOREDESK)
+          }
+        },
         { $group: { _id: "$storeId", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 1 }

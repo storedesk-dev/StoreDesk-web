@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import { SetupKeyModel, WorkerCredentialModel, WorkerInstallationModel } from "@/models/ControlPlane";
+import { productFilter, STOREDESK } from "@/lib/products";
 import { ControlPlaneError, publicId } from "@/lib/control-plane-security";
 import { auditAdmin } from "@/lib/audit";
 import { optionalEmail } from "@/lib/http";
@@ -38,7 +39,11 @@ async function loadContext(organizationId: string, storeId: string) {
   await expireLapsedLicenses({ organizationId });
   const [coverage, installations] = (await Promise.all([
     coverageFor(store, org),
-    WorkerInstallationModel.find({ organizationId, storeId }).sort({ createdAt: -1 }).lean()
+    // StoreDesk PCs only: a lottery PC is a separate product and must not appear in this store's
+    // setup status, its PC count or its replace-PC flow.
+    WorkerInstallationModel.find({ organizationId, storeId, ...productFilter(STOREDESK) })
+      .sort({ createdAt: -1 })
+      .lean()
   ])) as [Awaited<ReturnType<typeof coverageFor>>, Doc[]];
   return { org, store, license: coverage.license, licensingMode: coverage.mode, installations };
 }

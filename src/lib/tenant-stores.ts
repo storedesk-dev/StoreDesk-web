@@ -9,6 +9,7 @@ import {
   WorkerInstallationModel
 } from "@/models/ControlPlane";
 import { ControlPlaneError, publicId } from "@/lib/control-plane-security";
+import { productFilter, STOREDESK } from "@/lib/products";
 import { auditAdmin } from "@/lib/audit";
 import { notFound, optionalEmail, optionalText } from "@/lib/http";
 import { toIsoOr } from "@/lib/roles";
@@ -137,7 +138,7 @@ export type StoreView = ReturnType<typeof storeView>;
 /** The store's current PC: the most recently created installation. */
 async function primaryInstallations(storeIds: string[]): Promise<Map<string, Doc>> {
   if (!storeIds.length) return new Map();
-  const rows = (await WorkerInstallationModel.find({ storeId: { $in: storeIds } })
+  const rows = (await WorkerInstallationModel.find({ storeId: { $in: storeIds }, ...productFilter(STOREDESK) })
     .sort({ createdAt: -1 })
     .lean()) as Doc[];
   const map = new Map<string, Doc>();

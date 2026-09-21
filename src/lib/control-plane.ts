@@ -23,6 +23,7 @@ import {
   verifySecret,
   enforceRateLimit
 } from "@/lib/control-plane-security";
+import { productFilter, STOREDESK } from "@/lib/products";
 import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
 import { DEFAULT_ORG_ROLES } from "@/lib/roles";
 import { loadNotifyTargets, notifyInstallations, runAfterResponse, scheduleAppUserNotify, type NotifyTarget } from "@/lib/store-notify";
@@ -704,7 +705,8 @@ export async function lookupOrganization(rawSlug: string) {
   const remote = await remoteStatuses(stores);
   // Whether a store PC has been activated: the phone shows a store that is still waiting for its PC as
   // disabled ("Not set up yet") instead of hiding it.
-  const installations = (await WorkerInstallationModel.find({ storeId: { $in: stores.map((s) => String(s.storeId)) } })
+  const storeIds = stores.map((s) => String(s.storeId));
+  const installations = (await WorkerInstallationModel.find({ storeId: { $in: storeIds }, ...productFilter(STOREDESK) })
     .select({ storeId: 1, status: 1 })
     .lean()) as Doc[];
   const setupOf = (storeId: string): "active" | "awaiting_activation" | "none" => {

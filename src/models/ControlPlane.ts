@@ -234,6 +234,13 @@ const WorkerInstallationSchema = new Schema(
     ...tenant,
     workerInstallationId: { ...id, unique: true },
     storeId: { type: String, index: true },
+    /**
+     * Which product this PC runs. StoreDesk and StoreDesk Lottery are separate products with
+     * separate installations: a store can have one, the other or both, and a lottery PC must never
+     * count against StoreDesk's PC allowance or block its activation. Rows written before the
+     * lottery app existed have no value and read as "storedesk" (PRODUCTS in lib/products.ts).
+     */
+    product: { type: String, enum: ["storedesk", "lottery"], default: "storedesk", index: true },
     /** Older builds only; entitlement comes from the store's covering license. */
     subscriptionId: { type: String },
     workerName: { type: String, required: true, trim: true },
