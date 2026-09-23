@@ -323,8 +323,18 @@ describe("a credential proves a store and a product", () => {
     expect(JSON.stringify(res.body)).not.toContain("posPassword");
   });
 
-  it("still lets the StoreDesk PC use its own routes", async () => {
+  it("still lets the StoreDesk PC use its own routes, including one with no product field", async () => {
+    // activatePc deliberately writes no `product`, which is the shape every installation created
+    // before StoreDesk Lottery existed has -- including the one running in the live store. productOf
+    // reads a missing value as StoreDesk, and this is the test that says so. Do not "tidy" the
+    // helper by adding a product: it would delete the only coverage of the production case.
     const pc = await activatePc(params.organizationId, params.storeId);
+    // The helper writes product: "storedesk" because the schema defaults it. A document written
+    // before the field existed -- which is every installation running in a real store today --
+    // has no such key at all, and Mongo does not backfill one. So take it away and test THAT.
+    await WorkerInstallationModel.updateOne({ workerInstallationId: pc.workerInstallationId }, { $unset: { product: 1 } });
+    const legacy = await WorkerInstallationModel.findOne({ workerInstallationId: pc.workerInstallationId }).lean();
+    expect(legacy?.product).toBeUndefined();
     const { GET: syncConfig } = await import("@/app/api/v1/edge/sync/config/route");
     const res = await call(syncConfig, request("GET", "/", { token: pc.token }), {});
     expect(res.status).toBe(200);
