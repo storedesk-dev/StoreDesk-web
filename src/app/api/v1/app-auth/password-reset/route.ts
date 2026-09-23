@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { EmailSchema, PasswordSchema, requestPasswordReset, resetPassword } from "@/lib/accounts";
 import { callerIp, enforceRateLimit } from "@/lib/control-plane-security";
-import { passwordResetEmail } from "@/lib/email-provider";
+import { getEmailProvider, isEmailConfigured, passwordResetEmail } from "@/lib/email-provider";
 import { jsonError, parseBody } from "@/lib/http";
 
 /**
@@ -33,9 +33,24 @@ export async function POST(req: Request) {
 
     const started = await requestPasswordReset(body.email);
     if (started) {
-      // Until a mail provider is wired up, the message is written where the
-      // operator can find it — never the credential itself in an audit row.
-      console.info("[password-reset]", passwordResetEmail({ email: started.email, name: started.name, credential: started.credential }));
+      // The code IS the account: anyone holding it can set a new password. So it goes to the
+      // person's mailbox, and if there is no mail provider it goes nowhere at all.
+      //
+      // It used to be written to the server log "until a mail provider is wired up". That put a
+      // working reset token for any org owner in Vercel's runtime logs, readable by every project
+      // member and every log drain, obtainable by anyone who can POST an e-mail address to this
+      // public route. Never in production, and outside production only because a developer has no
+      // other way to finish the flow.
+      if (isEmailConfigured()) {
+        await getEmailProvider()
+          .sendPasswordReset({ email: started.email, name: started.name, credential: started.credential })
+          .catch(() => {
+            // A reset that could not be sent is not an error the caller may see: it would turn this
+            // route into an oracle for which addresses have accounts.
+          });
+      } else if (process.env.NODE_ENV !== "production") {
+        console.info("[password-reset]", passwordResetEmail({ email: started.email, name: started.name, credential: started.credential }));
+      }
     }
     return NextResponse.json({ ok: true, message: "If that address has an account, a reset link is on its way." }, { status: 202 });
   } catch (error) {

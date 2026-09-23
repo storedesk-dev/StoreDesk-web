@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { connectDb } from "@/lib/db";
+import { STOREDESK, productOf, type Product } from "@/lib/products";
 import {
   AdminSessionModel,
   InternalAdminModel,
@@ -121,11 +122,29 @@ const LAST_SEEN_EVERY_MS = 60_000;
  * organization or store with 403 STORE_SUSPENDED (P12): the store's access
  * pull then turns its sign-in off, like a revocation, until it is reactivated.
  */
-export async function authenticateWorker(req: Request): Promise<{
+/**
+ * Authenticate a store PC by its worker credential.
+ *
+ * **`expected` is not optional in spirit, only in syntax.** A credential proves which store a PC
+ * belongs to; it does not prove which product is holding it, and the two live in the same
+ * collection. Before StoreDesk Lottery existed that distinction did not exist either, so every edge
+ * route was written as "the caller is this store's own server, proven by its credential" — which
+ * stopped being true the day a lottery PC was issued a credential of the same shape.
+ *
+ * Left unguarded, a lottery counter PC could call `GET /api/v1/edge/sync/config` and be handed the
+ * store's Cloudflare tunnel token and its Verifone Commander password in clear, which D-5 and this
+ * repo's own non-negotiables forbid. So the default is StoreDesk, every existing route keeps the
+ * meaning it was written with, and a route that wants a lottery PC has to say so.
+ */
+export async function authenticateWorker(
+  req: Request,
+  expected: Product = STOREDESK,
+): Promise<{
   organizationId: string;
   storeId: string;
   workerInstallationId: string;
   credentialId: string;
+  product: Product;
 }> {
   await connectDb();
   const authorization = req.headers.get("authorization");
@@ -169,7 +188,20 @@ export async function authenticateWorker(req: Request): Promise<{
     // Store-facing: every edge route answers with this.
     throw new ControlPlaneError(403, "STORE_SUSPENDED", "This store is suspended in StoreDesk.");
   }
-  return { organizationId, storeId, workerInstallationId, credentialId };
+
+  // Rows written before the product field existed are StoreDesk, which is what productOf answers.
+  const product = productOf(installation as { product?: unknown });
+  if (product !== expected) {
+    throw new ControlPlaneError(
+      403,
+      "WRONG_PRODUCT",
+      expected === STOREDESK
+        ? "This is a StoreDesk Lottery PC; it cannot use StoreDesk's routes."
+        : "This is a StoreDesk PC; it cannot use StoreDesk Lottery's routes.",
+    );
+  }
+
+  return { organizationId, storeId, workerInstallationId, credentialId, product };
 }
 
 // ── Staff sign-in (P7) ───────────────────────────────────────────────────────

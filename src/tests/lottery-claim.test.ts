@@ -254,3 +254,79 @@ describe("a store that already runs StoreDesk types nothing", () => {
     expect(await lastAudit("lottery.installation.move")).toMatchObject({ metadata: { via: "storedesk_service" } });
   });
 });
+
+describe("the body the StoreDesk Service actually posts", () => {
+  /**
+   * The test above hand-wrote `{ deviceName }`. The service sends three keys — and against a
+   * `.strict()` schema that accepted two, the one screen that is supposed to need nothing typed
+   * answered `appVersion: Invalid input: expected string, received null`. A test that writes its
+   * own request cannot catch that, so this one is the service's body verbatim.
+   *
+   * LotteryClaimService.cs: { deviceName, appVersion, product: "lottery" }, with appVersion null
+   * when StoreDesk Desktop did not supply one.
+   */
+  const serviceBody = (appVersion: string | null) => ({
+    deviceName: "COUNTER-PC",
+    appVersion,
+    product: "lottery" as const
+  });
+
+  it("accepts it with no version, which is what the desktop sends today", async () => {
+    await enableLottery();
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const res = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: serviceBody(null) }), {});
+    expect(res.status).toBe(201);
+    expect(res.body.workerCredential).toMatch(/^wcred_[a-f0-9]{32}\./);
+  });
+
+  it("accepts it with a version", async () => {
+    await enableLottery();
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const res = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: serviceBody("1.4.0") }), {});
+    expect(res.status).toBe(201);
+    const installation = await WorkerInstallationModel.findOne({
+      workerInstallationId: res.body.workerInstallationId
+    }).lean();
+    expect(installation?.workerVersion).toBe("1.4.0");
+  });
+
+  it("still refuses a key it does not know, so the schema stayed strict", async () => {
+    await enableLottery();
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const res = await call(
+      vouchedClaim,
+      request("POST", "/", { token: pc.token, body: { ...serviceBody(null), tunnelToken: "nice try" } }),
+      {}
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("a credential proves a store and a product", () => {
+  /**
+   * `authenticateWorker` had no product check, so a lottery PC's credential opened every StoreDesk
+   * edge route — including `GET /api/v1/edge/sync/config`, which hands back the store's Cloudflare
+   * tunnel token and its Verifone Commander password in clear. D-5 and this repo's own
+   * non-negotiables forbid exactly that, and lottery-setup.ts says so in its own header.
+   */
+  it("refuses a lottery PC on a StoreDesk route", async () => {
+    await enableLottery();
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const claimed = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: { deviceName: "COUNTER-PC" } }), {});
+    expect(claimed.status).toBe(201);
+
+    const { GET: syncConfig } = await import("@/app/api/v1/edge/sync/config/route");
+    const res = await call(syncConfig, request("GET", "/", { token: claimed.body.workerCredential }), {});
+
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(res.body)).toContain("WRONG_PRODUCT");
+    expect(JSON.stringify(res.body)).not.toContain("posPassword");
+  });
+
+  it("still lets the StoreDesk PC use its own routes", async () => {
+    const pc = await activatePc(params.organizationId, params.storeId);
+    const { GET: syncConfig } = await import("@/app/api/v1/edge/sync/config/route");
+    const res = await call(syncConfig, request("GET", "/", { token: pc.token }), {});
+    expect(res.status).toBe(200);
+  });
+});

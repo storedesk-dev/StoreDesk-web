@@ -176,6 +176,7 @@ export interface EmailProvider {
   sendSetupKey(message: SetupKeyMessage): Promise<DeliveryResult>;
   sendInvitation(message: InvitationMessage): Promise<DeliveryResult>;
   sendInstallationReplaced(message: InstallationReplacedMessage): Promise<DeliveryResult>;
+  sendPasswordReset(message: PasswordResetMessage): Promise<DeliveryResult>;
 }
 
 class ResendEmailProvider implements EmailProvider {
@@ -233,6 +234,16 @@ class ResendEmailProvider implements EmailProvider {
       "Email provider rejected the replacement notice"
     );
   }
+
+  /** The code in this one is the account: it goes to the person's mailbox and nowhere else. */
+  sendPasswordReset(message: PasswordResetMessage): Promise<DeliveryResult> {
+    return this.send(
+      message.email,
+      "Reset your StoreDesk password",
+      passwordResetEmail(message),
+      "Email provider rejected the password reset"
+    );
+  }
 }
 
 class UnconfiguredEmailProvider implements EmailProvider {
@@ -245,6 +256,10 @@ class UnconfiguredEmailProvider implements EmailProvider {
   }
 
   async sendInstallationReplaced(): Promise<DeliveryResult> {
+    throw new Error("Email provider is not configured");
+  }
+
+  async sendPasswordReset(): Promise<DeliveryResult> {
     throw new Error("Email provider is not configured");
   }
 }

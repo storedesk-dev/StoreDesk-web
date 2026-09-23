@@ -36,7 +36,7 @@ const TokenSchema = z
 
 export async function POST(req: Request) {
   try {
-    const worker = await authenticateWorker(req);
+    const worker = await authenticateWorker(req, LOTTERY);
     // Generous: a PC mints once an hour in the ordinary case, and retries after a restart or a
     // dropped line. Tight enough that a loop cannot hammer the signer.
     enforceRateLimit(`lottery-token:${worker.workerInstallationId}`, { limit: 60, windowMs: 60 * 60_000, code: "RATE_LIMITED" });
