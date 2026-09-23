@@ -136,7 +136,6 @@ export async function reachableFor(appUserId: string): Promise<ReachableOrganiza
       const roleId = text(assignment.role);
       const settings = (store.settings as Doc | undefined) ?? {};
       const capabilities = (settings.capabilities as Doc | undefined) ?? {};
-      const lottery = (settings.lottery as Doc | undefined) ?? {};
       const covering = coveringFrom(mode, store, licences);
 
       reachable.push({

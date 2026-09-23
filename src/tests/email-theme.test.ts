@@ -56,10 +56,25 @@ describe("the things mail clients break", () => {
     expect(html).not.toContain("<button");
   });
 
-  it("asks for nothing to be downloaded — no images, no web fonts", () => {
-    expect(html).not.toContain("<img");
+  it("carries the logo, and reads as StoreDesk when the image is blocked", () => {
+    // Absolute, because a mail client has no page to be relative to. PNG, because Outlook and
+    // several others do not render SVG. And the alt is the wordmark, so a blocked image is still
+    // the brand rather than a broken box.
+    expect(html).toContain("https://storedesk.net/brand/logo-lockup-horizontal.png");
+    expect(html).toMatch(/alt="StoreDesk"/);
+    expect(html).toMatch(/width="144" height="40"/);
+    expect(html).not.toContain(".svg");
+  });
+
+  it("still asks for no web font", () => {
     expect(html).not.toContain("fonts.googleapis");
     expect(html).not.toContain("@font-face");
+  });
+
+  it("has no script, because every mail client strips it", () => {
+    // This is why there is no copy button in an email. It is not caution, it is the platform.
+    expect(html).not.toContain("<script");
+    expect(html).not.toMatch(/on(click|load|mouseover)=/);
   });
 
   it("declares a light colour scheme rather than letting a dark client invert it", () => {
@@ -76,8 +91,11 @@ describe("what goes in a message is not trusted", () => {
       callout: { label: "Key", value: '"><img src=x>' }
     });
     expect(html).not.toContain("<script>");
-    expect(html).not.toContain("<img");
     expect(html).toContain("&lt;script&gt;");
+    // The logo is the only <img> in the message; the injected one must not have become a tag.
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("&quot;&gt;&lt;img src=x&gt;");
+    expect(html.match(/<img/g)).toHaveLength(1);
     expect(html).toContain("Store &quot;A&quot; &amp; &lt;b&gt;B&lt;/b&gt;");
   });
 

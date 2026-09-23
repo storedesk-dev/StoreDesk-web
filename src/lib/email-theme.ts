@@ -9,12 +9,18 @@ import { SITE } from "@/lib/site";
  *
  * - **tables for layout**, never flex or grid;
  * - **inline styles**, because a stripped stylesheet leaves unreadable text rather than plain text;
- * - **no web fonts and no images**, so nothing depends on a download that may never happen — the
- *   wordmark is text;
+ * - **no web fonts**, and exactly one image: the logo, with the wordmark as its `alt`, so a
+ *   recipient whose client blocks images still reads "StoreDesk" rather than a broken box;
  * - **a plain-text part for every message**, which is what a screen reader, a watch and a spam
  *   filter all prefer, and what survives when everything else fails.
  *
  * Every message is built from the same small spec, so a new one cannot quietly look different.
+ *
+ * **What cannot go in here, however much we want it.** Mail clients strip `<script>`: Gmail,
+ * Outlook and Apple Mail all remove it before the message is shown. So there is no copy-to-clipboard
+ * button, no countdown and nothing that reacts to a click. A code is made easy to *select* instead —
+ * big, monospaced, on its own line — and the button goes to the page, where a real copy button can
+ * live because that is a web page and this is not.
  */
 
 const BRAND = {
@@ -29,6 +35,17 @@ const BRAND = {
 } as const;
 
 const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+/**
+ * The logo, absolute because a mail client has no page to be relative to, and PNG because SVG is
+ * unsupported in Outlook and several others. 900×250 served at 144×40: the extra pixels are what
+ * keep it sharp on a phone.
+ */
+const LOGO = {
+  url: `https://${SITE.domain}/brand/logo-lockup-horizontal.png`,
+  width: 144,
+  height: 40
+} as const;
 const MONO = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
 
 /** The address every StoreDesk message comes from, unless the deployment overrides it. */
@@ -118,8 +135,10 @@ export function renderHtml(spec: EmailSpec): string {
       <td align="center" style="padding:28px 16px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;">
           <tr>
-            <td style="padding:0 0 18px;font-family:${FONT};font-size:17px;font-weight:700;color:${BRAND.teal};letter-spacing:-0.01em;">
-              ${escape(SITE.name)}
+            <td style="padding:0 0 18px;">
+              <!-- alt carries the wordmark, so a blocked image still reads as StoreDesk. -->
+              <img src="${LOGO.url}" width="${LOGO.width}" height="${LOGO.height}" alt="${escape(SITE.name)}"
+                   style="display:block;border:0;outline:none;text-decoration:none;height:${LOGO.height}px;width:${LOGO.width}px;font-family:${FONT};font-size:17px;font-weight:700;color:${BRAND.teal};">
             </td>
           </tr>
           <tr>
