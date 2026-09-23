@@ -282,6 +282,56 @@ export const ALL_PAGES: PageDefinition[] = [
     knownFeatureFlags: {}
   },
   {
+    key: "mobileLotteryRack",
+    label: "Lottery rack",
+    description: "The counter as it stands: every box, what is in it, and a pack's card. The Lottery entry in the drawer needs this one.",
+    app: "mobile",
+    filePath: "lib/features/lottery/rack_screen.dart",
+    defaultEnabled: false,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
+    key: "mobileLotteryInventory",
+    label: "Lottery inventory",
+    description: "The back room by price, what needs ordering, and scanning a delivery into stock from the phone.",
+    app: "mobile",
+    filePath: "lib/features/lottery/inventory_screen.dart",
+    defaultEnabled: false,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
+    key: "mobileLotteryClose",
+    label: "Close a lottery shift",
+    description: "Start and commit a shift close from the phone. A clerk who may not close on the store PC may not close here either.",
+    app: "mobile",
+    filePath: "lib/features/lottery/close_screen.dart",
+    defaultEnabled: false,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
+    key: "mobileLotteryReports",
+    label: "Lottery reports",
+    description: "Closed shifts and their reports, and the day's figures, as they read at the counter.",
+    app: "mobile",
+    filePath: "lib/features/lottery/reports_screen.dart",
+    defaultEnabled: false,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
+    key: "mobileLotteryAnalytics",
+    label: "Lottery analytics",
+    description: "What sold, at which prices, which games, and how the rack is earning its space.",
+    app: "mobile",
+    filePath: "lib/features/lottery/analytics_screen.dart",
+    defaultEnabled: false,
+    requiresCapability: "lottery",
+    knownFeatureFlags: {}
+  },
+  {
     key: "mobileSalesTax",
     label: "Sales Tax",
     description: "Sales tax management and rate configuration on mobile.",
