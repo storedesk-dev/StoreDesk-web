@@ -177,6 +177,10 @@ const TenantStoreSchema = new Schema(
     status: { type: String, enum: ["pending", "active", "suspended", "closed"], default: "active" },
     settings: { type: StoreSettingsSchema, default: () => ({}) },
     /** +1 on every settings change; a missing value reads as 1. */
+    /** Bumped on every change the lottery cloud needs to know about; the push carries it. */
+    projectionVersion: { type: Number, default: 1 },
+    /** The version the cloud has actually taken. Behind means the hourly reconcile re-pushes. */
+    projectionPushedVersion: { type: Number, default: 0 },
     settingsVersion: { type: Number, min: 1, default: 1 },
     tunnelUrl: { type: String, trim: true },
     /** Hostname label the tunnel was (or will be) created under. */

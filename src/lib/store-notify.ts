@@ -345,10 +345,47 @@ export function runAfterResponse(task: () => Promise<unknown>): void {
   }
 }
 
+/**
+ * Which stores a change touches, for the lottery cloud. A notify that names no store is an
+ * organization-wide change, and every store of that organization needs the new projection.
+ */
+async function storesTouchedBy(input: NotifyInput): Promise<string[]> {
+  if (input.storeId) return [input.storeId];
+  if (input.storeIds?.length) return input.storeIds;
+  await connectDb();
+  const stores = (await TenantStoreModel.find({ organizationId: input.organizationId, status: { $ne: "closed" } })
+    .select("storeId")
+    .lean()) as Array<{ storeId: string }>;
+  return stores.map((store) => store.storeId);
+}
+
+/**
+ * The one choke point every admin change already passes through, now doing two things: nudging the
+ * StoreDesk stores that have a tunnel, and pushing the projection to the lottery cloud.
+ *
+ * A lottery PC has no tunnel by design, so before this it learned of a change only at its next daily
+ * pull. The push is what gives it the same seconds a StoreDesk store has had all along.
+ */
 export function scheduleNotify(input: NotifyInput): void {
   runAfterResponse(() => notifyInstallations(input));
+  runAfterResponse(async () => {
+    const { scheduleProjectionPush, isCloudConfigured } = await import("@/lib/supabase-admin");
+    if (!isCloudConfigured()) return;
+    for (const storeId of await storesTouchedBy(input)) scheduleProjectionPush(storeId, input.reason);
+  });
 }
 
 export function scheduleAppUserNotify(appUserId: string, reason: NotifyReason): void {
   runAfterResponse(() => notifyAppUserInstallations(appUserId, reason));
+  runAfterResponse(async () => {
+    const { scheduleProjectionPush, isCloudConfigured } = await import("@/lib/supabase-admin");
+    if (!isCloudConfigured()) return;
+    await connectDb();
+    const assignments = (await UserAssignmentModel.find({ appUserId }).lean()) as Array<Record<string, unknown>>;
+    const organizationIds = [...new Set(assignments.map((assignment) => String(assignment.organizationId ?? "")).filter(Boolean))];
+    const stores = (await TenantStoreModel.find({ organizationId: { $in: organizationIds }, status: { $ne: "closed" } })
+      .select("storeId")
+      .lean()) as Array<{ storeId: string }>;
+    for (const store of stores) scheduleProjectionPush(store.storeId, reason);
+  });
 }
