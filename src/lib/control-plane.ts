@@ -606,6 +606,10 @@ export async function enrollAppUser(body: {
   }
   user.passwordHash = await hashSecret(body.password);
   user.status = "active";
+  // Redeeming this code IS proof of the address: it only ever arrived by e-mail, and nothing else
+  // could have produced it. Sending a second message to prove what they have just proved would be
+  // a worse product, so the address is marked confirmed here.
+  user.emailVerifiedAt = user.emailVerifiedAt ?? new Date();
   user.passwordSetBy = "user";
   user.enrollmentConsumedAt = new Date();
   user.enrollmentSecretHash = undefined;

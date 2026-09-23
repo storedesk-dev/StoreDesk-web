@@ -305,3 +305,41 @@ describe("the password behind the email", () => {
     expect(await requestEmailVerification(dana)).toBeNull();
   });
 });
+
+describe("proving an e-mail address", () => {
+  /**
+   * `requestEmailVerification` and `verifyEmail` existed from the day e-mail became the identity
+   * (D-18) and nothing ever called them: no route, no page, so `emailVerifiedAt` was set for
+   * nobody. These cover the half that was missing.
+   */
+  it("confirms an address from its code", async () => {
+    const appUserId = await person(`v${Math.random().toString(36).slice(2)}@example.com`);
+    const started = await requestEmailVerification(appUserId);
+    expect(started?.credential).toBeTruthy();
+
+    const account = await verifyEmail(started!.credential);
+    expect(account.emailVerified).toBe(true);
+  });
+
+  it("answers the same on a second press, because a link gets clicked twice", async () => {
+    const appUserId = await person(`v${Math.random().toString(36).slice(2)}@example.com`);
+    const started = await requestEmailVerification(appUserId);
+    await verifyEmail(started!.credential);
+    // Idempotent: a person who pressed it on their phone and then their PC is not shown an error
+    // about something that already worked.
+    await expect(verifyEmail(started!.credential)).resolves.toMatchObject({ emailVerified: true });
+  });
+
+  it("refuses a code that is not ours", async () => {
+    const appUserId = await person(`v${Math.random().toString(36).slice(2)}@example.com`);
+    await requestEmailVerification(appUserId);
+    await expect(verifyEmail(`${appUserId}.not-the-secret`)).rejects.toMatchObject({ code: "VERIFICATION_INVALID" });
+  });
+
+  it("has nothing to start for an address already confirmed", async () => {
+    const appUserId = await person(`v${Math.random().toString(36).slice(2)}@example.com`);
+    const started = await requestEmailVerification(appUserId);
+    await verifyEmail(started!.credential);
+    expect(await requestEmailVerification(appUserId)).toBeNull();
+  });
+});
