@@ -28,6 +28,19 @@ export function isCloudConfigured(): boolean {
   return config() !== null;
 }
 
+/**
+ * Where the cloud is, in the two values that are safe to hand a store PC.
+ *
+ * The publishable key is public by design — it reads nothing on its own, as the pgTAP suite asserts
+ * — so the control plane tells each PC where to go rather than every PC carrying it in env. Moving
+ * projects or rotating the key is then one deployment instead of a visit to every counter.
+ */
+export function publishableCloud(): { url: string; anonKey: string } | null {
+  const url = process.env.SUPABASE_URL?.trim();
+  const anonKey = process.env.SUPABASE_ANON_KEY?.trim();
+  return url && anonKey ? { url: url.replace(/\/+$/, ""), anonKey } : null;
+}
+
 async function rpc<T>(name: string, body: unknown): Promise<T> {
   const settings = config();
   if (!settings) throw new Error("the lottery cloud is not configured");
