@@ -188,7 +188,7 @@ export function ResetPasswordClient() {
                 </div>
                 <div>
                   <label htmlFor="reset-confirm" className="block text-sm font-medium text-slate-900">
-                    Type it again
+                    Confirm new password
                   </label>
                   <input
                     id="reset-confirm"

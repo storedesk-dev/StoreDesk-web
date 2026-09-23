@@ -99,17 +99,25 @@ export type InvitationMessage = {
  * A user invited by e-mail. The code is pasted at /enroll (never put in a
  * link: a credential in a URL ends up in browser history and proxy logs).
  */
+/**
+ * The first message a person ever gets from StoreDesk.
+ *
+ * Somebody at their business created the account; they did not ask for it and may never have heard
+ * of us. So it says who added them and what it is for before it asks them to do anything — an
+ * unexplained code from an unknown sender is a phishing e-mail, and reads like one.
+ */
 export function invitationEmail(message: InvitationMessage): EmailSpec {
   return {
-    preheader: `Your StoreDesk login for ${message.organizationName}`,
-    heading: "Choose your StoreDesk password",
+    preheader: `${message.organizationName} has set up your StoreDesk account`,
+    heading: "Welcome to StoreDesk",
     body: [
       `Hello ${message.recipientName},`,
-      `${message.organizationName} has given you a StoreDesk login. To choose your password, open the page below and paste this code:`,
-      "Then sign in to the StoreDesk app on the store PC or your phone with this e-mail address and your new password."
+      `${message.organizationName} has set up a StoreDesk account for you. StoreDesk is the back-office software their store runs — prices, daily numbers and reports.`,
+      "To finish, open the page below and paste this code to choose your password:",
+      "Then sign in on the store PC or your phone with this e-mail address and the password you chose."
     ],
     callout: { label: "Your code", value: message.invitationCode },
-    action: { label: "Choose your password", url: `https://${SITE.domain}/enroll` },
+    action: { label: "Set your password", url: `https://${SITE.domain}/enroll` },
     footnote: [
       `The code works once and expires ${formatExpiry(message.expiresAt)}.`,
       "Keep this e-mail to yourself — anyone with the code can set your password.",

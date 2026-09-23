@@ -88,9 +88,9 @@ export function EnrollClient() {
 
   return (
     <MarketingShell
-      eyebrow="Account setup"
-      title="Finish setting up your account"
-      lede="Paste the enrollment code you were sent and choose a password. It takes a minute."
+      eyebrow="Welcome to StoreDesk"
+      title="Set your password and you are in"
+      lede="Someone at your business created your account. Paste the code from your welcome e-mail, choose a password, and that is the whole setup."
     >
       <motion.div
         initial={{ y: reduceMotion ? 0 : 10 }}
@@ -121,7 +121,7 @@ export function EnrollClient() {
           >
             <div>
               <label htmlFor="code" className="block text-[14px] font-medium">
-                Enrollment code
+                The code from your welcome e-mail
               </label>
               <textarea
                 id="code"
@@ -155,7 +155,7 @@ export function EnrollClient() {
 
             <div>
               <label htmlFor="confirm" className="block text-[14px] font-medium">
-                Type it again
+                Confirm password
               </label>
               <input
                 id="confirm"
@@ -191,7 +191,7 @@ export function EnrollClient() {
             </button>
 
             <p className="text-center text-[13px] text-[var(--muted)]">
-              No code, or it isn&apos;t working?{" "}
+              No code, or it isn&apos;t working? Ask whoever set your account up, or{" "}
               <a href={`mailto:${SITE.supportEmail}?subject=StoreDesk%20enrollment%20code`} className="font-medium text-[#1A63F4] hover:underline">
                 Email {SITE.supportEmail}
               </a>
