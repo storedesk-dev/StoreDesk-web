@@ -22,16 +22,27 @@ const FEATURES: Array<{ key: StoreCapability; label: string; description: string
 ];
 
 type Answer = boolean | null;
-type Draft = { caps: Record<StoreCapability, Answer>; googleSheets: boolean; lotteryApp: boolean };
+type Draft = {
+  caps: Record<StoreCapability, Answer>;
+  googleSheets: boolean;
+  storeDeskApp: boolean;
+  lotteryApp: boolean;
+};
 
 export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const settings = useStoreSettings(orgId, storeId);
-  const [draft, setDraft] = useState<Draft>({ caps: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null }, googleSheets: false, lotteryApp: false });
+  const [draft, setDraft] = useState<Draft>({
+    caps: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null },
+    googleSheets: false,
+    storeDeskApp: true,
+    lotteryApp: false
+  });
 
   const saved: Draft | null = settings.data
     ? {
         caps: settings.data.settings.capabilities,
         googleSheets: settings.data.settings.integrations.googleSheets.enabled,
+        storeDeskApp: settings.data.settings.storedesk.appEnabled,
         lotteryApp: settings.data.settings.lottery.appEnabled
       }
     : null;
@@ -41,6 +52,7 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
       setDraft({
         caps: settings.data.settings.capabilities,
         googleSheets: settings.data.settings.integrations.googleSheets.enabled,
+        storeDeskApp: settings.data.settings.storedesk.appEnabled,
         lotteryApp: settings.data.settings.lottery.appEnabled
       });
     }
@@ -54,6 +66,7 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const dirty =
     FEATURES.some((f) => draft.caps[f.key] !== saved.caps[f.key]) ||
     draft.googleSheets !== saved.googleSheets ||
+    draft.storeDeskApp !== saved.storeDeskApp ||
     draft.lotteryApp !== saved.lotteryApp;
 
   function save() {
@@ -61,6 +74,7 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
       (s) => ({
         ...s,
         capabilities: draft.caps,
+        storedesk: { ...s.storedesk, appEnabled: draft.storeDeskApp },
         // Switched off with the capability: a store that does not sell lottery cannot run the app.
         lottery: { ...s.lottery, appEnabled: draft.caps.lottery === true && draft.lotteryApp },
         integrations: { ...s.integrations, googleSheets: { ...s.integrations.googleSheets, enabled: draft.googleSheets } }
@@ -85,6 +99,45 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
             <Notice tone="amber">All set to No and never saved, so likely old defaults. Check each one and save.</Notice>
           </div>
         ) : null}
+        {/*
+          Products first, because it is the question that decides the rest: which of the two this
+          store runs. They are independent — one, the other, both, or neither — and this is the axis
+          a subscription will price, so it reads as a pair rather than as a setting buried under a
+          feature.
+        */}
+        <SwitchGroup title="Products">
+          <li className="py-3">
+            <SwitchRow
+              id="product-storedesk"
+              label="StoreDesk"
+              description="The register, the daily numbers, the desktop app and the phone. Off: this store cannot set a StoreDesk PC up."
+              checked={draft.storeDeskApp}
+              onChange={(v) => setDraft((d) => ({ ...d, storeDeskApp: v }))}
+            />
+          </li>
+          <li className="py-3">
+            <SwitchRow
+              id="product-lottery"
+              label="StoreDesk Lottery"
+              description={
+                draft.caps.lottery === true
+                  ? "The rack, the shift close and its reports, on their own PC. Off: this store cannot set a lottery PC up."
+                  : "Needs Has lottery below: a store that does not sell lottery tickets cannot run the lottery app."
+              }
+              checked={draft.caps.lottery === true && draft.lotteryApp}
+              disabled={draft.caps.lottery !== true}
+              onChange={(v) => setDraft((d) => ({ ...d, lotteryApp: v }))}
+            />
+          </li>
+          {!draft.storeDeskApp && !(draft.caps.lottery === true && draft.lotteryApp) ? (
+            <li className="pb-3">
+              <Notice tone="amber">
+                Neither product is on. Nobody at this store can set a PC up until one of them is.
+              </Notice>
+            </li>
+          ) : null}
+        </SwitchGroup>
+
         <SwitchGroup title="Store features">
           {FEATURES.map((f) => (
             <li key={f.key} className="py-3">
@@ -95,17 +148,7 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
                 value={draft.caps[f.key]}
                 onChange={(v) => setDraft((d) => ({ ...d, caps: { ...d.caps, [f.key]: v } }))}
               />
-              {f.key === "lottery" && draft.caps.lottery === true ? (
-                <div className="ml-12 mt-3">
-                  <SwitchRow
-                    id="lottery-app"
-                    label="StoreDesk Lottery app"
-                    description="Let this store set a PC up for the lottery app: the rack, the shift close and its reports."
-                    checked={draft.lotteryApp}
-                    onChange={(v) => setDraft((d) => ({ ...d, lotteryApp: v }))}
-                  />
-                </div>
-              ) : null}
+
             </li>
           ))}
         </SwitchGroup>

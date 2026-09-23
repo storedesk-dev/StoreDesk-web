@@ -106,6 +106,7 @@ describe("buildAccessSyncBody", () => {
       // A store record from an older build: every setting reads as its default, capabilities not answered.
       capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
       settings: {
+        storedesk: { appEnabled: true },
         lottery: { setupMode: null, appEnabled: false },
         integrations: {
           googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },

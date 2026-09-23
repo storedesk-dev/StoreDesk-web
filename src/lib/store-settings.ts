@@ -35,6 +35,13 @@ export type GoogleSheetsSettings = {
 
 export type StoreSettings = {
   capabilities: StoreCapabilities;
+  /**
+   * Which of the two products this store runs. They are independent: a store may run StoreDesk
+   * alone, StoreDesk Lottery alone, both, or neither. That is the axis a subscription will price,
+   * which is why it is its own field rather than a capability — a capability says what the shop
+   * sells, a product says what it is paying for.
+   */
+  storedesk: { appEnabled: boolean };
   lottery: { setupMode: null; appEnabled: boolean };
   integrations: {
     googleSheets: GoogleSheetsSettings;
@@ -46,6 +53,7 @@ export type StoreSettings = {
 export function defaultStoreSettings(): StoreSettings {
   return {
     capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
+    storedesk: { appEnabled: true },
     lottery: { setupMode: null, appEnabled: false },
     integrations: {
       googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
@@ -97,6 +105,10 @@ export function normalizeStoreSettings(raw: unknown): StoreSettings {
       moneyOrder: answer(capabilities.moneyOrder),
       prepaidGift: answer(capabilities.prepaidGift)
     },
+    // **Default on, and read as "not off".** Every store that exists today runs StoreDesk and has
+    // no such field; reading a missing value as false would switch all of them off the moment this
+    // deploys. Lottery is the other way round — nothing has it until somebody says so.
+    storedesk: { appEnabled: record(source.storedesk).appEnabled !== false },
     lottery: { setupMode: null, appEnabled: record(source.lottery).appEnabled === true },
     integrations: {
       googleSheets: {
@@ -153,6 +165,7 @@ export const StoreSettingsUpdateSchema = z
       })
       .strict()
       .optional(),
+    storedesk: z.object({ appEnabled: z.boolean().optional() }).strict().optional(),
     lottery: z.object({ setupMode: z.null().optional(), appEnabled: z.boolean().optional() }).strict().optional(),
     integrations: z
       .object({
@@ -188,6 +201,9 @@ export function applySettingsUpdate(
 ): { settings: StoreSettings; changed: string[] } {
   const next: StoreSettings = normalizeStoreSettings(current);
   if (update.capabilities) next.capabilities = { ...update.capabilities };
+  if (update.storedesk) {
+    next.storedesk = { appEnabled: update.storedesk.appEnabled ?? next.storedesk.appEnabled };
+  }
   if (update.lottery) {
     next.lottery = {
       setupMode: null,
@@ -202,6 +218,7 @@ export function applySettingsUpdate(
   const before = normalizeStoreSettings(current);
   const changed: string[] = [];
   if (canonicalJson(before.capabilities) !== canonicalJson(next.capabilities)) changed.push("capabilities");
+  if (canonicalJson(before.storedesk) !== canonicalJson(next.storedesk)) changed.push("storedesk");
   if (canonicalJson(before.lottery) !== canonicalJson(next.lottery)) changed.push("lottery");
   if (canonicalJson(before.integrations) !== canonicalJson(next.integrations)) changed.push("integrations");
   if (before.timeZone !== next.timeZone) changed.push("timeZone");
@@ -211,6 +228,7 @@ export function applySettingsUpdate(
 /** What the store server receives in the access sync (no secrets exist here). */
 export function syncSettingsView(settings: StoreSettings) {
   return {
+    storedesk: settings.storedesk,
     lottery: settings.lottery,
     integrations: settings.integrations,
     timeZone: settings.timeZone

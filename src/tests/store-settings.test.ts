@@ -52,6 +52,7 @@ describe("GET …/settings", () => {
     expect(res.body).toEqual({
       settings: {
         capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
+        storedesk: { appEnabled: true },
         lottery: { setupMode: null, appEnabled: false },
         integrations: {
           googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
@@ -220,7 +221,7 @@ describe("what the store receives, and suspension (P12)", () => {
       // Not answered: the store server reads null as present, so nothing is hidden.
       capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
       settingsVersion: 1,
-      settings: { lottery: { setupMode: null, appEnabled: false }, timeZone: null }
+      settings: { storedesk: { appEnabled: true }, lottery: { setupMode: null, appEnabled: false }, timeZone: null }
     });
     expect(first.body.store.settings.integrations.gtc).toEqual({ status: "coming_soon" });
 

@@ -28,6 +28,8 @@ export function withDefaults(s: Partial<StoreSettings> | null | undefined): Stor
       moneyOrder: answer(s?.capabilities?.moneyOrder),
       prepaidGift: answer(s?.capabilities?.prepaidGift)
     },
+    // Missing means on, the same way the server reads it: every store that exists runs StoreDesk.
+    storedesk: { appEnabled: s?.storedesk?.appEnabled !== false },
     lottery: { setupMode: null, appEnabled: Boolean(s?.lottery?.appEnabled) },
     integrations: {
       googleSheets: {

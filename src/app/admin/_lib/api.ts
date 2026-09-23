@@ -204,6 +204,7 @@ export type CapabilityAnswers = Record<StoreCapability, boolean | null>;
 
 export interface StoreSettings {
   capabilities: CapabilityAnswers;
+  storedesk: { appEnabled: boolean };
   lottery: { setupMode: null; appEnabled: boolean };
   integrations: {
     googleSheets: {
