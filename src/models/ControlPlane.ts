@@ -421,6 +421,14 @@ const AppUserSchema = new Schema(
      * organization has it (lib/users.ts). Missing on older records.
      */
     createdInOrganizationId: { type: String, index: true },
+    /** Proved the address is theirs. Email is the identity (D-18), so it is worth proving once. */
+    emailVerifiedAt: Date,
+    /** A password reset in flight: single use, an hour, and only the hash is kept. */
+    resetSecretHash: { type: String, select: false },
+    resetExpiresAt: Date,
+    resetConsumedAt: Date,
+    verificationSecretHash: { type: String, select: false },
+    verificationExpiresAt: Date,
     enrollmentSecretHash: { type: String, select: false },
     enrollmentExpiresAt: Date,
     enrollmentConsumedAt: Date,

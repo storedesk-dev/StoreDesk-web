@@ -1,4 +1,4 @@
-import { LegacySubscriptionModel, LicenseModel, OrganizationModel, TenantStoreModel } from "@/models/ControlPlane";
+import { AppUserModel, LegacySubscriptionModel, LicenseModel, OrganizationModel, TenantStoreModel } from "@/models/ControlPlane";
 import { ENTITLED_STATUSES, SUPERSEDED_BY_MASTER, coverageKeyFor, newLicenseNumber } from "@/lib/licenses";
 import { writeAudit } from "@/lib/audit";
 
@@ -188,6 +188,32 @@ export async function reportCapabilityDefaults(): Promise<CapabilityDefaultsRepo
   return report;
 }
 
+export type EmailIdentityReport = { verified: number; duplicates: number };
+
+/**
+ * Email is the identity now (D-18). Two things follow, both idempotent:
+ *
+ *   · Anyone who set their password from an invitation has already proved the
+ *     address — the code only ever reached that inbox — so they are marked
+ *     verified rather than asked to prove it again.
+ *   · Duplicate addresses are counted and reported. There should be none: the
+ *     collection has carried a unique index on email since before this, so a
+ *     merge step exists only to say so out loud if one ever appears.
+ */
+export async function migrateEmailIdentity(): Promise<EmailIdentityReport> {
+  const verified = await AppUserModel.updateMany(
+    { status: "active", emailVerifiedAt: { $exists: false }, enrollmentConsumedAt: { $exists: true } },
+    [{ $set: { emailVerifiedAt: "$enrollmentConsumedAt" } }],
+    { updatePipeline: true }
+  );
+  const duplicates = await AppUserModel.aggregate([
+    { $group: { _id: { $toLower: "$email" }, n: { $sum: 1 } } },
+    { $match: { n: { $gt: 1 } } },
+    { $count: "duplicates" }
+  ]);
+  return { verified: verified.modifiedCount ?? 0, duplicates: Number(duplicates[0]?.duplicates ?? 0) };
+}
+
 export async function runMigrations(): Promise<void> {
   const subscriptions = await migrateSubscriptionsToLicenses();
   if (Object.values(subscriptions).some((count) => count > 0)) {
@@ -197,6 +223,11 @@ export async function runMigrations(): Promise<void> {
   if (Object.values(modes).some((count) => count > 0)) {
     console.info(`[migrate] licensing modes: ${JSON.stringify(modes)}`);
   }
+  const identity = await migrateEmailIdentity();
+  if (identity.verified > 0 || identity.duplicates > 0) {
+    console.info(`[migrate] email identity: ${JSON.stringify(identity)}`);
+  }
+
   const capabilities = await reportCapabilityDefaults();
   if (capabilities.looksUntouched > 0) {
     console.info(`[migrate] store capabilities (report only, nothing changed): ${JSON.stringify(capabilities)}`);

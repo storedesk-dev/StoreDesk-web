@@ -257,7 +257,10 @@ describe("passwordHash stays out of every other response", () => {
     // a new way to leak it: the access sync (which returns it on purpose), the
     // legacy login and enrollment (which only verify or set it), and the
     // internal admin login (a different model).
-    const allowed = new Set(["lib/access-sync.ts", "lib/control-plane.ts", "lib/admin-auth.ts"]);
+    // App sign-in and password reset (lib/accounts.ts) join them: they verify
+    // or set the hash and return neither — accounts.test.ts reads the sign-in
+    // response and asserts the hash is not anywhere in it.
+    const allowed = new Set(["lib/access-sync.ts", "lib/control-plane.ts", "lib/admin-auth.ts", "lib/accounts.ts"]);
     const root = path.resolve(__dirname, "..");
     const offenders: string[] = [];
     const walk = (dir: string) => {

@@ -113,6 +113,35 @@ export function invitationEmailText(message: InvitationMessage): string {
   ].join("\n");
 }
 
+export interface PasswordResetMessage {
+  email: string;
+  name: string | null;
+  credential: string;
+}
+
+/**
+ * Resetting a password. Short, and it says plainly what happens if it was not
+ * them — because the one person who must not be confused by this message is
+ * someone who did not ask for it.
+ */
+export function passwordResetEmail(message: PasswordResetMessage): string {
+  return [
+    `Hello ${message.name ?? "there"},`,
+    "",
+    `Someone asked to reset the StoreDesk password for ${message.email}. To choose a new one, open https://${SITE.domain}/reset-password and paste this code:`,
+    "",
+    `    ${message.credential}`,
+    "",
+    "The code works once and runs out in an hour.",
+    "",
+    `Questions? Reply to this e-mail or write to ${SITE.supportEmail}.`,
+    "",
+    "— StoreDesk",
+    "",
+    "If you did not ask for this, you can ignore it: your password has not changed, and nothing happens until the code is used."
+  ].join("\n");
+}
+
 /**
  * The organization owner is told every time a store's PC is replaced, because
  * a replacement moves the whole store to another computer. Plain, short, and
