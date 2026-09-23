@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 import { MarketingShell } from "@/components/MarketingShell";
+import { useCodeFromLink } from "@/lib/use-code-from-link";
 import { SITE } from "@/lib/site";
 
 /**
@@ -40,6 +41,12 @@ export function EnrollClient() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
+
+  // Straight from the welcome e-mail's button: filled in, never spent on arrival.
+  const fromLink = useCodeFromLink();
+  useEffect(() => {
+    if (fromLink) setCode(fromLink);
+  }, [fromLink]);
 
   // Pasted codes routinely carry a trailing newline or stray spaces.
   const cleanCode = code.replace(/\s+/g, "");

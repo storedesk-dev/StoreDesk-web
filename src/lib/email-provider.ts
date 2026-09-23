@@ -1,5 +1,6 @@
 import { SITE } from "@/lib/site";
 import { DEFAULT_FROM, renderEmail, renderText, type EmailSpec } from "@/lib/email-theme";
+import { linkWithCode } from "@/lib/use-code-from-link";
 
 /**
  * Setup keys expire on a clock the recipient can read. Rendered in Eastern time
@@ -113,11 +114,13 @@ export function invitationEmail(message: InvitationMessage): EmailSpec {
     body: [
       `Hello ${message.recipientName},`,
       `${message.organizationName} has set up a StoreDesk account for you. StoreDesk is the back-office software their store runs — prices, daily numbers and reports.`,
-      "To finish, open the page below and paste this code to choose your password:",
+      "Press the button below to set your password. It takes a minute.",
       "Then sign in on the store PC or your phone with this e-mail address and the password you chose."
     ],
-    callout: { label: "Your code", value: message.invitationCode },
-    action: { label: "Set your password", url: `https://${SITE.domain}/enroll` },
+    callout: { label: "Or paste this code at " + SITE.domain + "/enroll", value: message.invitationCode },
+    // The code rides in the fragment, which never reaches a server, a proxy or a log. The page
+    // fills the form in with it and spends it only when a person submits.
+    action: { label: "Set your password", url: linkWithCode(`https://${SITE.domain}/enroll`, message.invitationCode) },
     footnote: [
       `The code works once and expires ${formatExpiry(message.expiresAt)}.`,
       "Keep this e-mail to yourself — anyone with the code can set your password.",
@@ -148,10 +151,10 @@ export function passwordResetSpec(message: PasswordResetMessage): EmailSpec {
     heading: "Reset your StoreDesk password",
     body: [
       `Hello ${message.name ?? "there"},`,
-      `Someone asked to reset the StoreDesk password for ${message.email}. To choose a new one, open the page below and paste this code:`
+      `Someone asked to reset the StoreDesk password for ${message.email}. Press the button below to choose a new one.`
     ],
-    callout: { label: "Your code", value: message.credential },
-    action: { label: "Choose a new password", url: `https://${SITE.domain}/reset-password` },
+    callout: { label: "Or paste this code at " + SITE.domain + "/reset-password", value: message.credential },
+    action: { label: "Choose a new password", url: linkWithCode(`https://${SITE.domain}/reset-password`, message.credential) },
     footnote: [
       "The code works once and runs out in an hour.",
       "If you did not ask for this, you can ignore it: your password has not changed, and nothing happens until the code is used."

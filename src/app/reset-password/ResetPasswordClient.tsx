@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, KeyRound, Loader2, Mail } from "lucide-react";
 import { MarketingShell } from "@/components/MarketingShell";
+import { useCodeFromLink } from "@/lib/use-code-from-link";
 import { SITE } from "@/lib/site";
 
 /**
@@ -48,6 +49,15 @@ export function ResetPasswordClient() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
+
+  // Clicked the button in the e-mail: the code is in the fragment. It is filled in, not spent —
+  // the link checkers corporate mail runs would otherwise burn it before its owner ever clicked.
+  const fromLink = useCodeFromLink();
+  useEffect(() => {
+    if (!fromLink) return;
+    setCode(fromLink);
+    setStep("choose");
+  }, [fromLink]);
 
   // Pasted codes routinely carry a trailing newline or stray spaces.
   const cleanCode = code.replace(/\s+/g, "");
