@@ -46,11 +46,15 @@ function whyBlocked(org: Doc, store: Doc, license: Doc | null, mode: Parameters<
     return { status: 409, code: "STORE_SUSPENDED", message: `The store is ${String(store.status)}.` };
   }
   const settings = normalizeStoreSettings(store.settings);
+  // One switch, not two. A store that sells lottery tickets runs StoreDesk Lottery — there is no
+  // second opt-in, because there is no version of this product where a store sells lottery and we
+  // hand them somebody else's rack. "Has lottery" is the whole answer.
   if (settings.capabilities.lottery !== true) {
-    return { status: 409, code: "STORE_NO_LOTTERY", message: "This store doesn't sell lottery." };
-  }
-  if (settings.lottery.appEnabled !== true) {
-    return { status: 409, code: "LOTTERY_APP_DISABLED", message: "StoreDesk Lottery isn't enabled for this store." };
+    return {
+      status: 409,
+      code: "STORE_NO_LOTTERY",
+      message: "This store isn't set up for lottery. Ask your StoreDesk contact to switch it on."
+    };
   }
   const problem = licenseProblem(license, mode);
   if (problem) return { status: 402, code: problem.code, message: problem.message };

@@ -56,7 +56,7 @@ export interface ReachableStore {
   readonly role: { readonly roleId: string; readonly roleName: string | null };
   /** What the role grants, per app, so a picker can grey out a store the person cannot work in. */
   readonly pages: Partial<Readonly<Record<App, readonly string[]>>>;
-  readonly lottery: { readonly sells: boolean; readonly appEnabled: boolean };
+  readonly lottery: { readonly sells: boolean };
   readonly licence: { readonly covered: boolean; readonly status: string | null; readonly expiresAt: string | null };
 }
 
@@ -147,7 +147,7 @@ export async function reachableFor(appUserId: string): Promise<ReachableOrganiza
         status: text(store.status),
         role: { roleId, roleName: roleNames.get(organizationId)?.get(roleId) ?? null },
         pages: (rolePages.get(organizationId)?.get(roleId) ?? {}) as Partial<Record<App, string[]>>,
-        lottery: { sells: capabilities.lottery === true, appEnabled: lottery.appEnabled === true },
+        lottery: { sells: capabilities.lottery === true },
         licence: {
           covered: covering !== null && isEntitled(covering),
           status: covering ? text(covering.status) : null,

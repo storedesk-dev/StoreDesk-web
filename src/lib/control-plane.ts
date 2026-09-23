@@ -741,7 +741,7 @@ export async function lookupOrganization(rawSlug: string) {
     );
     return {
       hasLottery: settings.capabilities.lottery === true,
-      appEnabled: settings.lottery.appEnabled === true,
+      appEnabled: settings.capabilities.lottery === true,
       pc: pc ? { claimedAt: isoDate(pc.activatedAt ?? pc.createdAt) } : null
     };
   };

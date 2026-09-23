@@ -117,7 +117,7 @@ describe("the org-tag lookup tells the lottery app what it needs", () => {
       admin,
       organizationId,
       storeId,
-      { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null }, lottery: { appEnabled: true } },
+      { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null } },
       1
     );
     const lookup = await lookupOrganization("example-retail");
@@ -125,7 +125,7 @@ describe("the org-tag lookup tells the lottery app what it needs", () => {
     expect(lookup.stores[0]?.licence).toEqual({ covered: true, status: "active" });
   });
 
-  it("separates selling lottery from being switched on for the app", async () => {
+  it("answers that the app is on the moment the store sells lottery — one switch, not two", async () => {
     await updateStoreSettings(
       admin,
       organizationId,
@@ -134,7 +134,8 @@ describe("the org-tag lookup tells the lottery app what it needs", () => {
       1
     );
     const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]?.lottery).toMatchObject({ hasLottery: true, appEnabled: false });
+    // D-24: there is no second opt-in. Selling lottery is running StoreDesk Lottery.
+    expect(lookup.stores[0]?.lottery).toMatchObject({ hasLottery: true, appEnabled: true });
   });
 
   it("reports the PC that already holds the store, by date and never by name", async () => {

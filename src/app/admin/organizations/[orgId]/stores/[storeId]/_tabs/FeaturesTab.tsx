@@ -14,7 +14,11 @@ import { useStoreSettings, type StoreTabProps } from "./shared";
 
 const FEATURES: Array<{ key: StoreCapability; label: string; description: string }> = [
   { key: "fuel", label: "Has fuel", description: "Fuel prices, fuel totals, gas in daily numbers." },
-  { key: "lottery", label: "Has lottery", description: "Lottery sales and payouts." },
+  {
+    key: "lottery",
+    label: "Has lottery",
+    description: "Lottery sales and payouts — and this store runs StoreDesk Lottery on its own PC."
+  },
   { key: "coam", label: "Has COAM", description: "Coin-operated amusement machine revenue." },
   { key: "ebt", label: "Takes EBT", description: "Food-stamp tenders on the register; an EBT line in daily numbers." },
   { key: "moneyOrder", label: "Sells money orders", description: "Money-order sales and fees, entered from the form, the sheet or a report." },
@@ -26,7 +30,6 @@ type Draft = {
   caps: Record<StoreCapability, Answer>;
   googleSheets: boolean;
   storeDeskApp: boolean;
-  lotteryApp: boolean;
 };
 
 export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
@@ -34,16 +37,14 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const [draft, setDraft] = useState<Draft>({
     caps: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null },
     googleSheets: false,
-    storeDeskApp: true,
-    lotteryApp: false
+    storeDeskApp: true
   });
 
   const saved: Draft | null = settings.data
     ? {
         caps: settings.data.settings.capabilities,
         googleSheets: settings.data.settings.integrations.googleSheets.enabled,
-        storeDeskApp: settings.data.settings.storedesk.appEnabled,
-        lotteryApp: settings.data.settings.lottery.appEnabled
+        storeDeskApp: settings.data.settings.storedesk.appEnabled
       }
     : null;
 
@@ -52,8 +53,7 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
       setDraft({
         caps: settings.data.settings.capabilities,
         googleSheets: settings.data.settings.integrations.googleSheets.enabled,
-        storeDeskApp: settings.data.settings.storedesk.appEnabled,
-        lotteryApp: settings.data.settings.lottery.appEnabled
+        storeDeskApp: settings.data.settings.storedesk.appEnabled
       });
     }
   }, [settings.data]);
@@ -66,8 +66,7 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
   const dirty =
     FEATURES.some((f) => draft.caps[f.key] !== saved.caps[f.key]) ||
     draft.googleSheets !== saved.googleSheets ||
-    draft.storeDeskApp !== saved.storeDeskApp ||
-    draft.lotteryApp !== saved.lotteryApp;
+    draft.storeDeskApp !== saved.storeDeskApp;
 
   function save() {
     void settings.save(
@@ -75,8 +74,6 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
         ...s,
         capabilities: draft.caps,
         storedesk: { ...s.storedesk, appEnabled: draft.storeDeskApp },
-        // Switched off with the capability: a store that does not sell lottery cannot run the app.
-        lottery: { ...s.lottery, appEnabled: draft.caps.lottery === true && draft.lotteryApp },
         integrations: { ...s.integrations, googleSheets: { ...s.integrations.googleSheets, enabled: draft.googleSheets } }
       }),
       "Features saved"
@@ -116,20 +113,27 @@ export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
             />
           </li>
           <li className="py-3">
-            <SwitchRow
-              id="product-lottery"
-              label="StoreDesk Lottery"
-              description={
-                draft.caps.lottery === true
-                  ? "The rack, the shift close and its reports, on their own PC. Off: this store cannot set a lottery PC up."
-                  : "Needs Has lottery below: a store that does not sell lottery tickets cannot run the lottery app."
-              }
-              checked={draft.caps.lottery === true && draft.lotteryApp}
-              disabled={draft.caps.lottery !== true}
-              onChange={(v) => setDraft((d) => ({ ...d, lotteryApp: v }))}
-            />
+            {/*
+              Not a switch of its own. A store that sells lottery tickets runs StoreDesk Lottery —
+              there is no version of this product where they sell lottery and we point them at
+              somebody else's rack. So "Has lottery" below is the whole answer, and this row says
+              what that answer currently is rather than asking the question twice.
+            */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="font-medium">StoreDesk Lottery</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">
+                  {draft.caps.lottery === true
+                    ? "On, because this store sells lottery. The rack, the shift close and its reports, on their own PC."
+                    : "Switched on by Has lottery below — a store that sells lottery tickets runs our lottery app."}
+                </div>
+              </div>
+              <Chip tone={draft.caps.lottery === true ? "green" : "gray"}>
+                {draft.caps.lottery === true ? "On" : "Off"}
+              </Chip>
+            </div>
           </li>
-          {!draft.storeDeskApp && !(draft.caps.lottery === true && draft.lotteryApp) ? (
+          {!draft.storeDeskApp && draft.caps.lottery !== true ? (
             <li className="pb-3">
               <Notice tone="amber">
                 Neither product is on. Nobody at this store can set a PC up until one of them is.

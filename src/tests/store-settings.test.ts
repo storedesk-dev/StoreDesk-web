@@ -53,7 +53,7 @@ describe("GET …/settings", () => {
       settings: {
         capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
         storedesk: { appEnabled: true },
-        lottery: { setupMode: null, appEnabled: false },
+        lottery: { setupMode: null },
         integrations: {
           googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
           gtc: { status: "coming_soon" }
@@ -99,30 +99,34 @@ describe("PUT …/settings", () => {
     expect(scheduleNotify).toHaveBeenCalledWith({ ...params, reason: "store.settings.update" });
   });
 
-  it("switches the lottery app on for a store, separately from whether it sells lottery", async () => {
-    const res = await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true } } });
+  /**
+   * There used to be three tests here for a second switch — "sells lottery" and "may run the app"
+   * were separate answers. They are one answer now (D-24): a store that sells lottery tickets runs
+   * StoreDesk Lottery, and `lottery.appEnabled` is gone rather than left as a switch nobody can
+   * reach. What replaces them is the test below, which pins the capability as the only lever.
+   */
+  it("makes Has lottery the whole answer: no second switch to set", async () => {
+    const res = await put({
+      settingsVersion: 1,
+      settings: { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null } }
+    });
     expect(res.status).toBe(200);
-    expect(res.body.settings.lottery).toEqual({ setupMode: null, appEnabled: true });
-    // The capability is untouched: selling lottery and running the app are two different answers.
-    expect(res.body.settings.capabilities.lottery).toBeNull();
+    expect(res.body.settings.capabilities.lottery).toBe(true);
+    expect(res.body.settings.lottery).toEqual({ setupMode: null });
     const audit = await lastAudit("store.settings.update");
-    expect(audit?.metadata).toMatchObject({ changed: ["lottery"] });
+    expect(audit?.metadata).toMatchObject({ changed: ["capabilities"] });
   });
 
-  it("keeps the lottery app switch across an unrelated save", async () => {
-    await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true } } });
-    const later = await put({ settingsVersion: 2, settings: { timeZone: "America/New_York" } });
-    expect(later.body.settings.lottery.appEnabled).toBe(true);
-  });
-
-  it("turns the lottery app back off", async () => {
-    await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true } } });
-    const off = await put({ settingsVersion: 2, settings: { lottery: { appEnabled: false } } });
-    expect(off.body.settings.lottery.appEnabled).toBe(false);
+  it("refuses the retired app switch rather than silently ignoring it", async () => {
+    // A caller still sending the old field is a caller working from a stale idea of the model, and
+    // a quiet 200 would let them believe they had switched something on.
+    const res = await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true } } });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("REQUEST_INVALID");
   });
 
   it("refuses an unknown key in the lottery section", async () => {
-    const res = await put({ settingsVersion: 1, settings: { lottery: { appEnabled: true, rackSize: 50 } } });
+    const res = await put({ settingsVersion: 1, settings: { lottery: { rackSize: 50 } } });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe("REQUEST_INVALID");
   });
@@ -221,7 +225,7 @@ describe("what the store receives, and suspension (P12)", () => {
       // Not answered: the store server reads null as present, so nothing is hidden.
       capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
       settingsVersion: 1,
-      settings: { storedesk: { appEnabled: true }, lottery: { setupMode: null, appEnabled: false }, timeZone: null }
+      settings: { storedesk: { appEnabled: true }, lottery: { setupMode: null }, timeZone: null }
     });
     expect(first.body.store.settings.integrations.gtc).toEqual({ status: "coming_soon" });
 

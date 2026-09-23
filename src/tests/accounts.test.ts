@@ -31,7 +31,7 @@ async function store(organizationId: string, name: string, extra: Record<string,
     organizationId,
     name,
     status: "active",
-    settings: { capabilities: { lottery: true }, lottery: { appEnabled: true }, timeZone: "America/New_York", ...extra }
+    settings: { capabilities: { lottery: true }, timeZone: "America/New_York", ...extra }
   });
   return storeId;
 }
@@ -91,7 +91,8 @@ describe("what one account can reach", () => {
     expect(reachable?.name).toBe("Patel Retail");
     expect(reachable?.stores.map((entry) => entry.name)).toEqual(["Store 42", "Store 7"]);
     expect(reachable?.stores.every((entry) => entry.licence.covered)).toBe(true);
-    expect(reachable?.stores[0]?.lottery).toEqual({ sells: true, appEnabled: true });
+    // One answer, not two: a store that sells lottery runs StoreDesk Lottery (D-24).
+    expect(reachable?.stores[0]?.lottery).toEqual({ sells: true });
   });
 
   it("answers one store for a person assigned to only that one", async () => {

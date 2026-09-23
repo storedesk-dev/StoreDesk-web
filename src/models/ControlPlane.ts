@@ -145,7 +145,9 @@ const StoreSettingsSchema = new Schema(
       // Whether this store may run the StoreDesk Lottery app. Separate from the `lottery`
       // capability, which only says the store sells lottery: a store can sell it and keep its
       // own book. Only a store with this on can set a lottery PC up.
-      appEnabled: { type: Boolean, default: false }
+      // Retired 2026-09-23: "Has lottery" is the only switch (D-24). Kept on the schema so an
+      // existing document with the field still loads; nothing reads it.
+      appEnabled: { type: Boolean, default: false, select: false }
     },
     integrations: {
       googleSheets: {

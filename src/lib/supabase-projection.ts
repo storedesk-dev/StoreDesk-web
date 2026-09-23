@@ -138,6 +138,8 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
 
   const settings = (store.settings as Doc | undefined) ?? {};
   const lottery = (settings.lottery as Doc | undefined) ?? {};
+  // One switch: selling lottery is running our lottery app (D-24).
+  const sellsLottery = ((settings.capabilities as Doc | undefined) ?? {}).lottery === true;
 
   return {
     version: typeof store.projectionVersion === "number" ? store.projectionVersion : 1,
@@ -165,7 +167,7 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
       offline_grace_days: covering && typeof covering.offlineGraceDays === "number" ? covering.offlineGraceDays : 7
     },
     config: [
-      { key: "lottery.appEnabled", value: lottery.appEnabled === true },
+      { key: "lottery.appEnabled", value: sellsLottery },
       ...(lottery.rackLayout ? [{ key: "rack.layout", value: lottery.rackLayout }] : []),
       ...(lottery.settings ? [{ key: "lottery.settings", value: lottery.settings }] : [])
     ],

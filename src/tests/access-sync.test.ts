@@ -107,7 +107,7 @@ describe("buildAccessSyncBody", () => {
       capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
       settings: {
         storedesk: { appEnabled: true },
-        lottery: { setupMode: null, appEnabled: false },
+        lottery: { setupMode: null },
         integrations: {
           googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
           gtc: { status: "coming_soon" }

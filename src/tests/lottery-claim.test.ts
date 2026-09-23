@@ -27,15 +27,14 @@ let admin: Awaited<ReturnType<typeof createAdmin>>;
 let params: { organizationId: string; storeId: string };
 
 /** The store as it has to be before a lottery PC may be set up: it sells lottery, and it is switched on. */
-async function enableLottery(appEnabled = true) {
+async function enableLottery(lottery: boolean = true) {
   const current = await getStoreSettings(params.organizationId, params.storeId);
   await updateStoreSettings(
     admin,
     params.organizationId,
     params.storeId,
     {
-      capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
-      lottery: { appEnabled }
+      capabilities: { lottery, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null }
     },
     current.settingsVersion
   );
@@ -59,11 +58,11 @@ describe("issuing a lottery setup key", () => {
     expect(res.body.error.code).toBe("STORE_NO_LOTTERY");
   });
 
-  it("refuses a store that sells lottery but is not switched on for the app", async () => {
+  it("refuses a store that is not set up for lottery", async () => {
     await enableLottery(false);
     const res = await issue();
     expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe("LOTTERY_APP_DISABLED");
+    expect(res.body.error.code).toBe("STORE_NO_LOTTERY");
   });
 
   it("refuses a store whose licence is not in force", async () => {
@@ -171,7 +170,7 @@ describe("claiming a PC with the key", () => {
     await enableLottery(false); // the switch goes off after the key was handed over
     const res = await redeem(key);
     expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe("LOTTERY_APP_DISABLED");
+    expect(res.body.error.code).toBe("STORE_NO_LOTTERY");
   });
 
   it("leaves no usable key behind when the installation is gone", async () => {
@@ -229,12 +228,12 @@ describe("a store that already runs StoreDesk types nothing", () => {
     expect(text).not.toContain("tunnelUrl");
   });
 
-  it("still refuses a store that is not switched on for the app", async () => {
+  it("still refuses a store that is not set up for lottery", async () => {
     await enableLottery(false);
     const pc = await activatePc(params.organizationId, params.storeId);
     const res = await call(vouchedClaim, request("POST", "/", { token: pc.token, body: { deviceName: "COUNTER-PC" } }), {});
     expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe("LOTTERY_APP_DISABLED");
+    expect(res.body.error.code).toBe("STORE_NO_LOTTERY");
   });
 
   it("refuses anyone without the store's credential", async () => {

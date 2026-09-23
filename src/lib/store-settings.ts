@@ -42,7 +42,7 @@ export type StoreSettings = {
    * sells, a product says what it is paying for.
    */
   storedesk: { appEnabled: boolean };
-  lottery: { setupMode: null; appEnabled: boolean };
+  lottery: { setupMode: null };
   integrations: {
     googleSheets: GoogleSheetsSettings;
     gtc: { status: "coming_soon" };
@@ -54,7 +54,7 @@ export function defaultStoreSettings(): StoreSettings {
   return {
     capabilities: { lottery: null, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null },
     storedesk: { appEnabled: true },
-    lottery: { setupMode: null, appEnabled: false },
+    lottery: { setupMode: null },
     integrations: {
       googleSheets: { enabled: false, spreadsheetUrl: null, spreadsheetId: null, sheetName: null, headerRow: 1 },
       gtc: { status: "coming_soon" }
@@ -109,7 +109,7 @@ export function normalizeStoreSettings(raw: unknown): StoreSettings {
     // no such field; reading a missing value as false would switch all of them off the moment this
     // deploys. Lottery is the other way round — nothing has it until somebody says so.
     storedesk: { appEnabled: record(source.storedesk).appEnabled !== false },
-    lottery: { setupMode: null, appEnabled: record(source.lottery).appEnabled === true },
+    lottery: { setupMode: null },
     integrations: {
       googleSheets: {
         enabled: sheets.enabled === true,
@@ -166,7 +166,7 @@ export const StoreSettingsUpdateSchema = z
       .strict()
       .optional(),
     storedesk: z.object({ appEnabled: z.boolean().optional() }).strict().optional(),
-    lottery: z.object({ setupMode: z.null().optional(), appEnabled: z.boolean().optional() }).strict().optional(),
+    lottery: z.object({ setupMode: z.null().optional() }).strict().optional(),
     integrations: z
       .object({
         googleSheets: z
@@ -204,12 +204,7 @@ export function applySettingsUpdate(
   if (update.storedesk) {
     next.storedesk = { appEnabled: update.storedesk.appEnabled ?? next.storedesk.appEnabled };
   }
-  if (update.lottery) {
-    next.lottery = {
-      setupMode: null,
-      appEnabled: update.lottery.appEnabled ?? next.lottery.appEnabled
-    };
-  }
+  if (update.lottery) next.lottery = { setupMode: null };
   const sheets = update.integrations?.googleSheets;
   // The switch only: the sheet the store PC reported is kept as it is.
   if (sheets) next.integrations.googleSheets = { ...next.integrations.googleSheets, enabled: sheets.enabled };
