@@ -145,6 +145,7 @@ async function fixture(options: { lotteryPages?: boolean; userStatus?: string } 
     assignmentId: publicId("asg"),
     appUserId,
     organizationId,
+    storeId,
     role: "clerk",
     status: "active",
     createdByAdminId: publicId("adm")

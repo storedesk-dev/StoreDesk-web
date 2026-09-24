@@ -4,7 +4,6 @@ import {
   AppUserModel,
   LicenseModel,
   LoginThrottleModel,
-  OrganizationModel,
   TenantStoreModel,
   UserAssignmentModel
 } from "@/models/ControlPlane";
@@ -16,7 +15,7 @@ import {
   sha256,
   verifySecret
 } from "@/lib/control-plane-security";
-import { coveringFrom, isEntitled } from "@/lib/licenses";
+import { isEntitled } from "@/lib/licenses";
 import { readOrganizationRoles } from "@/lib/roles";
 import { writeAudit } from "@/lib/audit";
 import { scheduleAppUserNotify } from "@/lib/store-notify";
@@ -27,8 +26,9 @@ import type { App } from "@/config/pages";
  *
  * Email is the identity (D-18): unique across the whole system, normalized
  * lowercase, and nobody types an organization tag any more. A person signs in
- * with email and password and is answered with the stores they can reach,
- * grouped by organization — one store goes straight in, several show a picker.
+ * with email and password and is answered with the stores they can reach, as a
+ * flat list — one store goes straight in, several show a picker. There is no
+ * grouping above a store any more (D-22).
  *
  * What this is not: a session. The control plane says who someone is and what
  * they may reach; a StoreDesk app still signs in at its own store server
@@ -60,14 +60,6 @@ export interface ReachableStore {
   readonly licence: { readonly covered: boolean; readonly status: string | null; readonly expiresAt: string | null };
 }
 
-export interface ReachableOrganization {
-  readonly organizationId: string;
-  readonly name: string;
-  readonly slug: string;
-  readonly status: string;
-  readonly stores: readonly ReachableStore[];
-}
-
 export interface Account {
   readonly appUserId: string;
   readonly email: string;
@@ -76,28 +68,38 @@ export interface Account {
   readonly emailVerified: boolean;
 }
 
-/** An assignment with no `storeId` is organization-wide: every store, present and future. */
-const allStores = (assignment: Doc): boolean => !text(assignment.storeId) && !text(assignment.workerInstallationId);
-
 /**
- * Which stores this person can reach, grouped by organization, with the role
- * that applies to each. The most specific assignment wins — the store's own
- * over the organization's — which is the rule the access sync already uses for
- * a store server (`lib/access-sync.ts`), kept the same here so a picker and a
- * store server never disagree about someone's role.
+ * Which stores this person can reach, flat, with the role that applies at each.
+ *
+ * Every assignment names a store (D-22), so there is nothing to resolve: one
+ * row, one store. A tie — the same store twice, which the unique index should
+ * prevent — goes to the lowest `assignmentId`, the same tie-break the access
+ * sync uses (`lib/access-sync.ts`), so a picker and a store server never
+ * disagree about someone's role.
  */
-export async function reachableFor(appUserId: string): Promise<ReachableOrganization[]> {
+export async function reachableFor(appUserId: string): Promise<ReachableStore[]> {
   await connectDb();
   const assignments = (await UserAssignmentModel.find({ appUserId, status: "active" }).lean()) as Doc[];
   if (!assignments.length) return [];
 
-  const organizationIds = [...new Set(assignments.map((assignment) => text(assignment.organizationId)).filter(Boolean))];
-  const [organizations, stores, licences] = (await Promise.all([
-    OrganizationModel.find({ organizationId: { $in: organizationIds } }).lean(),
-    TenantStoreModel.find({ organizationId: { $in: organizationIds }, status: { $ne: "closed" } }).lean(),
-    LicenseModel.find({ organizationId: { $in: organizationIds }, status: { $ne: "cancelled" } }).lean()
-  ])) as [Doc[], Doc[], Doc[]];
+  const byStore = new Map<string, Doc>();
+  for (const assignment of assignments) {
+    const storeId = text(assignment.storeId);
+    if (!storeId) continue;
+    const current = byStore.get(storeId);
+    if (!current || text(assignment.assignmentId) < text(current.assignmentId)) byStore.set(storeId, assignment);
+  }
+  if (!byStore.size) return [];
 
+  const storeIds = [...byStore.keys()];
+  const [stores, licences] = (await Promise.all([
+    TenantStoreModel.find({ storeId: { $in: storeIds }, status: { $ne: "closed" } }).lean(),
+    LicenseModel.find({ storeId: { $in: storeIds }, status: { $ne: "cancelled" } }).lean()
+  ])) as [Doc[], Doc[]];
+
+  // Roles are still written on the organization (they move to the store in S6),
+  // so they are read per organization and applied per store.
+  const organizationIds = [...new Set(stores.map((store) => text(store.organizationId)).filter(Boolean))];
   const roleNames = new Map<string, Map<string, string>>();
   const rolePages = new Map<string, Map<string, Record<string, string[]>>>();
   for (const organizationId of organizationIds) {
@@ -119,50 +121,36 @@ export async function reachableFor(appUserId: string): Promise<ReachableOrganiza
     );
   }
 
-  const result: ReachableOrganization[] = [];
-  for (const organization of organizations) {
-    const organizationId = text(organization.organizationId);
-    const mine = assignments.filter((assignment) => text(assignment.organizationId) === organizationId);
-    if (!mine.length) continue;
-    const orgWide = mine.find(allStores) ?? null;
+  const byId = new Map(licences.map((licence) => [text(licence.storeId), licence]));
+  const reachable: ReachableStore[] = [];
+  for (const store of stores) {
+    const storeId = text(store.storeId);
+    const assignment = byStore.get(storeId);
+    if (!assignment) continue;
+    const organizationId = text(store.organizationId);
 
-    const reachable: ReachableStore[] = [];
-    for (const store of stores.filter((row) => text(row.organizationId) === organizationId)) {
-      const storeId = text(store.storeId);
-      const assignment = mine.find((row) => text(row.storeId) === storeId) ?? orgWide;
-      if (!assignment) continue;
+    const roleId = text(assignment.role);
+    const settings = (store.settings as Doc | undefined) ?? {};
+    const capabilities = (settings.capabilities as Doc | undefined) ?? {};
+    const covering = byId.get(storeId) ?? null;
 
-      const roleId = text(assignment.role);
-      const settings = (store.settings as Doc | undefined) ?? {};
-      const capabilities = (settings.capabilities as Doc | undefined) ?? {};
-      const covering = coveringFrom(store, licences);
-
-      reachable.push({
-        storeId,
-        name: text(store.name),
-        storeNumber: store.storeNumber ? text(store.storeNumber) : null,
-        timeZone: settings.timeZone ? text(settings.timeZone) : null,
-        status: text(store.status),
-        role: { roleId, roleName: roleNames.get(organizationId)?.get(roleId) ?? null },
-        pages: (rolePages.get(organizationId)?.get(roleId) ?? {}) as Partial<Record<App, string[]>>,
-        lottery: { sells: capabilities.lottery === true },
-        licence: {
-          covered: covering !== null && isEntitled(covering),
-          status: covering ? text(covering.status) : null,
-          expiresAt: covering ? iso(covering.entitlementExpiresAt) : null
-        }
-      });
-    }
-
-    result.push({
-      organizationId,
-      name: text(organization.name),
-      slug: text(organization.slug),
-      status: text(organization.status),
-      stores: reachable.sort((a, b) => a.name.localeCompare(b.name))
+    reachable.push({
+      storeId,
+      name: text(store.name),
+      storeNumber: store.storeNumber ? text(store.storeNumber) : null,
+      timeZone: settings.timeZone ? text(settings.timeZone) : null,
+      status: text(store.status),
+      role: { roleId, roleName: roleNames.get(organizationId)?.get(roleId) ?? null },
+      pages: (rolePages.get(organizationId)?.get(roleId) ?? {}) as Partial<Record<App, string[]>>,
+      lottery: { sells: capabilities.lottery === true },
+      licence: {
+        covered: covering !== null && isEntitled(covering),
+        status: covering ? text(covering.status) : null,
+        expiresAt: covering ? iso(covering.entitlementExpiresAt) : null
+      }
     });
   }
-  return result.sort((a, b) => a.name.localeCompare(b.name));
+  return reachable.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ── signing in ───────────────────────────────────────────────────────────────
@@ -200,7 +188,7 @@ const unknownAccountHash = (): Promise<string> => (dummyHash ??= hashSecret(rand
 
 export interface SignInResult {
   readonly user: Account;
-  readonly organizations: readonly ReachableOrganization[];
+  readonly stores: readonly ReachableStore[];
 }
 
 /**
@@ -258,7 +246,7 @@ export async function signIn(input: { email: string; password: string; ip?: stri
     metadata: { ipHash }
   });
 
-  return { user: account(user as unknown as Doc), organizations: await reachableFor(text(user.appUserId)) };
+  return { user: account(user as unknown as Doc), stores: await reachableFor(text(user.appUserId)) };
 }
 
 const account = (user: Doc): Account => ({

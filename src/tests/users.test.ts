@@ -60,7 +60,7 @@ const managed = (overrides: Record<string, unknown> = {}) => ({
   email: "Rakesh@StoreDesk.com",
   name: "Rakesh",
   password: "first-password",
-  assignments: [{ storeId: null, role: "store_manager" }],
+  assignments: [{ storeId, role: "store_manager" }],
   ...overrides
 });
 
@@ -83,7 +83,7 @@ describe("POST …/users", () => {
     });
     expect(res.body.user.appUserId).toMatch(/^appu_[a-f0-9]{32}$/);
     expect(res.body.user.assignments).toEqual([
-      expect.objectContaining({ storeId: null, role: "store_manager", roleName: "Store Manager", status: "active" })
+      expect.objectContaining({ storeId, role: "store_manager", roleName: "Store Manager", status: "active" })
     ]);
     expect(res.body.user.assignments[0].assignmentId).toMatch(/^assign_[a-f0-9]{32}$/);
     expect(await verifySecret(await hashOf("rakesh@storedesk.com"), "first-password")).toBe(true);
@@ -127,7 +127,8 @@ describe("POST …/users", () => {
 
   it("never modifies an existing login: its password stays, only the access is added (P1)", async () => {
     const other = await seedOrganization(admin, { slug: "other-retail", name: "Other Retail" });
-    await addCall(managed({ name: "Original" }), other.organization.organizationId);
+    // Its own store: an assignment names a store of the organization it is posted to (D-22).
+    await addCall(managed({ name: "Original", assignments: [{ storeId: other.store.storeId, role: "store_manager" }] }), other.organization.organizationId);
     const before = await hashOf("rakesh@storedesk.com");
 
     const res = await addCall(managed({ name: "Changed", password: "attacker-password", assignments: [{ storeId, role: "cashier" }] }));
@@ -146,16 +147,19 @@ describe("POST …/users", () => {
   });
 
   it.each([
-    ["a short password", managed({ password: "short" })],
-    ["no password for a managed login", managed({ password: undefined })],
-    ["a role the organization doesn't have", managed({ assignments: [{ storeId: null, role: "store_operator" }] })],
-    ["a store of another organization", managed({ assignments: [{ storeId: "store_elsewhere", role: "cashier" }] })],
-    ["the same store twice", managed({ assignments: [{ storeId, role: "cashier" }, { storeId, role: "viewer" }] })],
-    ["no assignments", managed({ assignments: [] })],
-    ["a login that is not e-mail-shaped", managed({ email: "rakesh" })],
-    ["no mode", { email: "a@example.invalid", assignments: [{ storeId: null, role: "viewer" }] }]
+    ["a short password", () => managed({ password: "short" })],
+    ["no password for a managed login", () => managed({ password: undefined })],
+    ["a role the organization doesn't have", () => managed({ assignments: [{ storeId, role: "store_operator" }] })],
+    ["a store of another organization", () => managed({ assignments: [{ storeId: "store_elsewhere", role: "cashier" }] })],
+    ["the same store twice", () => managed({ assignments: [{ storeId, role: "cashier" }, { storeId, role: "viewer" }] })],
+    ["no assignments", () => managed({ assignments: [] })],
+    // D-22: there is no scope above a store, so an assignment without one is not a request.
+    ["an assignment with no store", () => managed({ assignments: [{ role: "cashier" }] })],
+    ["an assignment with a null store", () => managed({ assignments: [{ storeId: null, role: "cashier" }] })],
+    ["a login that is not e-mail-shaped", () => managed({ email: "rakesh" })],
+    ["no mode", () => ({ email: "a@example.invalid", assignments: [{ storeId, role: "viewer" }] })]
   ])("answers 400 for %s", async (_label, body) => {
-    const res = await addCall(body);
+    const res = await addCall(body());
     expect(res.status).toBe(400);
     expect(await AppUserModel.countDocuments()).toBe(0);
   });
@@ -165,7 +169,7 @@ describe("POST …/users", () => {
     const res = await call(list, request("GET", "/", { token: admin.token }), { organizationId });
     expect(res.status).toBe(200);
     expect(res.body.users).toHaveLength(1);
-    expect(res.body.users[0].assignments[0]).toMatchObject({ role: "store_manager", storeId: null });
+    expect(res.body.users[0].assignments[0]).toMatchObject({ role: "store_manager", storeId });
     expect((await call(list, request("GET", "/"), { organizationId })).status).toBe(401);
     expect((await addCall({ ...managed() }, "org_nope")).status).toBe(404);
   });
@@ -236,9 +240,11 @@ describe("PATCH, password and invite on …/users/{appUserId}", () => {
 
 describe("…/users/{appUserId}/assignments", () => {
   it("adds, changes and revokes access, notifying the stores each reaches", async () => {
-    const { body } = await addCall(managed());
-    const appUserId = body.user.appUserId;
     const { store: second } = await createStore(admin, organizationId, { name: "Store 17" });
+    const { store: home } = await createStore(admin, organizationId, { name: "Store 90" });
+    // Their access starts somewhere else, so Store 42 and Store 17 are both free to move between.
+    const { body } = await addCall(managed({ assignments: [{ storeId: home.storeId, role: "store_manager" }] }));
+    const appUserId = body.user.appUserId;
 
     const added = await call(addAssignment, request("POST", "/", { token: admin.token, body: { storeId, role: "cashier" } }), { organizationId, appUserId });
     expect(added.status).toBe(201);

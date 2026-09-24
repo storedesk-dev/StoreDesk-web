@@ -207,7 +207,7 @@ describe("DELETE /organizations/{org}", () => {
       mode: "managed",
       email: "only-a@example.invalid",
       password: "password-1",
-      assignments: [{ storeId: null, role: "viewer" }]
+      assignments: [{ storeId: a.store.storeId, role: "viewer" }]
     });
     for (const org of [a, b]) {
       await addUser(admin, org.organization.organizationId, {

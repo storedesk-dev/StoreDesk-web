@@ -1,4 +1,5 @@
-import { AppUserModel, TenantStoreModel } from "@/models/ControlPlane";
+import { AppUserModel, TenantStoreModel, UserAssignmentModel } from "@/models/ControlPlane";
+import { publicId } from "@/lib/control-plane-security";
 
 /**
  * Data migrations, run once per server process right after the database
@@ -70,10 +71,76 @@ export async function migrateEmailIdentity(): Promise<EmailIdentityReport> {
   return { verified: verified.modifiedCount ?? 0, duplicates: Number(duplicates[0]?.duplicates ?? 0) };
 }
 
+export type StoreAccessReport = { expanded: number; orphans: number };
+
+/**
+ * D-22: an assignment names a store, so the organization-wide row — one with no
+ * `storeId`, which used to mean "every store, present and future" — is expanded
+ * into one row per store of its organization and then deleted.
+ *
+ * Idempotent twice over: the source rows are gone after the first run, and each
+ * new row goes in with the unique index's own key, so a row that already exists
+ * for that person at that store is left exactly as it is — its role is the more
+ * specific answer and always won before this too.
+ *
+ * An org-wide row whose organization has no stores has nothing to expand into.
+ * It is counted as an orphan and deleted all the same: it granted nothing then
+ * and would grant nothing now.
+ */
+export async function migrateStoreScopedAccess(): Promise<StoreAccessReport> {
+  const orgWide = (await UserAssignmentModel.find({
+    $or: [{ storeId: { $exists: false } }, { storeId: null }, { storeId: "" }]
+  }).lean()) as Array<Record<string, unknown>>;
+  if (!orgWide.length) return { expanded: 0, orphans: 0 };
+
+  const organizationIds = [...new Set(orgWide.map((row) => String(row.organizationId)))];
+  const stores = (await TenantStoreModel.find({ organizationId: { $in: organizationIds } })
+    .select("storeId organizationId")
+    .lean()) as Array<Record<string, unknown>>;
+  const byOrg = new Map<string, string[]>();
+  for (const store of stores) {
+    const key = String(store.organizationId);
+    byOrg.set(key, [...(byOrg.get(key) ?? []), String(store.storeId)]);
+  }
+
+  let expanded = 0;
+  let orphans = 0;
+  for (const row of orgWide) {
+    const storeIds = byOrg.get(String(row.organizationId)) ?? [];
+    if (!storeIds.length) orphans += 1;
+    for (const storeId of storeIds) {
+      const key = {
+        appUserId: String(row.appUserId),
+        storeId,
+        workerInstallationId: null
+      };
+      const already = await UserAssignmentModel.findOne(key).lean();
+      if (already) continue;
+      await UserAssignmentModel.create({
+        ...key,
+        assignmentId: publicId("assign"),
+        organizationId: String(row.organizationId),
+        role: String(row.role),
+        scopes: Array.isArray(row.scopes) ? row.scopes : ["relay:request"],
+        status: String(row.status ?? "active"),
+        createdByAdminId: String(row.createdByAdminId ?? "")
+      });
+      expanded += 1;
+    }
+    await UserAssignmentModel.deleteOne({ assignmentId: row.assignmentId });
+  }
+  return { expanded, orphans };
+}
+
 export async function runMigrations(): Promise<void> {
   const identity = await migrateEmailIdentity();
   if (identity.verified > 0 || identity.duplicates > 0) {
     console.info(`[migrate] email identity: ${JSON.stringify(identity)}`);
+  }
+
+  const access = await migrateStoreScopedAccess();
+  if (access.expanded > 0 || access.orphans > 0) {
+    console.info(`[migrate] store-scoped access: ${JSON.stringify(access)}`);
   }
 
   const capabilities = await reportCapabilityDefaults();

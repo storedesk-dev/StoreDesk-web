@@ -214,23 +214,23 @@ describe("access sync version", () => {
 describe("pickAssignmentsForInstallation", () => {
   const target = { organizationId: "org_1", storeId: "store_1", workerInstallationId: "winst_1" };
 
-  it("takes the most specific assignment and ignores other stores", () => {
+  it("takes this installation's assignment over the store's, and ignores other stores", () => {
     const picked = pickAssignmentsForInstallation(
       [
-        assignment("u1", { assignmentId: "z_org", storeId: undefined, workerInstallationId: undefined, role: "org_viewer" }),
         assignment("u1", { assignmentId: "y_store", workerInstallationId: undefined, role: "store_manager" }),
         assignment("u1", { assignmentId: "x_inst", role: "cashier" }),
-        assignment("u2", { workerInstallationId: undefined, storeId: undefined, role: "org_admin" }),
+        assignment("u2", { workerInstallationId: undefined, role: "org_admin" }),
         assignment("u3", { storeId: "store_2", workerInstallationId: undefined }),
         assignment("u4", { workerInstallationId: "winst_other" }),
-        assignment("u5", { organizationId: "org_2", workerInstallationId: undefined, storeId: undefined }),
-        assignment("u6", { status: "revoked" })
+        assignment("u5", { organizationId: "org_2", workerInstallationId: undefined }),
+        assignment("u6", { status: "revoked" }),
+        // A row with no store reaches nothing: there is no scope above a store (D-22).
+        assignment("u7", { assignmentId: "a_org", storeId: undefined, workerInstallationId: undefined, role: "org_viewer" })
       ],
       target
     );
     expect([...picked.keys()].sort()).toEqual(["u1", "u2"]);
     expect(picked.get("u1")?.role).toBe("cashier");
-    // Organization-wide ("All Stores") reaches every store of the organization.
     expect(picked.get("u2")?.role).toBe("org_admin");
   });
 

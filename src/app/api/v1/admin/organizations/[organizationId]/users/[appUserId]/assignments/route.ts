@@ -5,7 +5,7 @@ import { AssignmentCreateSchema, addAssignment } from "@/lib/users";
 
 type Ctx = { params: Promise<{ organizationId: string; appUserId: string }> };
 
-/** `{storeId | null, role}`: access at one store, or every store. 409 ASSIGNMENT_EXISTS. */
+/** `{storeId, role}`: access at one store, which is the only scope there is. 409 ASSIGNMENT_EXISTS. */
 export async function POST(req: Request, ctx: Ctx) {
   try {
     const admin = await requireInternalAdmin(req);

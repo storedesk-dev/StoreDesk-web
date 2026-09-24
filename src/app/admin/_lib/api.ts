@@ -347,7 +347,8 @@ export type RoleTemplate = "org_admin" | "store_manager" | "cashier" | "viewer" 
 
 export interface Assignment {
   assignmentId: string;
-  storeId: string | null;
+  /** The store this is access to. There is nothing above a store to grant (D-22). */
+  storeId: string;
   role: string;
   status: "active" | "revoked";
 }
@@ -372,7 +373,7 @@ export interface AddUserInput {
   email: string;
   name?: string;
   password?: string;
-  assignments: Array<{ storeId: string | null; role: string }>;
+  assignments: Array<{ storeId: string; role: string }>;
 }
 
 export interface AddUserResult {
@@ -695,13 +696,13 @@ export const api = {
     request<{ ok: true }>("POST", `${user(orgId, appUserId)}/password`, { password }),
   resendInvite: (orgId: string, appUserId: string) =>
     request<Invitation>("POST", `${user(orgId, appUserId)}/invite`),
-  addAssignment: (orgId: string, appUserId: string, input: { storeId: string | null; role: string }) =>
+  addAssignment: (orgId: string, appUserId: string, input: { storeId: string; role: string }) =>
     request<{ assignment: Assignment }>("POST", `${user(orgId, appUserId)}/assignments`, input),
   updateAssignment: (
     orgId: string,
     appUserId: string,
     assignmentId: string,
-    patch: { storeId?: string | null; role?: string }
+    patch: { storeId?: string; role?: string }
   ) =>
     request<{ assignment: Assignment }>(
       "PATCH",

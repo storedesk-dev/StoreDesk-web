@@ -105,7 +105,8 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
     email: owner,
     name: "Priya (owner)",
     password: userPassword,
-    assignments: [{ storeId: null, role: "org_admin" }]
+    // A row per store: there is no organization-wide grant any more (D-22).
+    assignments: [main, elm, hwy].map((store) => ({ storeId: store.storeId, role: "org_admin" }))
   });
   await addUser(admin, organizationId, {
     mode: "managed",

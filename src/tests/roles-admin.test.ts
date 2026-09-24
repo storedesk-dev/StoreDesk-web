@@ -25,11 +25,14 @@ setupMemoryMongo();
 
 let admin: TestAdmin;
 let organizationId: string;
+let storeId: string;
 
 beforeEach(async () => {
   vi.clearAllMocks();
   admin = await createAdmin();
-  organizationId = (await seedOrganization(admin)).organization.organizationId;
+  const seeded = await seedOrganization(admin);
+  organizationId = seeded.organization.organizationId;
+  storeId = seeded.store.storeId;
 });
 
 const cashier = () => findTemplate("cashier")!;
@@ -40,7 +43,7 @@ describe("GET …/roles", () => {
       mode: "managed",
       email: "clerk@example.invalid",
       password: "password-1",
-      assignments: [{ storeId: null, role: "cashier" }]
+      assignments: [{ storeId, role: "cashier" }]
     });
     const res = await call(list, request("GET", "/", { token: admin.token }), { organizationId });
     expect(res.status).toBe(200);
@@ -152,7 +155,7 @@ describe("DELETE …/roles/{roleId}", () => {
       mode: "managed",
       email: "viewer@example.invalid",
       password: "password-1",
-      assignments: [{ storeId: null, role: "viewer" }]
+      assignments: [{ storeId, role: "viewer" }]
     });
     const inUse = await call(remove, request("DELETE", "/", { token: admin.token }), { organizationId, roleId: "viewer" });
     expect(inUse.status).toBe(409);

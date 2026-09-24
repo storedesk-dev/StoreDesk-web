@@ -104,15 +104,15 @@ afterEach(() => {
   for (const key of ["STORE_SECRET_KEY", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]) delete process.env[key];
 });
 
-/** An app user with `role` over every store of the organization. */
-async function makeUser(role: string, storeId: string | null = null): Promise<string> {
+/** An app user with `role` at a store — the only scope an assignment has (D-22). */
+async function makeUser(role: string, storeId: string = params.storeId): Promise<string> {
   const appUserId = publicId("appu");
   await AppUserModel.create({ appUserId, email: `${appUserId}@example.invalid`, name: "Test", status: "active", createdByAdminId: admin.adminId });
   await UserAssignmentModel.create({
     assignmentId: publicId("asg"),
     appUserId,
     organizationId: params.organizationId,
-    ...(storeId ? { storeId } : {}),
+    storeId,
     role,
     status: "active",
     createdByAdminId: admin.adminId

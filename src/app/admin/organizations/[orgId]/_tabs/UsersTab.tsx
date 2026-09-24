@@ -35,7 +35,6 @@ import {
 import { RowMenu } from "../../../_components/Menu";
 import type { OrgTabProps } from "./types";
 
-const WHOLE_ORG = "";
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 
@@ -323,7 +322,6 @@ function AccessRows({
             <div className="min-w-40 flex-1">
               <label htmlFor={`acc-store-${i}`} className="sr-only">Store {i + 1}</label>
               <Select id={`acc-store-${i}`} value={row.storeId} onChange={(e) => set(i, { storeId: e.target.value })}>
-                <option value={WHOLE_ORG}>All stores (whole organization)</option>
                 {stores.map((s) => (
                   <option key={s.storeId} value={s.storeId}>
                     {s.name}
@@ -360,7 +358,7 @@ function AccessRows({
           onClick={() => {
             const used = new Set(rows.map((r) => r.storeId));
             const next = stores.find((s) => !used.has(s.storeId));
-            onChange([...rows, { storeId: next?.storeId ?? WHOLE_ORG, role: rows[rows.length - 1]?.role ?? defaultRole(roles) }]);
+            onChange([...rows, { storeId: next?.storeId ?? "", role: rows[rows.length - 1]?.role ?? defaultRole(roles) }]);
           }}
         >
           Another store
@@ -452,7 +450,7 @@ function AddUserDialog({
     setEmail("");
     setName("");
     setPassword("");
-    setRows([{ storeId: stores[0]?.storeId ?? WHOLE_ORG, role: defaultRole(roles) }]);
+    setRows([{ storeId: stores[0]?.storeId ?? "", role: defaultRole(roles) }]);
     setError(null);
     setTouched(false);
     setResult(null);
@@ -478,7 +476,7 @@ function AddUserDialog({
         email: login,
         name: name.trim() || undefined,
         password: mode === "managed" && !alreadyHere ? password : undefined,
-        assignments: rows.map((r) => ({ storeId: r.storeId || null, role: r.role }))
+        assignments: rows.map((r) => ({ storeId: r.storeId, role: r.role }))
       });
       onAdded();
       toast(res.existing ? `Access added for ${login}` : `${login} added`, "success");
@@ -683,18 +681,18 @@ function AssignmentsDialog({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const current = (a: Assignment) => edits[a.assignmentId] ?? { storeId: a.storeId ?? WHOLE_ORG, role: a.role };
+  const current = (a: Assignment) => edits[a.assignmentId] ?? { storeId: a.storeId ?? "", role: a.role };
 
   async function save(a: Assignment) {
     const next = current(a);
     setBusy(a.assignmentId);
     setError(null);
     try {
-      const patch: { storeId?: string | null; role?: string } = {};
-      if (next.storeId !== (a.storeId ?? WHOLE_ORG)) patch.storeId = next.storeId || null;
+      const patch: { storeId?: string; role?: string } = {};
+      if (next.storeId && next.storeId !== a.storeId) patch.storeId = next.storeId;
       if (next.role !== a.role) patch.role = next.role;
       const res = await api.updateAssignment(orgId, user.appUserId, a.assignmentId, patch);
-      setItems((list) => list.map((x) => (x.assignmentId === a.assignmentId ? res.assignment ?? { ...x, storeId: next.storeId || null, role: next.role } : x)));
+      setItems((list) => list.map((x) => (x.assignmentId === a.assignmentId ? res.assignment ?? { ...x, storeId: next.storeId, role: next.role } : x)));
       setEdits((e) => {
         const copy = { ...e };
         delete copy[a.assignmentId];
@@ -732,13 +730,12 @@ function AssignmentsDialog({
         <ul className="space-y-2">
           {items.map((a) => {
             const c = current(a);
-            const dirty = c.storeId !== (a.storeId ?? WHOLE_ORG) || c.role !== a.role;
+            const dirty = c.storeId !== a.storeId || c.role !== a.role;
             return (
               <li key={a.assignmentId} className="flex flex-wrap items-end gap-2 rounded-md border border-slate-200 p-2.5">
                 <Field label="Store" className="min-w-40 flex-1">
                   {(p) => (
                     <Select {...p} value={c.storeId} onChange={(e) => setEdits((x) => ({ ...x, [a.assignmentId]: { ...c, storeId: e.target.value } }))}>
-                      <option value={WHOLE_ORG}>All stores (whole organization)</option>
                       {stores.map((s) => (
                         <option key={s.storeId} value={s.storeId}>{s.name}</option>
                       ))}
@@ -786,8 +783,9 @@ function AddAccessDialog({
   onAdded: () => void;
 }) {
   const { toast } = useToast();
-  const used = new Set(user.assignments.filter((a) => a.status === "active").map((a) => a.storeId ?? WHOLE_ORG));
-  const firstFree = stores.find((s) => !used.has(s.storeId))?.storeId ?? (used.has(WHOLE_ORG) ? "" : WHOLE_ORG);
+  const used = new Set(user.assignments.filter((a) => a.status === "active").map((a) => a.storeId));
+  // Every store already taken leaves nothing to add, which the Store select says by being empty.
+  const firstFree = stores.find((s) => !used.has(s.storeId))?.storeId ?? "";
   const [storeId, setStoreId] = useState(firstFree);
   const [role, setRole] = useState(defaultRole(roles));
   const [busy, setBusy] = useState(false);
@@ -799,7 +797,7 @@ function AddAccessDialog({
     setBusy(true);
     setError(null);
     try {
-      await api.addAssignment(orgId, user.appUserId, { storeId: storeId || null, role });
+      await api.addAssignment(orgId, user.appUserId, { storeId, role });
       toast(`Access added for ${user.email}`, "success");
       onAdded();
       onClose();
@@ -828,7 +826,6 @@ function AddAccessDialog({
         <Field label="Store" error={taken ? "They already have access here — change the role instead." : undefined}>
           {(p) => (
             <Select {...p} value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-              <option value={WHOLE_ORG}>All stores (whole organization)</option>
               {stores.map((s) => (
                 <option key={s.storeId} value={s.storeId}>{s.name}</option>
               ))}

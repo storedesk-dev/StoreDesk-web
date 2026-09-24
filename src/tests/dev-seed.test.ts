@@ -86,7 +86,10 @@ describe("seedDevData", () => {
     const users = await AppUserModel.find({}).lean();
     expect(users.map((user) => user.status).sort()).toEqual(["active", "active", "pending_enrollment"]);
     expect(users.filter((user) => user.loginType === "managed")).toHaveLength(2);
-    expect(await UserAssignmentModel.countDocuments({ status: "active" })).toBe(3);
+    expect(await UserAssignmentModel.countDocuments({ status: "active" })).toBe(5);
+    // The owner reaches all three Example Retail stores, one explicit row each (D-22).
+    const ownerRows = await UserAssignmentModel.find({ role: "org_admin", status: "active" }).lean();
+    expect(ownerRows.map((row) => String(row.storeId)).sort()).toEqual([main.storeId, elm.storeId, hwy.storeId].sort());
     expect(await SetupKeyModel.countDocuments({ status: "shown" })).toBe(1);
 
     const invited = seed.users.find((user) => user.kind === "invite")!;

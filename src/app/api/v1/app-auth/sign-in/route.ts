@@ -7,8 +7,8 @@ import { jsonError, parseBody } from "@/lib/http";
 /**
  * `POST /api/v1/app-auth/sign-in` — email and password, no organization tag.
  *
- * Answers who the person is and every store they can reach, grouped by
- * organization: one store goes straight in, several show a picker (D-18). It
+ * Answers who the person is and every store they can reach, as a flat list:
+ * one store goes straight in, several show a picker (D-18). It
  * mints nothing — a StoreDesk app still signs in at its own store server, and
  * the lottery token comes from a separate route in P2 — so what this returns
  * is a directory answer, not a session.
@@ -30,12 +30,11 @@ export async function POST(req: Request) {
     const body = await parseBody(req, SignInSchema);
     const result = await signIn({ email: body.email, password: body.password, ip });
 
-    const stores = result.organizations.flatMap((organization) => organization.stores);
     return NextResponse.json({
       user: result.user,
-      organizations: result.organizations,
+      stores: result.stores,
       // What the app does next, said plainly, so a phone does not have to work it out.
-      next: stores.length === 0 ? "no_stores" : stores.length === 1 ? "one_store" : "pick_a_store"
+      next: result.stores.length === 0 ? "no_stores" : result.stores.length === 1 ? "one_store" : "pick_a_store"
     });
   } catch (error) {
     return jsonError(error);

@@ -274,7 +274,7 @@ describe("GET …/stores/{store}/access-preview", () => {
       mode: "managed",
       email: "owner@example.invalid",
       password: "password-1",
-      assignments: [{ storeId: null, role: "org_admin" }]
+      assignments: [{ storeId: store.storeId, role: "org_admin" }]
     });
     // Not answered stays null, and as in both apps a fuel page shows only on a literal true.
     const unanswered = await call(preview, request("GET", "/", { token: admin.token }), params);

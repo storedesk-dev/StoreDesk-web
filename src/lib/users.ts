@@ -42,8 +42,8 @@ const passwordSchema = z
 
 const AssignmentInputSchema = z
   .object({
-    /** A store of this organization, or null for every store. */
-    storeId: z.string().trim().min(1).max(80).nullable(),
+    /** The store this is access to. There is no wider scope. */
+    storeId: z.string().trim().min(1).max(80),
     role: z.string().trim().min(1).max(40)
   })
   .strict();
@@ -76,7 +76,7 @@ export const SetPasswordSchema = z.object({ password: passwordSchema }).strict()
 export const AssignmentCreateSchema = AssignmentInputSchema;
 export const AssignmentPatchSchema = z
   .object({
-    storeId: z.string().trim().min(1).max(80).nullable().optional(),
+    storeId: z.string().trim().min(1).max(80).optional(),
     role: z.string().trim().min(1).max(40).optional()
   })
   .strict()
@@ -145,13 +145,13 @@ const iso = (value: unknown): string | null => (value ? toIsoOr(value, "") || nu
 type Lookup = { stores: Map<string, string>; roles: Map<string, string> };
 
 function assignmentView(assignment: Doc, lookup?: Lookup) {
-  const storeId = assignment.storeId ? String(assignment.storeId) : null;
+  const storeId = String(assignment.storeId ?? "");
   const role = String(assignment.role);
   return {
     assignmentId: String(assignment.assignmentId),
     organizationId: String(assignment.organizationId),
     storeId,
-    storeName: storeId ? (lookup?.stores.get(storeId) ?? null) : null,
+    storeName: lookup?.stores.get(storeId) ?? null,
     workerInstallationId: assignment.workerInstallationId ? String(assignment.workerInstallationId) : null,
     role,
     roleName: lookup?.roles.get(role) ?? null,
@@ -238,20 +238,19 @@ async function validateAssignments(organizationId: string, org: Doc, inputs: Ass
     if (!roleIds.has(input.role)) {
       throw new ControlPlaneError(400, "ROLE_UNKNOWN", `role: "${input.role}" is not a role of this organization`);
     }
-    if (input.storeId !== null && !storeIds.has(input.storeId)) {
+    if (!storeIds.has(input.storeId)) {
       throw new ControlPlaneError(400, "STORE_UNKNOWN", `storeId: "${input.storeId}" is not a store of this organization`);
     }
-    const scope = input.storeId ?? "*";
-    if (scopes.has(scope)) {
+    if (scopes.has(input.storeId)) {
       throw new ControlPlaneError(400, "REQUEST_INVALID", "assignments: the same store is listed twice");
     }
-    scopes.add(scope);
+    scopes.add(input.storeId);
   }
 }
 
-/** The one assignment a user can have at a scope (the collection's unique index). */
-function scopeFilter(appUserId: string, organizationId: string, storeId: string | null) {
-  return { appUserId, organizationId, storeId: storeId ?? null, workerInstallationId: null };
+/** The one assignment a user can have at a store (the collection's unique index). */
+function scopeFilter(appUserId: string, organizationId: string, storeId: string) {
+  return { appUserId, organizationId, storeId, workerInstallationId: null };
 }
 
 type Upserted = { assignment: Doc; outcome: "created" | "reactivated" | "exists" };
@@ -277,7 +276,7 @@ async function upsertAssignment(
     assignmentId: publicId("assign"),
     appUserId,
     organizationId,
-    ...(input.storeId ? { storeId: input.storeId } : {}),
+    storeId: input.storeId,
     role: input.role,
     scopes: ["relay:request"],
     status: "active",
@@ -291,23 +290,21 @@ async function upsertAssignment(
 function auditAssignment(admin: InternalAdminActor, action: string, assignment: Doc, extra: Doc = {}) {
   return auditAdmin(admin, {
     organizationId: String(assignment.organizationId),
-    storeId: assignment.storeId ? String(assignment.storeId) : undefined,
+    storeId: String(assignment.storeId),
     action,
     targetType: "user_assignment",
     targetId: String(assignment.assignmentId),
-    metadata: { appUserId: assignment.appUserId, storeId: assignment.storeId ?? null, role: assignment.role, ...extra }
+    metadata: { appUserId: assignment.appUserId, storeId: String(assignment.storeId), role: assignment.role, ...extra }
   });
 }
 
-/** Nudge the stores an assignment reaches (it may be revoked already, so not by user). */
+/** Nudge the store an assignment reaches (it may be revoked already, so not by user). */
 function notifyAssignmentScope(assignment: Doc, reason: NotifyReason) {
   const organizationId = String(assignment.organizationId);
   if (assignment.workerInstallationId) {
     scheduleNotify({ organizationId, workerInstallationIds: [String(assignment.workerInstallationId)], reason });
-  } else if (assignment.storeId) {
-    scheduleNotify({ organizationId, storeId: String(assignment.storeId), reason });
   } else {
-    scheduleNotify({ organizationId, reason });
+    scheduleNotify({ organizationId, storeId: String(assignment.storeId), reason });
   }
 }
 
@@ -594,13 +591,13 @@ export async function updateAssignment(
   const org = await requireOrganization(organizationId);
   const before = await requireAssignment(organizationId, appUserId, assignmentId);
   const target: AssignmentInput = {
-    storeId: body.storeId === undefined ? (before.storeId ? String(before.storeId) : null) : body.storeId,
+    storeId: body.storeId ?? String(before.storeId),
     role: body.role ?? String(before.role)
   };
   await validateAssignments(organizationId, org, [target]);
   const set: Doc = { role: target.role };
   const unset: Doc = {};
-  const beforeStore = before.storeId ? String(before.storeId) : null;
+  const beforeStore = String(before.storeId);
   if (target.storeId !== beforeStore || before.workerInstallationId) {
     const clash = (await UserAssignmentModel.findOne({
       ...scopeFilter(appUserId, organizationId, target.storeId),
@@ -612,8 +609,7 @@ export async function updateAssignment(
     // A revoked assignment at the target scope is only a tombstone; the audit
     // log keeps its history, and the unique index allows one row per scope.
     if (clash) await UserAssignmentModel.deleteOne({ assignmentId: clash.assignmentId });
-    if (target.storeId) set.storeId = target.storeId;
-    else unset.storeId = 1;
+    set.storeId = target.storeId;
     unset.workerInstallationId = 1;
   }
   const after = (await UserAssignmentModel.findOneAndUpdate(

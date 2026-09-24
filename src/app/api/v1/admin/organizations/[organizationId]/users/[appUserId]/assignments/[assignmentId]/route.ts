@@ -5,7 +5,7 @@ import { AssignmentPatchSchema, revokeAssignment, updateAssignment } from "@/lib
 
 type Ctx = { params: Promise<{ organizationId: string; appUserId: string; assignmentId: string }> };
 
-/** `{role?, storeId?}`: change the role, the store (null = every store), or both. */
+/** `{role?, storeId?}`: change the role, the store, or both. */
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const admin = await requireInternalAdmin(req);

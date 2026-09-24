@@ -455,7 +455,8 @@ const UserAssignmentSchema = new Schema(
     assignmentId: { ...id, unique: true },
     appUserId: id,
     organizationId: id,
-    storeId: { type: String, index: true },
+    /** The store this is access to. There is nothing above a store to grant (D-22). */
+    storeId: { type: String, required: true, index: true },
     workerInstallationId: { type: String, index: true },
     role: { type: String, required: true },
     scopes: { type: [String], default: ["relay:request"] },
@@ -465,10 +466,7 @@ const UserAssignmentSchema = new Schema(
   },
   timestamps
 );
-UserAssignmentSchema.index(
-  { appUserId: 1, organizationId: 1, storeId: 1, workerInstallationId: 1 },
-  { unique: true }
-);
+UserAssignmentSchema.index({ appUserId: 1, storeId: 1, workerInstallationId: 1 }, { unique: true });
 
 const ClientDeviceSchema = new Schema(
   {

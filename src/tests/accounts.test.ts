@@ -8,7 +8,7 @@ import {
   UserAssignmentModel
 } from "@/models/ControlPlane";
 import { hashSecret, publicId, resetRateLimitsForTests } from "@/lib/control-plane-security";
-import { migrateEmailIdentity } from "@/lib/migrations";
+import { migrateEmailIdentity, migrateStoreScopedAccess } from "@/lib/migrations";
 import { reachableFor, requestPasswordReset, resetPassword, signIn, verifyEmail, requestEmailVerification } from "@/lib/accounts";
 import { POST as signInRoute } from "@/app/api/v1/app-auth/sign-in/route";
 import { POST as resetRoute } from "@/app/api/v1/app-auth/password-reset/route";
@@ -58,12 +58,12 @@ async function person(email: string, status = "active") {
   return appUserId;
 }
 
-async function assign(appUserId: string, organizationId: string, role = "org_admin", storeId?: string) {
+async function assign(appUserId: string, organizationId: string, storeId: string, role = "org_admin") {
   await UserAssignmentModel.create({
     assignmentId: publicId("asg"),
     appUserId,
     organizationId,
-    ...(storeId ? { storeId } : {}),
+    storeId,
     role,
     status: "active",
     createdByAdminId: publicId("adm")
@@ -80,19 +80,20 @@ const post = (body: unknown, caller = "203.0.113.9") =>
 beforeEach(() => resetRateLimitsForTests());
 
 describe("what one account can reach", () => {
-  it("answers every store of an organization for a person assigned to all of them", async () => {
+  it("answers the stores a person has a row at, and only those", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await store(org, "Store 42");
-    await store(org, "Store 7");
+    const forty_two = await store(org, "Store 42");
+    const seven = await store(org, "Store 7");
+    await store(org, "Store 90");
     const dana = await person("dana@example.com");
-    await assign(dana, org);
+    await assign(dana, org, forty_two);
+    await assign(dana, org, seven);
 
-    const [reachable] = await reachableFor(dana);
-    expect(reachable?.name).toBe("Patel Retail");
-    expect(reachable?.stores.map((entry) => entry.name)).toEqual(["Store 42", "Store 7"]);
-    expect(reachable?.stores.every((entry) => entry.licence.covered)).toBe(true);
+    const reachable = await reachableFor(dana);
+    expect(reachable.map((entry) => entry.name)).toEqual(["Store 42", "Store 7"]);
+    expect(reachable.every((entry) => entry.licence.covered)).toBe(true);
     // One answer, not two: a store that sells lottery runs StoreDesk Lottery (D-24).
-    expect(reachable?.stores[0]?.lottery).toEqual({ sells: true });
+    expect(reachable[0]?.lottery).toEqual({ sells: true });
   });
 
   it("answers one store for a person assigned to only that one", async () => {
@@ -100,72 +101,78 @@ describe("what one account can reach", () => {
     const one = await store(org, "Store 42");
     await store(org, "Store 7");
     const sam = await person("sam@example.com");
-    await assign(sam, org, "clerk", one);
+    await assign(sam, org, one, "clerk");
 
-    const [reachable] = await reachableFor(sam);
-    expect(reachable?.stores).toHaveLength(1);
-    expect(reachable?.stores[0]?.storeId).toBe(one);
-    expect(reachable?.stores[0]?.role.roleId).toBe("clerk");
+    const reachable = await reachableFor(sam);
+    expect(reachable).toHaveLength(1);
+    expect(reachable[0]?.storeId).toBe(one);
+    expect(reachable[0]?.role.roleId).toBe("clerk");
   });
 
-  it("lets the store's own assignment win over the organization's, the way a store server reads it", async () => {
+  it("carries a different role at each store, which is what a row per store is for", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    const one = await store(org, "Store 42");
+    const forty_two = await store(org, "Store 42");
+    const seven = await store(org, "Store 7");
     const dana = await person("dana@example.com");
-    await assign(dana, org, "org_admin");
-    await assign(dana, org, "clerk", one);
+    await assign(dana, org, forty_two, "org_admin");
+    await assign(dana, org, seven, "clerk");
 
-    const [reachable] = await reachableFor(dana);
-    expect(reachable?.stores[0]?.role.roleId).toBe("clerk");
+    const byStore = new Map((await reachableFor(dana)).map((entry) => [entry.storeId, entry.role.roleId]));
+    expect(byStore.get(forty_two)).toBe("org_admin");
+    expect(byStore.get(seven)).toBe("clerk");
   });
 
-  it("gathers one person's two organizations, which is what the picker is for", async () => {
+  it("returns one flat list across two organizations, with no grouping above a store", async () => {
     const first = await organization("Patel Retail", "patel-retail");
     const second = await organization("Highway Stores", "highway");
-    await store(second, "Highway 1");
-    await store(first, "Store 42");
+    const highway = await store(second, "Highway 1");
+    const fortyTwo = await store(first, "Store 42");
 
     const dana = await person("dana@example.com");
-    await assign(dana, first);
-    await assign(dana, second);
+    await assign(dana, first, fortyTwo);
+    await assign(dana, second, highway);
 
     const reachable = await reachableFor(dana);
-    expect(reachable.map((entry) => entry.name)).toEqual(["Highway Stores", "Patel Retail"]);
-    expect(reachable.flatMap((entry) => entry.stores)).toHaveLength(2);
+    expect(reachable.map((entry) => entry.name)).toEqual(["Highway 1", "Store 42"]);
+    expect(reachable[0]).not.toHaveProperty("stores");
+    expect(reachable[0]).not.toHaveProperty("organizationId");
   });
 
   it("says a store is not covered rather than hiding it, so the reason can be read on screen", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await store(org, "Store 42", { unlicensed: true });
+    const one = await store(org, "Store 42", { unlicensed: true });
     const dana = await person("dana@example.com");
-    await assign(dana, org);
+    await assign(dana, org, one);
 
-    const [reachable] = await reachableFor(dana);
-    expect(reachable?.stores[0]?.licence).toEqual({ covered: false, status: null, expiresAt: null });
+    const reachable = await reachableFor(dana);
+    expect(reachable[0]?.licence).toEqual({ covered: false, status: null, expiresAt: null });
   });
 });
 
 describe("signing in with an email and nothing else", () => {
   it("answers the person and their stores, and says what to do next", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await store(org, "Store 42");
+    const one = await store(org, "Store 42");
     const dana = await person("dana@example.com");
-    await assign(dana, org);
+    await assign(dana, org, one);
 
     const res = await signInRoute(post({ email: "Dana@Example.com ", password: PASSWORD }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.user.email).toBe("dana@example.com");
     expect(body.next).toBe("one_store");
-    expect(body.organizations[0].stores[0].name).toBe("Store 42");
+    // A flat list of stores, with nothing above them (D-22).
+    expect(body.stores[0].name).toBe("Store 42");
+    expect(body).not.toHaveProperty("organizations");
   });
 
   it("asks for a store when there is more than one", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await store(org, "Store 42");
-    await store(org, "Store 7");
+    const one = await store(org, "Store 42");
+    const two = await store(org, "Store 7");
     const dana = await person("dana@example.com");
-    await assign(dana, org);
+    await assign(dana, org, one);
+    await assign(dana, org, two);
 
     const body = await (await signInRoute(post({ email: "dana@example.com", password: PASSWORD }))).json();
     expect(body.next).toBe("pick_a_store");
@@ -183,9 +190,9 @@ describe("signing in with an email and nothing else", () => {
 
   it("returns no password hash to anybody, ever", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await store(org, "Store 42");
+    const one = await store(org, "Store 42");
     const dana = await person("dana@example.com");
-    await assign(dana, org);
+    await assign(dana, org, one);
 
     const text = await (await signInRoute(post({ email: "dana@example.com", password: PASSWORD }))).text();
     expect(text).not.toContain("argon2");
@@ -220,7 +227,7 @@ describe("signing in with an email and nothing else", () => {
     await person("nostores@example.com");
     const body = await (await signInRoute(post({ email: "nostores@example.com", password: PASSWORD }))).json();
     expect(body.next).toBe("no_stores");
-    expect(body.organizations).toEqual([]);
+    expect(body.stores).toEqual([]);
   });
 });
 
@@ -242,6 +249,61 @@ describe("the move to email as the identity", () => {
     await migrateEmailIdentity();
     const started = await requestEmailVerification(sam);
     expect(started).not.toBeNull();
+  });
+});
+
+describe("the move to access at a store (D-22)", () => {
+  /** The row the old model wrote for "every store": no storeId at all. */
+  const orgWide = async (appUserId: string, organizationId: string, role = "org_admin") =>
+    UserAssignmentModel.collection.insertOne({
+      assignmentId: publicId("asg"),
+      appUserId,
+      organizationId,
+      role,
+      scopes: ["relay:request"],
+      status: "active",
+      createdByAdminId: publicId("adm")
+    });
+
+  it("expands one organization-wide row into a row per store, and keeps the reach", async () => {
+    const org = await organization("Patel Retail", "patel-retail");
+    const forty_two = await store(org, "Store 42");
+    const seven = await store(org, "Store 7");
+    const dana = await person("dana@example.com");
+    await orgWide(dana, org);
+
+    expect(await reachableFor(dana)).toEqual([]);
+    expect(await migrateStoreScopedAccess()).toEqual({ expanded: 2, orphans: 0 });
+
+    const reachable = await reachableFor(dana);
+    expect(reachable.map((entry) => entry.storeId).sort()).toEqual([forty_two, seven].sort());
+    expect(reachable.every((entry) => entry.role.roleId === "org_admin")).toBe(true);
+    // The source row is gone, so a second instance running it changes nothing.
+    expect(await UserAssignmentModel.countDocuments({})).toBe(2);
+    expect(await migrateStoreScopedAccess()).toEqual({ expanded: 0, orphans: 0 });
+  });
+
+  it("leaves a store's own row alone, because it was always the more specific answer", async () => {
+    const org = await organization("Patel Retail", "patel-retail");
+    const forty_two = await store(org, "Store 42");
+    const seven = await store(org, "Store 7");
+    const dana = await person("dana@example.com");
+    await assign(dana, org, forty_two, "clerk");
+    await orgWide(dana, org, "org_admin");
+
+    expect(await migrateStoreScopedAccess()).toEqual({ expanded: 1, orphans: 0 });
+    const byStore = new Map((await reachableFor(dana)).map((entry) => [entry.storeId, entry.role.roleId]));
+    expect(byStore.get(forty_two)).toBe("clerk");
+    expect(byStore.get(seven)).toBe("org_admin");
+  });
+
+  it("deletes a row whose organization has no stores: it granted nothing then either", async () => {
+    const org = await organization("Patel Retail", "patel-retail");
+    const dana = await person("dana@example.com");
+    await orgWide(dana, org);
+
+    expect(await migrateStoreScopedAccess()).toEqual({ expanded: 0, orphans: 1 });
+    expect(await UserAssignmentModel.countDocuments({})).toBe(0);
   });
 });
 describe("the password behind the email", () => {

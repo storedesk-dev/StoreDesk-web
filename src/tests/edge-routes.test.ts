@@ -154,7 +154,8 @@ beforeEach(() => {
   ];
   h.state.assignments = [
     { assignmentId: "asg_1", appUserId: "appu_1", organizationId: "org_1", storeId: "store_1", workerInstallationId: "winst_1", role: "org_admin", scopes: ["relay:request"], status: "active" },
-    { assignmentId: "asg_2", appUserId: "appu_2", organizationId: "org_1", role: "cashier", scopes: ["relay:request"], status: "active" }
+    // Its store, like every assignment: there is no organization-wide row any more (D-22).
+    { assignmentId: "asg_2", appUserId: "appu_2", organizationId: "org_1", storeId: "store_1", role: "cashier", scopes: ["relay:request"], status: "active" }
   ];
   vi.mocked(updateRoleFromEdge).mockReset();
   vi.mocked(scheduleNotify).mockReset();

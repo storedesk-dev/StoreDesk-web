@@ -94,7 +94,8 @@ function optionalText(value: unknown): string | null {
  * names an installation, or only a store (the admin UI's "Store #…"), or
  * neither (the admin UI's "All Stores" — organization-wide). The most specific
  * wins; a tie goes to the lowest assignmentId so the answer is stable.
- * Assignments to another store or installation are ignored.
+ * Assignments to another store or installation are ignored, and there is no
+ * organization-wide row left to out-rank (D-22).
  */
 export function pickAssignmentsForInstallation(
   assignments: Doc[],
@@ -106,8 +107,7 @@ export function pickAssignmentsForInstallation(
     const installation = text(assignment.workerInstallationId);
     const store = text(assignment.storeId);
     if (installation) return installation === target.workerInstallationId ? 0 : -1;
-    if (store) return store === target.storeId ? 1 : -1;
-    return 2;
+    return store === target.storeId ? 1 : -1;
   };
   const picked = new Map<string, { assignment: Doc; rank: number }>();
   for (const assignment of assignments) {
@@ -272,11 +272,8 @@ export async function loadAccessSync(worker: {
   const assignments = (await UserAssignmentModel.find({
     organizationId,
     status: "active",
-    $or: [
-      { workerInstallationId },
-      { workerInstallationId: unset, storeId },
-      { workerInstallationId: unset, storeId: unset }
-    ]
+    storeId,
+    $or: [{ workerInstallationId }, { workerInstallationId: unset }]
   }).lean()) as Doc[];
   const picked = pickAssignmentsForInstallation(assignments, worker);
 
