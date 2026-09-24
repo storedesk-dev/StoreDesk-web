@@ -1,5 +1,6 @@
-import { AppUserModel, TenantStoreModel, UserAssignmentModel } from "@/models/ControlPlane";
+import { AppUserModel, LicenseModel, TenantStoreModel, UserAssignmentModel } from "@/models/ControlPlane";
 import { publicId } from "@/lib/control-plane-security";
+import { coverageKeyFor, newLicenseNumber } from "@/lib/licenses";
 
 /**
  * Data migrations, run once per server process right after the database
@@ -71,6 +72,75 @@ export async function migrateEmailIdentity(): Promise<EmailIdentityReport> {
   return { verified: verified.modifiedCount ?? 0, duplicates: Number(duplicates[0]?.duplicates ?? 0) };
 }
 
+export type StoreLicenseReport = { issued: number; masters: number; alreadyCovered: number };
+
+/**
+ * D-22: a license covers a store, found by the coverage key `store:<storeId>`. A master license —
+ * `scope: "organization"`, keyed `org:<organizationId>` — matches no store, so the moment S1
+ * shipped every store covered only by one became **Unlicensed**: no setup key, no activation, and
+ * `GET /edge/sync/access` answering 403 to the store PC.
+ *
+ * S1's note said `storeWise` was already the fallback so no live store changed behaviour. That was
+ * wrong: the fallback decides what an organization *without* a stored mode does, not what happens
+ * to a real master license row, and there was one in production covering a live store.
+ *
+ * So each live master is copied into a license per store of its organization, carrying its plan,
+ * status, dates, grace and PC limit across, and the master row is left exactly as it is — it is
+ * inert (no store key can ever match it) and it is the record of what the store used to hold.
+ *
+ * Idempotent: a store that already has its own non-cancelled license is left alone and counted,
+ * and the unique index on `coverageKey` is the backstop if two instances race.
+ */
+export async function migrateStoreScopedLicenses(): Promise<StoreLicenseReport> {
+  const masters = (await LicenseModel.find({
+    coverageKey: { $regex: "^org:" },
+    status: { $ne: "cancelled" }
+  }).lean()) as Array<Record<string, unknown>>;
+  if (!masters.length) return { issued: 0, masters: 0, alreadyCovered: 0 };
+
+  let issued = 0;
+  let alreadyCovered = 0;
+  for (const master of masters) {
+    const organizationId = String(master.organizationId);
+    const stores = (await TenantStoreModel.find({ organizationId, status: { $ne: "closed" } })
+      .select("storeId")
+      .lean()) as Array<Record<string, unknown>>;
+
+    for (const store of stores) {
+      const storeId = String(store.storeId);
+      const coverageKey = coverageKeyFor(storeId);
+      const own = await LicenseModel.findOne({ coverageKey, status: { $ne: "cancelled" } }).lean();
+      if (own) {
+        alreadyCovered += 1;
+        continue;
+      }
+      try {
+        await LicenseModel.create({
+          licenseId: publicId("lic"),
+          licenseNumber: newLicenseNumber(),
+          organizationId,
+          scope: "store",
+          storeId,
+          coverageKey,
+          plan: master.plan,
+          status: master.status,
+          startsAt: master.startsAt,
+          entitlementExpiresAt: master.entitlementExpiresAt,
+          offlineGraceDays: master.offlineGraceDays,
+          maxPcsPerStore: master.maxPcsPerStore,
+          notes: `Issued from ${String(master.licenseNumber)} when licensing moved to one per store (D-22).`
+        });
+        issued += 1;
+      } catch (error) {
+        // The unique coverageKey index: another instance got there first, which is the right answer.
+        if (!String((error as { message?: string }).message ?? "").includes("coverageKey")) throw error;
+        alreadyCovered += 1;
+      }
+    }
+  }
+  return { issued, masters: masters.length, alreadyCovered };
+}
+
 export type StoreAccessReport = { expanded: number; orphans: number };
 
 /**
@@ -136,6 +206,11 @@ export async function runMigrations(): Promise<void> {
   const identity = await migrateEmailIdentity();
   if (identity.verified > 0 || identity.duplicates > 0) {
     console.info(`[migrate] email identity: ${JSON.stringify(identity)}`);
+  }
+
+  const licenses = await migrateStoreScopedLicenses();
+  if (licenses.issued > 0 || licenses.masters > 0) {
+    console.info(`[migrate] store-scoped licenses: ${JSON.stringify(licenses)}`);
   }
 
   const access = await migrateStoreScopedAccess();

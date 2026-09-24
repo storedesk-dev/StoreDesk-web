@@ -59,8 +59,6 @@ export const CAPABILITIES = {
 export const PLANS = {
   trialDays: 30,
   standardDays: 365,
-  /** An organization license's default seats. */
-  defaultMaxStores: 5,
   /** A license's default PCs per store. */
   defaultMaxWorkers: 1,
   /** CLIENT_SESSION_TTL_SECONDS — one retail shift. */

@@ -65,11 +65,11 @@ export default function TermsPage() {
 
           <LegalSection id="licence" index={3} icon={<FileText className="h-4.5 w-4.5" />} title="Your licence">
             <p>
-              While your plan is current, you may install and use StoreDesk in the stores your licence covers.
+              While your plan is current, you may install and use StoreDesk in the store your licence covers.
               A licence begins with a {PLANS.trialDays}-day trial and then runs as a {PLANS.standardDays}-day
-              plan. By default an organisation licence covers up to {PLANS.defaultMaxStores} stores with{" "}
-              {PLANS.defaultMaxWorkers} store PC each; a single store can hold its own licence instead. Any
-              different limits are whatever we have agreed with you in writing.
+              plan, and covers one store with {PLANS.defaultMaxWorkers} store PC. A business with several
+              stores holds a licence for each. Any different limits are whatever we have agreed with you in
+              writing.
             </p>
             <p>
               StoreDesk does not charge for the software today, so there is nothing to pay, cancel or refund. If

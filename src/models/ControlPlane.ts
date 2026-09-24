@@ -102,8 +102,6 @@ const LicenseSchema = new Schema(
     startsAt: { type: Date, required: true },
     entitlementExpiresAt: { type: Date, required: true },
     offlineGraceDays: { type: Number, min: 0, max: 30, default: 7 },
-    /** Unused: the master license has no store limit. Kept (and ignored) on older records. */
-    maxStores: { type: Number, min: 1, default: 1 },
     maxPcsPerStore: { type: Number, min: 1, default: 1 },
     notes: { type: String, trim: true, maxlength: 1000 },
     /**

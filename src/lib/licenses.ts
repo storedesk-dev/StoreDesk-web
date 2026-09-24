@@ -296,7 +296,6 @@ function licenseDoc(organizationId: string, storeId: string, input: NewLicense):
     status: input.status ?? (input.plan === "trial" ? "trialing" : "active"),
     ...licenseTerms(input),
     offlineGraceDays: input.offlineGraceDays ?? DEFAULT_GRACE,
-    maxStores: 1,
     maxPcsPerStore: input.maxPcsPerStore ?? DEFAULT_PCS,
     ...(input.notes ? { notes: input.notes } : {}),
     coverageKey: coverageKeyFor(storeId)

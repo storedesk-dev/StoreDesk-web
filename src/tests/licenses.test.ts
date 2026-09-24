@@ -22,6 +22,7 @@ import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { GET as dashboardRoute } from "@/app/api/v1/admin/dashboard/route";
 import { createOrganization } from "@/lib/organizations";
 import { LICENSE_NUMBER, coveringLicense } from "@/lib/licenses";
+import { migrateStoreScopedLicenses } from "@/lib/migrations";
 import { scheduleNotify } from "@/lib/store-notify";
 import { LicenseModel } from "@/models/ControlPlane";
 
@@ -157,6 +158,77 @@ describe("a store and its licence", () => {
     // Coverage stays with its own store: the unlicensed one gains nothing from its neighbour.
     expect((await coveringLicense({ organizationId, storeId: ending.storeId }))?.storeId).toBe(ending.storeId);
     expect(await coveringLicense({ organizationId, storeId: bare.storeId })).toBeNull();
+  });
+
+  it("copies a live master license into one per store, so no live store goes Unlicensed", async () => {
+    const organizationId = await newOrg();
+    const one = (await newStore(organizationId, "Hop In 4630")).body.store;
+    const two = (await newStore(organizationId, "Bay Rd")).body.store;
+
+    // The shape the production database actually held on 2026-09-23: scope "organization",
+    // keyed by the organization, trialing, with an end date in the future.
+    // Whole seconds: the stored date carries no milliseconds.
+    const ends = new Date(Math.floor((Date.now() + 23 * DAY) / 1000) * 1000);
+    await LicenseModel.create({
+      licenseId: "lic_master",
+      licenseNumber: "SD-ORG-D7QD2X",
+      organizationId,
+      scope: "organization",
+      plan: "standard",
+      status: "trialing",
+      startsAt: new Date(Date.now() - DAY),
+      entitlementExpiresAt: ends,
+      offlineGraceDays: 7,
+      maxPcsPerStore: 2,
+      coverageKey: `org:${organizationId}`
+    });
+
+    // Before: the master matches no store key, so both stores are Unlicensed.
+    expect(await coveringLicense({ organizationId, storeId: one.storeId })).toBeNull();
+    expect(await coveringLicense({ organizationId, storeId: two.storeId })).toBeNull();
+
+    expect(await migrateStoreScopedLicenses()).toEqual({ issued: 2, masters: 1, alreadyCovered: 0 });
+
+    for (const store of [one, two]) {
+      const covering = await coveringLicense({ organizationId, storeId: store.storeId });
+      expect(covering).toMatchObject({
+        scope: "store",
+        storeId: store.storeId,
+        plan: "standard",
+        status: "trialing",
+        offlineGraceDays: 7,
+        maxPcsPerStore: 2
+      });
+      expect(String(covering!.licenseNumber)).toMatch(/^SD-STR-/);
+      expect(new Date(String(covering!.entitlementExpiresAt)).toISOString()).toBe(ends.toISOString());
+      expect(String(covering!.notes)).toContain("SD-ORG-D7QD2X");
+    }
+
+    // The master row stays as the record of what the store held; it simply covers nothing now.
+    const master = await LicenseModel.findOne({ licenseId: "lic_master" }).lean();
+    expect(master).toMatchObject({ scope: "organization", status: "trialing" });
+
+    // Idempotent: a second instance issues nothing and says both stores are already covered.
+    expect(await migrateStoreScopedLicenses()).toEqual({ issued: 0, masters: 1, alreadyCovered: 2 });
+  });
+
+  it("leaves a store that already has its own license, and a cancelled master, alone", async () => {
+    const organizationId = await newOrg();
+    const own = (await newStore(organizationId, "Has its own", { storeLicense: { plan: "trial", entitlementDays: 30 } })).body.store;
+    await LicenseModel.create({
+      licenseId: "lic_dead",
+      licenseNumber: "SD-ORG-CANCEL",
+      organizationId,
+      scope: "organization",
+      plan: "standard",
+      status: "cancelled",
+      startsAt: new Date(Date.now() - DAY),
+      entitlementExpiresAt: new Date(Date.now() + DAY)
+    });
+
+    // A cancelled master is not a live license, so there is nothing to copy from it.
+    expect(await migrateStoreScopedLicenses()).toEqual({ issued: 0, masters: 0, alreadyCovered: 0 });
+    expect((await coveringLicense({ organizationId, storeId: own.storeId }))?.licenseNumber).toBe(own.license.licenseNumber);
   });
 
   it("organization create: no mode, no license, and the old master fields change nothing", async () => {
