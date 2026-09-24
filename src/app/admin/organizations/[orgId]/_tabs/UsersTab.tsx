@@ -68,7 +68,8 @@ export function UsersTab({ orgId, org, refreshOrg }: OrgTabProps) {
 
   const storeName = useMemo(() => {
     const map = new Map((data?.stores ?? []).map((s) => [s.storeId, s.name]));
-    return (id: string | null) => (id ? map.get(id) ?? id : "All stores");
+    // Every assignment names a store (D-22); the id is the fallback when the name has not loaded.
+    return (id: string) => map.get(id) ?? id;
   }, [data]);
   const roleName = useMemo(() => {
     const map = new Map((data?.roles ?? []).map((r) => [r.roleId, r.roleName]));

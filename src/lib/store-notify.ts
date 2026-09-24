@@ -238,23 +238,20 @@ export async function notifyAppUserInstallations(
     const assignments = (await UserAssignmentModel.find({ appUserId, status: "active" }).lean()) as Array<
       Record<string, unknown>
     >;
-    const byOrganization = new Map<string, { wholeOrg: boolean; storeIds: Set<string>; ids: Set<string> }>();
+    const byOrganization = new Map<string, { storeIds: Set<string>; ids: Set<string> }>();
     for (const assignment of assignments) {
       const organizationId = String(assignment.organizationId ?? "");
-      if (!organizationId) continue;
-      const scope =
-        byOrganization.get(organizationId) ?? { wholeOrg: false, storeIds: new Set(), ids: new Set() };
+      const storeId = String(assignment.storeId ?? "");
+      if (!organizationId || !storeId) continue;
+      const scope = byOrganization.get(organizationId) ?? { storeIds: new Set(), ids: new Set() };
       if (assignment.workerInstallationId) scope.ids.add(String(assignment.workerInstallationId));
-      else if (assignment.storeId) scope.storeIds.add(String(assignment.storeId));
-      else scope.wholeOrg = true;
+      else scope.storeIds.add(storeId);
       byOrganization.set(organizationId, scope);
     }
     const results = await Promise.all(
       [...byOrganization].map(([organizationId, scope]) =>
         notifyInstallations(
-          scope.wholeOrg
-            ? { organizationId, reason }
-            : { organizationId, reason, storeIds: [...scope.storeIds], workerInstallationIds: [...scope.ids] },
+          { organizationId, reason, storeIds: [...scope.storeIds], workerInstallationIds: [...scope.ids] },
           deps
         )
       )
@@ -382,8 +379,8 @@ export function scheduleAppUserNotify(appUserId: string, reason: NotifyReason): 
     if (!isCloudConfigured()) return;
     await connectDb();
     const assignments = (await UserAssignmentModel.find({ appUserId }).lean()) as Array<Record<string, unknown>>;
-    const organizationIds = [...new Set(assignments.map((assignment) => String(assignment.organizationId ?? "")).filter(Boolean))];
-    const stores = (await TenantStoreModel.find({ organizationId: { $in: organizationIds }, status: { $ne: "closed" } })
+    const storeIds = [...new Set(assignments.map((assignment) => String(assignment.storeId ?? "")).filter(Boolean))];
+    const stores = (await TenantStoreModel.find({ storeId: { $in: storeIds }, status: { $ne: "closed" } })
       .select("storeId")
       .lean()) as Array<{ storeId: string }>;
     for (const store of stores) scheduleProjectionPush(store.storeId, reason);

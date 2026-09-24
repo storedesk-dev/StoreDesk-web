@@ -25,7 +25,6 @@ import {
 } from "@/lib/control-plane-security";
 import { auditAdmin, writeAudit } from "@/lib/audit";
 import { coverageFor, expireLapsedLicenses, licenseProblem } from "@/lib/licenses";
-import { requireOrganization } from "@/lib/organizations";
 import { requireStore } from "@/lib/tenant-stores";
 import { normalizeStoreSettings } from "@/lib/store-settings";
 import { mintReusableKey } from "@/lib/store-setup-key";
@@ -38,10 +37,8 @@ const OPEN_KEY = ["queued", "shown", "sent", "delivery_failed"];
 const LIVE = ["active", "degraded", "updating", "rollback"];
 
 /** Why a store cannot run the lottery app. The app shows these words; the picker greys the row. */
-function whyBlocked(org: Doc, store: Doc, license: Doc | null) {
-  if (org.status === "suspended") {
-    return { status: 409, code: "ORGANIZATION_SUSPENDED", message: "The organization is suspended." };
-  }
+function whyBlocked(store: Doc, license: Doc | null) {
+  // Only the store's own status blocks it (D-22).
   if (store.status !== "active") {
     return { status: 409, code: "STORE_SUSPENDED", message: `The store is ${String(store.status)}.` };
   }
@@ -62,13 +59,12 @@ function whyBlocked(org: Doc, store: Doc, license: Doc | null) {
 }
 
 async function loadStore(organizationId: string, storeId: string) {
-  const org = await requireOrganization(organizationId);
   const store = await requireStore(organizationId, storeId);
   await expireLapsedLicenses({ organizationId });
   const coverage = await coverageFor(store);
-  const blocked = whyBlocked(org, store, coverage.license);
+  const blocked = whyBlocked(store, coverage.license);
   if (blocked) throw new ControlPlaneError(blocked.status, blocked.code, blocked.message);
-  return { org, store, coverage };
+  return { store, coverage };
 }
 
 /**

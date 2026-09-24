@@ -190,19 +190,15 @@ export async function redeemSetupKey(body: RedeemBody) {
 
   const ack = body.acknowledgements;
 
-  const [org, store] = (await Promise.all([
-    OrganizationModel.findOne({ organizationId: key.organizationId }).lean(),
-    TenantStoreModel.findOne({ organizationId: key.organizationId, storeId: key.storeId })
-      .select("+cloudflareToken")
-      .lean()
-  ])) as [Doc | null, Doc | null];
-  if (!org || !store) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Store not found");
+  const store = (await TenantStoreModel.findOne({ organizationId: key.organizationId, storeId: key.storeId })
+    .select("+cloudflareToken")
+    .lean()) as Doc | null;
+  if (!store) throw new ControlPlaneError(404, "RESOURCE_NOT_FOUND", "Store not found");
   // 423 STORE_SUSPENDED (P12), forwarded by the store server to the desktop wizard.
-  if (org.status === "suspended" || store.status === "suspended" || store.status === "closed") {
+  if (store.status === "suspended" || store.status === "closed") {
     throw new ControlPlaneError(423, "STORE_SUSPENDED", STORE_MESSAGES.STORE_SUSPENDED);
   }
-  // The store's covering license (from the organization's licensing mode)
-  // decides, not the one the key was issued under.
+  // The store's own license decides, not the one the key was issued under.
   const coverage = await coverageFor(store);
   const problem = licenseProblem(coverage.license);
   if (problem) {

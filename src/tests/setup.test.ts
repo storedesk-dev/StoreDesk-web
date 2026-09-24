@@ -187,8 +187,9 @@ describe("POST …/setup-keys", () => {
     expect((await issue()).body.error.code).toBe("STORE_SUSPENDED");
     await updateStore(admin, params.organizationId, params.storeId, { status: "active" });
 
+    // D-22: a store stands on its own, so its organization's status blocks nothing.
     await updateOrganization(admin, params.organizationId, { status: "suspended" });
-    expect((await issue()).body.error.code).toBe("ORGANIZATION_SUSPENDED");
+    expect((await issue()).status).toBe(201);
     await updateOrganization(admin, params.organizationId, { status: "active" });
 
     process.env.CLOUDFLARE_API_TOKEN = "cf";
@@ -294,12 +295,18 @@ describe("activation, Replace PC, and the PC limit", () => {
     expect(res.body.error.code).toBe("NO_PC_TO_REPLACE");
   });
 
-  it("refuses activation with 423 STORE_SUSPENDED once the organization is suspended", async () => {
+  it("refuses activation with 423 STORE_SUSPENDED once the store is suspended", async () => {
     const { body } = await issue();
-    await updateOrganization(admin, params.organizationId, { status: "suspended" });
+    await updateStore(admin, params.organizationId, params.storeId, { status: "suspended" });
     const res = await redeemKey(body.setupKey);
     expect(res.status).toBe(423);
     expect(res.body.error).toMatchObject({ code: "STORE_SUSPENDED", message: "This store is suspended in StoreDesk." });
+  });
+
+  it("lets a store activate although its organization is suspended: the cascade is gone (D-22)", async () => {
+    const { body } = await issue();
+    await updateOrganization(admin, params.organizationId, { status: "suspended" });
+    expect((await redeemKey(body.setupKey)).status).toBe(201);
   });
 
   it("answers an inactive or missing license with store-facing messages (402)", async () => {

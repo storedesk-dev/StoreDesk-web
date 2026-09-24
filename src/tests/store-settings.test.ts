@@ -242,7 +242,7 @@ describe("what the store receives, and suspension (P12)", () => {
     expect(second.body.version).not.toBe(first.body.version);
   });
 
-  it("answers 403 STORE_SUSPENDED for a suspended store or organization, and works again once reactivated", async () => {
+  it("answers 403 STORE_SUSPENDED for a suspended store, and works again once reactivated", async () => {
     const pc = await activatePc(params.organizationId, params.storeId);
     await updateStore(admin, params.organizationId, params.storeId, { status: "suspended" });
     const store = await pull(pc.token);
@@ -252,10 +252,10 @@ describe("what the store receives, and suspension (P12)", () => {
     expect(hidden.body.stores).toEqual([]);
 
     await updateStore(admin, params.organizationId, params.storeId, { status: "active" });
-    await updateOrganization(admin, params.organizationId, { status: "suspended" });
-    expect((await pull(pc.token)).status).toBe(403);
+    expect((await pull(pc.token)).status).toBe(200);
 
-    await updateOrganization(admin, params.organizationId, { status: "active" });
+    // D-22: suspending the organization leaves the store running. Nothing is above it.
+    await updateOrganization(admin, params.organizationId, { status: "suspended" });
     expect((await pull(pc.token)).status).toBe(200);
   });
 });

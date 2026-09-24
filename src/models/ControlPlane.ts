@@ -504,6 +504,7 @@ const AuditEventSchema = new Schema(
   timestamps
 );
 AuditEventSchema.index({ organizationId: 1, occurredAt: -1 });
+AuditEventSchema.index({ storeId: 1, occurredAt: -1 });
 
 /**
  * Staff sign-in failure counters, per hashed address and per hashed e-mail,

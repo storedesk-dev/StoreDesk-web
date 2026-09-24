@@ -90,19 +90,20 @@ describe("POST …/stores", () => {
     expect((await lastAudit("store.tunnel.provision"))?.metadata).toMatchObject({ status: "not_configured" });
   });
 
-  it("creates the tunnel under <org tag>-<store name> and never returns its token", async () => {
+  it("creates the tunnel under the store's own name and never returns its token", async () => {
     useCloudflare();
     vi.mocked(provisionCloudflareTunnel).mockResolvedValueOnce({
       cloudflareToken: "CF_TOKEN_MUST_NOT_LEAK",
-      tunnelUrl: "https://example-retail-store-42.tunnels.example",
+      tunnelUrl: "https://store-42.tunnels.example",
       tunnelId: "cf-tunnel-1",
       dnsRecordId: "dns-1"
     });
     const { organizationId } = await orgWithLicense();
     const res = await createStoreCall(organizationId, { name: "Store 42" });
     expect(res.status).toBe(201);
-    expect(res.body.tunnel).toEqual({ status: "ok", url: "https://example-retail-store-42.tunnels.example", message: null });
-    expect(vi.mocked(provisionCloudflareTunnel).mock.calls[0][1]).toBe("example-retail-store-42");
+    expect(res.body.tunnel).toEqual({ status: "ok", url: "https://store-42.tunnels.example", message: null });
+    // No org tag in front of it: the label comes from the store (D-22).
+    expect(vi.mocked(provisionCloudflareTunnel).mock.calls[0][1]).toBe("store-42");
     expect(JSON.stringify(res.body)).not.toContain("CF_TOKEN_MUST_NOT_LEAK");
     const got = await call(detail, request("GET", "/", { token: admin.token }), { organizationId, storeId: res.body.store.storeId });
     expect(got.body.store.tunnel.status).toBe("ok");
@@ -174,7 +175,7 @@ describe("POST …/stores", () => {
     expect(bare.body.store).toMatchObject({ licenseId: null, license: null });
   });
 
-  it("store-wise: issues the store's license now or leaves it Unlicensed; a suspended organization is refused", async () => {
+  it("issues the store's license now or leaves it Unlicensed; a suspended organization no longer blocks it", async () => {
     const { organization } = await createOrganization(admin, { name: "Corner Mart", slug: "corner-mart" });
     const unlicensed = await createStoreCall(organization.organizationId, { name: "S" });
     expect(unlicensed.status).toBe(201);
@@ -185,11 +186,11 @@ describe("POST …/stores", () => {
     expect(past.status).toBe(400);
     expect(await TenantStoreModel.countDocuments({ name: "U" })).toBe(0);
 
+    // D-22: there is nothing above a store, so an organization's status blocks nothing.
     const { organizationId } = await orgWithLicense();
     await updateOrganization(admin, organizationId, { status: "suspended" });
     const suspended = await createStoreCall(organizationId, { name: "S" });
-    expect(suspended.status).toBe(409);
-    expect(suspended.body.error.code).toBe("ORGANIZATION_SUSPENDED");
+    expect(suspended.status).toBe(201);
   });
 
   it.each([

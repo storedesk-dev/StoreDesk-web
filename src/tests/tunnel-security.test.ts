@@ -181,11 +181,11 @@ describe("tunnel labels", () => {
     vi.mocked(provisionCloudflareTunnel).mockImplementation(async (storeId: string, label: string) => created(storeId, label));
     const first = await call(createStoreRoute, request("POST", "/", { token: admin.token, body: { name: "Main St" } }), params);
     const second = await call(createStoreRoute, request("POST", "/", { token: admin.token, body: { name: "Main St" } }), params);
-    expect(first.body.store.tunnel.label).toBe("example-retail-main-st");
-    expect(second.body.store.tunnel.label).toBe("example-retail-main-st-2");
+    expect(first.body.store.tunnel.label).toBe("main-st");
+    expect(second.body.store.tunnel.label).toBe("main-st-2");
     const taken = await call(
       createStoreRoute,
-      request("POST", "/", { token: admin.token, body: { name: "Other", tunnelLabel: "example-retail-main-st" } }),
+      request("POST", "/", { token: admin.token, body: { name: "Other", tunnelLabel: "main-st" } }),
       params
     );
     expect(taken.status).toBe(409);
@@ -201,7 +201,7 @@ describe("tunnel labels", () => {
     expect((await TenantStoreModel.findOne({ storeId: failed.body.store.storeId }).lean())?.tunnelLabel).toBeUndefined();
     vi.mocked(provisionCloudflareTunnel).mockImplementation(async (storeId: string, label: string) => created(storeId, label));
     const next = await call(createStoreRoute, request("POST", "/", { token: admin.token, body: { name: "Elm Ave" } }), params);
-    expect(next.body.store.tunnel.label).toBe("example-retail-elm-ave");
+    expect(next.body.store.tunnel.label).toBe("elm-ave");
   });
 });
 

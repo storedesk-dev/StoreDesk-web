@@ -5,7 +5,6 @@ import {
   AdminSessionModel,
   InternalAdminModel,
   LoginThrottleModel,
-  OrganizationModel,
   TenantStoreModel,
   WorkerCredentialModel,
   WorkerInstallationModel
@@ -177,14 +176,12 @@ export async function authenticateWorker(
     await WorkerInstallationModel.updateOne({ workerInstallationId }, { $set: { lastSeenAt: new Date() } });
   }
 
-  const [org, store] = await Promise.all([
-    OrganizationModel.findOne({ organizationId }).select("status").lean(),
-    TenantStoreModel.findOne({ organizationId, storeId }).select("status").lean()
-  ]);
-  if (!org || !store) {
+  const store = await TenantStoreModel.findOne({ organizationId, storeId }).select("status").lean();
+  if (!store) {
     throw new ControlPlaneError(401, "WORKER_CREDENTIAL_INVALID", "Worker authentication failed");
   }
-  if (org.status === "suspended" || store.status === "suspended" || store.status === "closed") {
+  // A store stands on its own (D-22): there is nothing above it left to suspend it.
+  if (store.status === "suspended" || store.status === "closed") {
     // Store-facing: every edge route answers with this.
     throw new ControlPlaneError(403, "STORE_SUSPENDED", "This store is suspended in StoreDesk.");
   }

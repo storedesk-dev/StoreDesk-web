@@ -225,10 +225,7 @@ export async function createStore(
   organizationId: string,
   body: StoreCreate
 ): Promise<{ store: StoreView; tunnel: TunnelOutcome }> {
-  const org = await requireOrganization(organizationId);
-  if (org.status === "suspended") {
-    throw new ControlPlaneError(409, "ORGANIZATION_SUSPENDED", "The organization is suspended; reactivate it first");
-  }
+  await requireOrganization(organizationId);
   await expireLapsedLicenses({ organizationId });
   if (body.storeLicense) checkNewLicense(body.storeLicense);
 
@@ -238,10 +235,10 @@ export async function createStore(
   if (explicit && (await tunnelLabelInUse(explicit, storeId))) throw labelTaken(explicit);
   const label =
     explicit ||
+    // From the store itself (D-22). Labels are checked against every store, and
+    // freeTunnelLabel appends -2, -3, … , so two businesses may both have a "main-street".
     (await freeTunnelLabel(
-      toDnsLabel(`${String(org.slug)}-${body.name}`) ||
-        toDnsLabel(`${String(org.slug)}-${body.storeNumber ?? ""}`) ||
-        toDnsLabel(storeId),
+      toDnsLabel(body.name) || toDnsLabel(body.storeNumber ?? "") || toDnsLabel(storeId),
       storeId
     ));
   const settings: StoreSettings = { ...defaultStoreSettings(), timeZone: body.timeZone ?? null };

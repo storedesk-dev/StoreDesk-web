@@ -49,9 +49,7 @@ async function loadContext(organizationId: string, storeId: string) {
 }
 
 function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | null {
-  if (ctx.org.status === "suspended") {
-    return { status: 409, code: "ORGANIZATION_SUSPENDED", message: "The organization is suspended; reactivate it first." };
-  }
+  // Only the store's own status blocks it (D-22).
   if (ctx.store.status !== "active") {
     return { status: 409, code: "STORE_SUSPENDED", message: `The store is ${String(ctx.store.status)}; reactivate it first.` };
   }
