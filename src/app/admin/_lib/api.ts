@@ -531,7 +531,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 const enc = encodeURIComponent;
 const ADMIN = "/api/v1/admin";
 const org = (orgId: string) => `${ADMIN}/organizations/${enc(orgId)}`;
-const store = (orgId: string, storeId: string) => `${org(orgId)}/stores/${enc(storeId)}`;
+// A store answers on its own id (D-22): the organization is no longer in the path.
+const store = (_orgId: string, storeId: string) => `${ADMIN}/stores/${enc(storeId)}`;
 const user = (orgId: string, appUserId: string) => `${org(orgId)}/users/${enc(appUserId)}`;
 
 // ── Routes ───────────────────────────────────────────────────────────────────

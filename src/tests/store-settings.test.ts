@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, lastAudit, request, seedOrganization, type TestAdmin } from "./helpers/api";
-import { GET as getSettings, PUT as putSettings } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/settings/route";
+import { GET as getSettings, PUT as putSettings } from "@/app/api/v1/admin/stores/[storeId]/settings/route";
 import { GET as accessSync } from "@/app/api/v1/edge/sync/access/route";
 import { GET as lookup } from "@/app/api/v1/app-auth/organizations/[slug]/route";
 import { updateOrganization } from "@/lib/organizations";
@@ -244,14 +244,14 @@ describe("what the store receives, and suspension (P12)", () => {
 
   it("answers 403 STORE_SUSPENDED for a suspended store, and works again once reactivated", async () => {
     const pc = await activatePc(params.organizationId, params.storeId);
-    await updateStore(admin, params.organizationId, params.storeId, { status: "suspended" });
+    await updateStore(admin, params.storeId, { status: "suspended" });
     const store = await pull(pc.token);
     expect(store.status).toBe(403);
     expect(store.body.error).toMatchObject({ code: "STORE_SUSPENDED", message: "This store is suspended in StoreDesk." });
     const hidden = await call(lookup, request("GET", "/"), { slug: "example-retail" });
     expect(hidden.body.stores).toEqual([]);
 
-    await updateStore(admin, params.organizationId, params.storeId, { status: "active" });
+    await updateStore(admin, params.storeId, { status: "active" });
     expect((await pull(pc.token)).status).toBe(200);
 
     // D-22: suspending the organization leaves the store running. Nothing is above it.

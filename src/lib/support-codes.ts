@@ -77,8 +77,8 @@ export function supportCodeView(doc: Doc) {
 }
 
 /** Issue a code for the store; the plain code is in the answer only. */
-export async function issueSupportCode(admin: InternalAdminActor, organizationId: string, storeId: string) {
-  await requireStore(organizationId, storeId);
+export async function issueSupportCode(admin: InternalAdminActor, storeId: string) {
+  const organizationId = String((await requireStore(storeId)).organizationId);
   const who = (await InternalAdminModel.findOne({ adminId: admin.adminId }).select("name email").lean()) as Doc | null;
   const issuedBy = String(who?.name || who?.email || admin.email);
   const expiresAt = new Date(Date.now() + SUPPORT_CODE_TTL_MS);
@@ -114,16 +114,16 @@ export async function issueSupportCode(admin: InternalAdminActor, organizationId
 }
 
 /** The store's latest codes (never the codes themselves). */
-export async function listSupportCodes(organizationId: string, storeId: string) {
-  await requireStore(organizationId, storeId);
-  const rows = (await SupportCodeModel.find({ organizationId, storeId }).sort({ createdAt: -1 }).limit(LIST_LIMIT).lean()) as Doc[];
+export async function listSupportCodes(storeId: string) {
+  await requireStore(storeId);
+  const rows = (await SupportCodeModel.find({ storeId }).sort({ createdAt: -1 }).limit(LIST_LIMIT).lean()) as Doc[];
   return rows.map(supportCodeView);
 }
 
 /** Revoke an active code. 409 SUPPORT_CODE_NOT_ACTIVE when it is used, expired or revoked. */
-export async function revokeSupportCode(admin: InternalAdminActor, organizationId: string, storeId: string, supportCodeId: string) {
+export async function revokeSupportCode(admin: InternalAdminActor, storeId: string, supportCodeId: string) {
   await connectDb();
-  const current = (await SupportCodeModel.findOne({ organizationId, storeId, supportCodeId }).lean()) as Doc | null;
+  const current = (await SupportCodeModel.findOne({ storeId, supportCodeId }).lean()) as Doc | null;
   if (!current) throw notFound("Support code");
   const notActive = (status: SupportCodeStatus) =>
     new ControlPlaneError(409, "SUPPORT_CODE_NOT_ACTIVE", `This support code is already ${status}.`);
@@ -138,7 +138,7 @@ export async function revokeSupportCode(admin: InternalAdminActor, organizationI
     throw notActive(latest ? statusOf(latest) : "revoked");
   }
   await auditAdmin(admin, {
-    organizationId,
+    organizationId: String(current.organizationId),
     storeId,
     action: "support_code.revoke",
     targetType: "support_code",

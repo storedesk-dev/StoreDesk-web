@@ -143,9 +143,9 @@ function readKey(key: Doc): string | null {
  * `GET …/stores/:storeId/setup-keys/current` (internal admin): the store's
  * reusable key, readable any time. 10 a minute per admin; audited.
  */
-export async function revealStoreSetupKey(admin: InternalAdminActor, organizationId: string, storeId: string) {
+export async function revealStoreSetupKey(admin: InternalAdminActor, storeId: string) {
   enforceRateLimit(`setup-key-reveal:${admin.adminId}`, { limit: 10, windowMs: 60_000, code: "RATE_LIMITED" });
-  await requireStore(organizationId, storeId);
+  const organizationId = String((await requireStore(storeId)).organizationId);
   const key = await openReusableKey({ organizationId, storeId });
   if (!key) {
     throw new ControlPlaneError(404, SETUP_KEY_NOT_FOUND, "This store has no reusable setup key yet. Issue or rotate one.");
@@ -181,11 +181,11 @@ export const RotateSetupKeySchema = z
  */
 export async function rotateStoreSetupKey(
   admin: InternalAdminActor,
-  organizationId: string,
   storeId: string,
   body: z.output<typeof RotateSetupKeySchema>
 ) {
-  const store = await requireStore(organizationId, storeId);
+  const store = await requireStore(storeId);
+  const organizationId = String(store.organizationId);
   const installations = (await WorkerInstallationModel.find({ organizationId, storeId }).sort({ createdAt: -1 }).lean()) as Doc[];
   const candidates = body.workerInstallationId
     ? installations.filter((row) => row.workerInstallationId === body.workerInstallationId)
@@ -310,8 +310,8 @@ export function pcAlreadyActive(): ControlPlaneError {
  * activation replace the PC that is running now. Expires in 24 hours, is used
  * up by the activation that takes it, and is audited.
  */
-export async function allowPcReplacement(admin: InternalAdminActor, organizationId: string, storeId: string) {
-  await requireStore(organizationId, storeId);
+export async function allowPcReplacement(admin: InternalAdminActor, storeId: string) {
+  const organizationId = String((await requireStore(storeId)).organizationId);
   const allowedUntil = new Date(Date.now() + REPLACEMENT_APPROVAL_MS);
   await TenantStoreModel.updateOne(
     { organizationId, storeId },

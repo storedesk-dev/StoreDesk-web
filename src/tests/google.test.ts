@@ -2,7 +2,7 @@ import { createVerify, generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, lastAudit, request, seedOrganization, type TestAdmin } from "./helpers/api";
-import { GET as getSettings } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/settings/route";
+import { GET as getSettings } from "@/app/api/v1/admin/stores/[storeId]/settings/route";
 import { GET as sheetMeta } from "@/app/api/v1/edge/google/sheets/meta/route";
 import { GET as sheetValues } from "@/app/api/v1/edge/google/sheets/values/route";
 import { POST as sheetAppend } from "@/app/api/v1/edge/google/sheets/append/route";

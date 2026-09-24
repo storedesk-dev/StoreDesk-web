@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { ADMIN_PASSWORD, call, createAdmin, request, seedOrganization } from "./helpers/api";
 import { GET as whoAmI, POST as login } from "@/app/api/admin/login/route";
-import { PUT as putPosCredentials } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/pos-credentials/route";
+import { PUT as putPosCredentials } from "@/app/api/v1/admin/stores/[storeId]/pos-credentials/route";
 import { adminCookieName } from "@/lib/admin-auth";
 import { resetRateLimitsForTests } from "@/lib/control-plane-security";
 import { DEV_LOCAL_BLANKED_ENV } from "@/lib/dev-local-env";

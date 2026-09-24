@@ -33,9 +33,10 @@ const LIVE = ["active", "degraded", "updating", "rollback", "suspended"];
 
 type Blocked = { status: number; code: string; message: string };
 
-async function loadContext(organizationId: string, storeId: string) {
+async function loadContext(storeId: string) {
+  const store = await requireStore(storeId);
+  const organizationId = String(store.organizationId);
   const org = await requireOrganization(organizationId);
-  const store = await requireStore(organizationId, storeId);
   await expireLapsedLicenses({ organizationId });
   const [coverage, installations] = (await Promise.all([
     coverageFor(store),
@@ -105,8 +106,9 @@ function keyView(key: Doc | null) {
   };
 }
 
-export async function getStoreSetup(organizationId: string, storeId: string) {
-  const ctx = await loadContext(organizationId, storeId);
+export async function getStoreSetup(storeId: string) {
+  const ctx = await loadContext(storeId);
+  const organizationId = String(ctx.store.organizationId);
   const primary = ctx.installations[0] ?? null;
   const [openKey, latestKey, credential] = await Promise.all([
     // The store's open reusable key first: that is the key the store uses.
@@ -172,11 +174,11 @@ export type IssuedSetupKey = {
 
 export async function issueStoreSetupKey(
   admin: InternalAdminActor,
-  organizationId: string,
   storeId: string,
   body: IssueSetupKey
 ): Promise<IssuedSetupKey> {
-  const ctx = await loadContext(organizationId, storeId);
+  const ctx = await loadContext(storeId);
+  const organizationId = String(ctx.store.organizationId);
   const blocked = whyBlocked(ctx);
   if (blocked) throw new ControlPlaneError(blocked.status, blocked.code, blocked.message);
 
@@ -319,11 +321,11 @@ export const ReplacePcSchema = z
  */
 export async function replaceStorePc(
   admin: InternalAdminActor,
-  organizationId: string,
   storeId: string,
   body: z.output<typeof ReplacePcSchema>
 ) {
-  const ctx = await loadContext(organizationId, storeId);
+  const ctx = await loadContext(storeId);
+  const organizationId = String(ctx.store.organizationId);
   const candidates = body.workerInstallationId
     ? ctx.installations.filter((row) => row.workerInstallationId === body.workerInstallationId)
     : ctx.installations.filter((row) => LIVE.includes(String(row.status)) || row.workerCredentialId);
@@ -372,7 +374,7 @@ export async function replaceStorePc(
 
   const [fresh, store] = await Promise.all([
     WorkerInstallationModel.findOne({ workerInstallationId }).lean(),
-    requireStore(organizationId, storeId)
+    requireStore(storeId)
   ]);
   return { installation: installationSummary(fresh as Doc | null), tunnel: tunnelView(store) };
 }

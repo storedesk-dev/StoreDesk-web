@@ -72,7 +72,6 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
   });
   await updateStoreSettings(
     admin,
-    organizationId,
     main.storeId,
     {
       capabilities: { fuel: true, lottery: true, coam: false, ebt: true, moneyOrder: true, prepaidGift: false },
@@ -123,7 +122,7 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
   });
 
   // A key waiting on Store 42's PC, so the dashboard has something to show.
-  const key = await issueStoreSetupKey(admin, organizationId, main.storeId, { deliver: "show" });
+  const key = await issueStoreSetupKey(admin, main.storeId, { deliver: "show" });
 
   // ── Corner Mart Group ──────────────────────────────────────────────────────
   const { organization: corner } = await createOrganization(admin, {

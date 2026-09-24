@@ -35,8 +35,8 @@ afterEach(() => {
 
 describe("GET /api/v1/admin/dashboard", () => {
   it("counts, lists what needs attention, and shows recent activity by admin e-mail", async () => {
-    const { organization, license, store } = await seedOrganization(admin);
-    await issueStoreSetupKey(admin, organization.organizationId, store.storeId, { deliver: "show" });
+    const { license, store } = await seedOrganization(admin);
+    await issueStoreSetupKey(admin, store.storeId, { deliver: "show" });
     await LicenseModel.updateOne(
       { licenseId: license.licenseId },
       { $set: { entitlementExpiresAt: new Date(Date.now() + 10 * DAY) } }

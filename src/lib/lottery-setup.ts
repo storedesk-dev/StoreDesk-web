@@ -58,13 +58,14 @@ function whyBlocked(store: Doc, license: Doc | null) {
   return null;
 }
 
-async function loadStore(organizationId: string, storeId: string) {
-  const store = await requireStore(organizationId, storeId);
+async function loadStore(storeId: string) {
+  const store = await requireStore(storeId);
+  const organizationId = String(store.organizationId);
   await expireLapsedLicenses({ organizationId });
   const coverage = await coverageFor(store);
   const blocked = whyBlocked(store, coverage.license);
   if (blocked) throw new ControlPlaneError(blocked.status, blocked.code, blocked.message);
-  return { store, coverage };
+  return { store, organizationId, coverage };
 }
 
 /**
@@ -96,12 +97,11 @@ async function installationFor(organizationId: string, storeId: string, contactE
 /** Issue the key that authorises a lottery PC for this store. Admin action, audited. */
 export async function issueLotterySetupKey(
   admin: InternalAdminActor,
-  organizationId: string,
   storeId: string,
   contactEmail?: string
 ) {
   await connectDb();
-  const { store } = await loadStore(organizationId, storeId);
+  const { store, organizationId } = await loadStore(storeId);
   const email = contactEmail ?? String(store.contactEmail ?? "");
   if (!email) {
     throw new ControlPlaneError(400, "REQUEST_INVALID", "A contact e-mail is needed for the setup key");
@@ -230,7 +230,7 @@ export async function claimLotteryForWorker(
   input: { deviceName: string; appVersion?: string }
 ) {
   await connectDb();
-  const { store, coverage } = await loadStore(worker.organizationId, worker.storeId);
+  const { store, coverage } = await loadStore(worker.storeId);
   const workerInstallationId = await installationFor(
     worker.organizationId,
     worker.storeId,
@@ -301,7 +301,7 @@ export async function redeemLotterySetupKey(input: LotteryClaim) {
   }
 
   // Re-checked at claim, not only at issue: a licence can lapse or the switch can go off in between.
-  const { store, coverage } = await loadStore(organizationId, storeId);
+  const { store, coverage } = await loadStore(storeId);
 
   const { credential, replacedPc } = await claimInstallation({
     organizationId,
@@ -337,10 +337,9 @@ export async function redeemLotterySetupKey(input: LotteryClaim) {
 }
 
 /** What the store's lottery PC looks like to an admin. */
-export async function lotteryInstallationView(organizationId: string, storeId: string) {
+export async function lotteryInstallationView(storeId: string) {
   await connectDb();
   const installation = (await WorkerInstallationModel.findOne({
-    organizationId,
     storeId,
     ...productFilter(LOTTERY)
   }).lean()) as Doc | null;

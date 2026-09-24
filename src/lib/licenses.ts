@@ -514,10 +514,11 @@ export async function updateLicense(admin: InternalAdminActor, organizationId: s
 }
 
 /** `PUT …/stores/{store}/license`: issue the store's license when it has none, else edit it. */
-export async function upsertStoreLicense(admin: InternalAdminActor, organizationId: string, storeId: string, body: StoreLicenseBody) {
-  await requireOrg(organizationId);
-  const store = (await TenantStoreModel.findOne({ organizationId, storeId }).select("storeId name").lean()) as Doc | null;
+export async function upsertStoreLicense(admin: InternalAdminActor, storeId: string, body: StoreLicenseBody) {
+  await connectDb();
+  const store = (await TenantStoreModel.findOne({ storeId }).select("storeId name organizationId").lean()) as Doc | null;
   if (!store) throw notFound("Store");
+  const organizationId = String(store.organizationId);
   const own = await ownStoreLicense(organizationId, storeId);
   if (!own) {
     if (!body.plan) throw new ControlPlaneError(400, "REQUEST_INVALID", "plan: this store has no license yet; give its plan and end date");

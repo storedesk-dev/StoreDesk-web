@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { call, createAdmin, request, seedOrganization, type TestAdmin } from "./helpers/api";
-import { PUT as putSettings } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/settings/route";
+import { PUT as putSettings } from "@/app/api/v1/admin/stores/[storeId]/settings/route";
 import { ControlPlaneError } from "@/lib/control-plane-security";
 import { assertSheetNotInOtherOrganization } from "@/lib/store-sheets";
 import { createStore } from "@/lib/tenant-stores";

@@ -11,12 +11,12 @@ import {
   seedOrganization,
   type TestAdmin
 } from "./helpers/api";
-import { GET as getSetup } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup/route";
-import { POST as issueKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
-import { GET as revealKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/current/route";
-import { POST as rotateKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/rotate/route";
-import { POST as replacePc } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/replace-pc/route";
-import { POST as allowReplacement } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/replacement-approval/route";
+import { GET as getSetup } from "@/app/api/v1/admin/stores/[storeId]/setup/route";
+import { POST as issueKey } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/route";
+import { GET as revealKey } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/current/route";
+import { POST as rotateKey } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/rotate/route";
+import { POST as replacePc } from "@/app/api/v1/admin/stores/[storeId]/replace-pc/route";
+import { POST as allowReplacement } from "@/app/api/v1/admin/stores/[storeId]/replacement-approval/route";
 import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { GET as edgeSetupKey } from "@/app/api/v1/edge/setup-key/route";
 import { POST as edgeRelease } from "@/app/api/v1/edge/installation/release/route";
@@ -449,8 +449,11 @@ describe("the admin reads and rotates the key", () => {
     expect((await call(revealKey, request("GET", "/"), params)).status).toBe(401);
 
     const other = await seedOrganization(admin, { slug: "other-retail", name: "Other Retail" });
+    // Staff reach every store, and the path no longer carries an organization to be scoped by
+    // (D-22): what refuses a stranger is the session, which the 401 above pins down.
     const cross = await reveal(admin.token, { organizationId: other.organization.organizationId, storeId: params.storeId });
-    expect(cross.status).toBe(404);
+    expect(cross.status).toBe(200);
+    expect((await reveal(admin.token, { organizationId: params.organizationId, storeId: "store_nope" })).status).toBe(404);
   });
 
   it("answers 404 SETUP_KEY_NOT_FOUND before a key exists, and limits reveals to 10 a minute", async () => {

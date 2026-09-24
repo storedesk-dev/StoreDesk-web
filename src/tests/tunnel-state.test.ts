@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, request, seedOrganization, type TestAdmin } from "./helpers/api";
 import { GET as configRoute } from "@/app/api/v1/edge/sync/config/route";
-import { POST as retryTunnelRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/tunnel/route";
+import { POST as retryTunnelRoute } from "@/app/api/v1/admin/stores/[storeId]/tunnel/route";
 import { deleteCloudflareTunnel, rotateCloudflareTunnel } from "@/lib/cloudflare";
 import { scheduleNotify } from "@/lib/store-notify";
 import { edgeTunnelState, removeStoreTunnel } from "@/lib/tunnel";

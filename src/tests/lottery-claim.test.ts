@@ -7,10 +7,10 @@ import { getStoreSettings, updateStoreSettings } from "@/lib/tenant-stores";
 import {
   GET as getLotteryPc,
   POST as issueLotteryKey
-} from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/lottery/setup-keys/route";
+} from "@/app/api/v1/admin/stores/[storeId]/lottery/setup-keys/route";
 import { POST as claim } from "@/app/api/v1/lottery/setup-keys/redeem/route";
 import { POST as vouchedClaim } from "@/app/api/v1/edge/lottery/claim/route";
-import { POST as issueStoreDeskKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
+import { POST as issueStoreDeskKey } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/route";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/store-notify")>()),
@@ -28,10 +28,9 @@ let params: { organizationId: string; storeId: string };
 
 /** The store as it has to be before a lottery PC may be set up: it sells lottery, and it is switched on. */
 async function enableLottery(lottery: boolean = true) {
-  const current = await getStoreSettings(params.organizationId, params.storeId);
+  const current = await getStoreSettings(params.storeId);
   await updateStoreSettings(
     admin,
-    params.organizationId,
     params.storeId,
     {
       capabilities: { lottery, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null }

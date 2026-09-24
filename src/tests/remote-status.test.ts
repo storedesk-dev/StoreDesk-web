@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, request, seedOrganization, type TestAdmin } from "./helpers/api";
 import { GET as lookup } from "@/app/api/v1/app-auth/organizations/[slug]/route";
-import { GET as setupRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup/route";
+import { GET as setupRoute } from "@/app/api/v1/admin/stores/[storeId]/setup/route";
 import { GET as dashboardRoute } from "@/app/api/v1/admin/dashboard/route";
 import { resetRateLimitsForTests } from "@/lib/control-plane-security";
 import { createStore } from "@/lib/tenant-stores";

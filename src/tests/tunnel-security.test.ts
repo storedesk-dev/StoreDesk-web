@@ -11,12 +11,12 @@ import {
   seedOrganization,
   type TestAdmin
 } from "./helpers/api";
-import { GET as getSetup } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup/route";
-import { POST as issueKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
-import { POST as replacePc } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/replace-pc/route";
-import { POST as retryTunnel } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/tunnel/route";
+import { GET as getSetup } from "@/app/api/v1/admin/stores/[storeId]/setup/route";
+import { POST as issueKey } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/route";
+import { POST as replacePc } from "@/app/api/v1/admin/stores/[storeId]/replace-pc/route";
+import { POST as retryTunnel } from "@/app/api/v1/admin/stores/[storeId]/tunnel/route";
 import { POST as createStoreRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/route";
-import { DELETE as deleteStoreRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/route";
+import { DELETE as deleteStoreRoute } from "@/app/api/v1/admin/stores/[storeId]/route";
 import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { deleteCloudflareTunnel, provisionCloudflareTunnel, rotateCloudflareTunnel } from "@/lib/cloudflare";
 import { TenantStoreModel } from "@/models/ControlPlane";
@@ -144,10 +144,11 @@ describe("Replace PC and the tunnel", () => {
     });
     const retried = await post(retryTunnel);
     expect(retried.status).toBe(200);
-    expect(vi.mocked(provisionCloudflareTunnel).mock.calls[0][1]).toBe("example-retail-store-42-2");
+    // The store's own name, and its own legacy label does not block it (freeTunnelLabel skips this store).
+    expect(vi.mocked(provisionCloudflareTunnel).mock.calls[0][1]).toBe("store-42");
     expect((await lastAudit("store.tunnel.provision"))?.metadata).toMatchObject({ replacedLegacyTunnel: "example-retail-store-42" });
     const store = await TenantStoreModel.findOne({ storeId: params.storeId }).lean();
-    expect(store).toMatchObject({ tunnelId: "cf-tunnel-2", tunnelDnsRecordId: "dns-2", tunnelLabel: "example-retail-store-42-2" });
+    expect(store).toMatchObject({ tunnelId: "cf-tunnel-2", tunnelDnsRecordId: "dns-2", tunnelLabel: "store-42" });
     expect(store?.tunnelRotationRequired).toBeUndefined();
     expect((await post(issueKey, { deliver: "show" })).status).toBe(201);
   });

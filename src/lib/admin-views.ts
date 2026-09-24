@@ -56,15 +56,16 @@ export function effectivePages(
     });
 }
 
-export async function accessPreview(organizationId: string, storeId: string) {
+export async function accessPreview(storeId: string) {
+  const store = await requireStore(storeId);
+  const organizationId = String(store.organizationId);
   const org = await requireOrganization(organizationId);
-  const store = await requireStore(organizationId, storeId);
   const capabilities = normalizeStoreSettings(store.settings).capabilities;
   const roles = normalizeRoles(org.roles, toIsoOr(org.createdAt, EPOCH));
   const assignments = (await UserAssignmentModel.find({
     organizationId,
     status: "active",
-    $or: [{ storeId }, { storeId: null }]
+    storeId
   }).lean()) as Doc[];
   const users = new Map<string, Set<string>>();
   for (const assignment of assignments) {

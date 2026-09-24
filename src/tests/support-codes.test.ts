@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, lastAudit, request, seedOrganization, type TestAdmin } from "./helpers/api";
-import { GET as listRoute, POST as issueRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/support-codes/route";
-import { DELETE as revokeRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/support-codes/[supportCodeId]/route";
+import { GET as listRoute, POST as issueRoute } from "@/app/api/v1/admin/stores/[storeId]/support-codes/route";
+import { DELETE as revokeRoute } from "@/app/api/v1/admin/stores/[storeId]/support-codes/[supportCodeId]/route";
 import { POST as redeemRoute } from "@/app/api/v1/edge/support-codes/redeem/route";
 import { resetRateLimitsForTests, sha256 } from "@/lib/control-plane-security";
 import { normalizeSupportCode } from "@/lib/support-codes";
@@ -87,9 +87,12 @@ describe("issuing", () => {
     expect(JSON.stringify(listed.body)).not.toContain("codeHash");
   });
 
-  it("answers 401 without a staff session and 404 for another organization's store", async () => {
+  it("answers 401 without a staff session, and 404 for a store that does not exist", async () => {
     expect((await call(issueRoute, request("POST", "/"), params)).status).toBe(401);
-    expect((await issue({ organizationId: "org_nope", storeId: params.storeId })).status).toBe(404);
+    expect((await issue({ organizationId: params.organizationId, storeId: "store_nope" })).status).toBe(404);
+    // Staff reach every store by design, so naming another organization changes nothing: the
+    // guard is the session, never the path (D-22).
+    expect((await issue({ organizationId: "org_nope", storeId: params.storeId })).status).toBe(201);
   });
 });
 

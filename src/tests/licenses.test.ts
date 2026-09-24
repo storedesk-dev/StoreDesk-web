@@ -12,11 +12,11 @@ import {
 } from "./helpers/api";
 import { GET as listLicensesRoute, POST as createLicenseRoute } from "@/app/api/v1/admin/organizations/[organizationId]/licenses/route";
 import { PATCH as patchLicenseRoute } from "@/app/api/v1/admin/organizations/[organizationId]/licenses/[licenseId]/route";
-import { PUT as storeLicenseRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/license/route";
+import { PUT as storeLicenseRoute } from "@/app/api/v1/admin/stores/[storeId]/license/route";
 import { POST as createStoreRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/route";
 import { POST as createOrgRoute } from "@/app/api/v1/admin/organizations/route";
-import { GET as setupRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup/route";
-import { POST as issueKeyRoute } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
+import { GET as setupRoute } from "@/app/api/v1/admin/stores/[storeId]/setup/route";
+import { POST as issueKeyRoute } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/route";
 import { GET as accessSync } from "@/app/api/v1/edge/sync/access/route";
 import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { GET as dashboardRoute } from "@/app/api/v1/admin/dashboard/route";

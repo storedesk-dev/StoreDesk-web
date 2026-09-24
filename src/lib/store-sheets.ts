@@ -66,7 +66,7 @@ export async function storeSpreadsheetId(worker: Worker): Promise<string> {
     code: "GOOGLE_SHEETS_RATE_LIMITED"
   });
   requireServiceAccount();
-  const store = await requireStore(worker.organizationId, worker.storeId);
+  const store = await requireStore(worker.storeId);
   const sheets = normalizeStoreSettings(store.settings).integrations.googleSheets;
   if (sheets.enabled !== true) {
     throw new ControlPlaneError(409, "GOOGLE_SHEETS_NOT_ENABLED", "Google Sheets is not turned on for this store");

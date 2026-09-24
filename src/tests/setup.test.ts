@@ -10,9 +10,9 @@ import {
   seedOrganization,
   type TestAdmin
 } from "./helpers/api";
-import { GET as getSetup } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup/route";
-import { POST as issueKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
-import { POST as replacePc } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/replace-pc/route";
+import { GET as getSetup } from "@/app/api/v1/admin/stores/[storeId]/setup/route";
+import { POST as issueKey } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/route";
+import { POST as replacePc } from "@/app/api/v1/admin/stores/[storeId]/replace-pc/route";
 import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { updateOrganization } from "@/lib/organizations";
 import { updateStore } from "@/lib/tenant-stores";
@@ -159,7 +159,7 @@ describe("POST …/setup-keys", () => {
   it("refuses e-mail delivery when e-mail is off or there is no contact", async () => {
     expect((await issue({ deliver: "email" })).body.error.code).toBe("EMAIL_NOT_CONFIGURED");
     useEmail();
-    await updateStore(admin, params.organizationId, params.storeId, { contactEmail: null });
+    await updateStore(admin, params.storeId, { contactEmail: null });
     const noContact = await issue({ deliver: "email" });
     expect(noContact.status).toBe(400);
     expect(noContact.body.error.code).toBe("CONTACT_EMAIL_REQUIRED");
@@ -183,9 +183,9 @@ describe("POST …/setup-keys", () => {
       { $set: { status: "active", entitlementExpiresAt: new Date(Date.now() + 86_400_000) } }
     );
 
-    await updateStore(admin, params.organizationId, params.storeId, { status: "suspended" });
+    await updateStore(admin, params.storeId, { status: "suspended" });
     expect((await issue()).body.error.code).toBe("STORE_SUSPENDED");
-    await updateStore(admin, params.organizationId, params.storeId, { status: "active" });
+    await updateStore(admin, params.storeId, { status: "active" });
 
     // D-22: a store stands on its own, so its organization's status blocks nothing.
     await updateOrganization(admin, params.organizationId, { status: "suspended" });
@@ -297,7 +297,7 @@ describe("activation, Replace PC, and the PC limit", () => {
 
   it("refuses activation with 423 STORE_SUSPENDED once the store is suspended", async () => {
     const { body } = await issue();
-    await updateStore(admin, params.organizationId, params.storeId, { status: "suspended" });
+    await updateStore(admin, params.storeId, { status: "suspended" });
     const res = await redeemKey(body.setupKey);
     expect(res.status).toBe(423);
     expect(res.body.error).toMatchObject({ code: "STORE_SUSPENDED", message: "This store is suspended in StoreDesk." });

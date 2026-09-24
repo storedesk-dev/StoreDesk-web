@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, lastAudit, request, seedOrganization, type TestAdmin } from "./helpers/api";
 import { GET as list, POST as create } from "@/app/api/v1/admin/organizations/[organizationId]/stores/route";
-import * as storeRoute from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/route";
-import { DELETE as remove, GET as detail, PATCH as patch } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/route";
-import * as tunnelRoute from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/tunnel/route";
-import { POST as retryTunnel } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/tunnel/route";
-import { GET as preview } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/access-preview/route";
+import * as storeRoute from "@/app/api/v1/admin/stores/[storeId]/route";
+import { DELETE as remove, GET as detail, PATCH as patch } from "@/app/api/v1/admin/stores/[storeId]/route";
+import * as tunnelRoute from "@/app/api/v1/admin/stores/[storeId]/tunnel/route";
+import { POST as retryTunnel } from "@/app/api/v1/admin/stores/[storeId]/tunnel/route";
+import { GET as preview } from "@/app/api/v1/admin/stores/[storeId]/access-preview/route";
 import { createOrganization, updateOrganization } from "@/lib/organizations";
 import { updateStoreSettings } from "@/lib/tenant-stores";
 import { addUser } from "@/lib/users";
@@ -285,7 +285,7 @@ describe("GET …/stores/{store}/access-preview", () => {
     expect(unansweredAdmins.mobile.find((page: { key: string }) => page.key === "mobileFuelPrices")).toMatchObject({ hiddenBecause: "fuel", allowed: false });
     expect(unansweredAdmins.electron.find((page: { key: string }) => page.key === "pos")).toMatchObject({ hiddenBecause: null, allowed: true });
 
-    await updateStoreSettings(admin, organization.organizationId, store.storeId, { capabilities: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } }, 1);
+    await updateStoreSettings(admin, store.storeId, { capabilities: { fuel: false, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } }, 1);
     const before = await call(preview, request("GET", "/", { token: admin.token }), params);
     expect(before.status).toBe(200);
     expect(before.body.capabilities).toEqual({ lottery: false, coam: false, fuel: false, ebt: false, moneyOrder: false, prepaidGift: false });
@@ -301,7 +301,7 @@ describe("GET …/stores/{store}/access-preview", () => {
     const cashier = before.body.roles.find((role: { roleId: string }) => role.roleId === "cashier");
     expect(cashier.electron.map((page: { key: string }) => page.key)).not.toContain("fuelPrices");
 
-    await updateStoreSettings(admin, organization.organizationId, store.storeId, { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } }, 2);
+    await updateStoreSettings(admin, store.storeId, { capabilities: { fuel: true, lottery: false, coam: false, ebt: false, moneyOrder: false, prepaidGift: false } }, 2);
     const after = await call(preview, request("GET", "/", { token: admin.token }), params);
     const adminsAfter = after.body.roles.find((role: { roleId: string }) => role.roleId === "org_admin");
     expect(adminsAfter.electron.find((page: { key: string }) => page.key === "fuelPrices").allowed).toBe(true);

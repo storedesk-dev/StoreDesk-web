@@ -147,9 +147,9 @@ async function primaryInstallations(storeIds: string[]): Promise<Map<string, Doc
   return map;
 }
 
-export async function requireStore(organizationId: string, storeId: string): Promise<Doc> {
+export async function requireStore(storeId: string): Promise<Doc> {
   await connectDb();
-  const store = (await TenantStoreModel.findOne({ organizationId, storeId }).lean()) as Doc | null;
+  const store = (await TenantStoreModel.findOne({ storeId }).lean()) as Doc | null;
   if (!store) throw notFound("Store");
   return store;
 }
@@ -167,9 +167,9 @@ export async function listStores(organizationId: string) {
   );
 }
 
-export async function getStoreDetail(organizationId: string, storeId: string) {
-  await expireLapsedLicenses({ organizationId });
-  const store = await requireStore(organizationId, storeId);
+export async function getStoreDetail(storeId: string) {
+  const store = await requireStore(storeId);
+  await expireLapsedLicenses({ organizationId: String(store.organizationId) });
   const [installations, coverage] = await Promise.all([primaryInstallations([storeId]), coverageFor(store)]);
   return {
     store: storeView(store, installations.get(storeId) ?? null, coverage.license),
@@ -274,12 +274,13 @@ export async function createStore(
     targetId: storeId,
     metadata: { status: tunnel.status, label, ...(tunnel.status === "failed" ? { error: tunnel.message } : {}) }
   });
-  const store = await requireStore(organizationId, storeId);
+  const store = await requireStore(storeId);
   return { store: storeView(store, null, await coveringLicense(store)), tunnel };
 }
 
-export async function updateStore(admin: InternalAdminActor, organizationId: string, storeId: string, body: StorePatch) {
-  const before = await requireStore(organizationId, storeId);
+export async function updateStore(admin: InternalAdminActor, storeId: string, body: StorePatch) {
+  const before = await requireStore(storeId);
+  const organizationId = String(before.organizationId);
   const set: Doc = {};
   const unset: Doc = {};
   for (const key of ["name", "storeNumber", "address", "contactEmail", "status"] as const) {
@@ -309,8 +310,9 @@ export async function updateStore(admin: InternalAdminActor, organizationId: str
   return storeView(after, installations.get(storeId) ?? null, license);
 }
 
-export async function deleteStore(admin: InternalAdminActor, organizationId: string, storeId: string) {
-  const store = await requireStore(organizationId, storeId);
+export async function deleteStore(admin: InternalAdminActor, storeId: string) {
+  const store = await requireStore(storeId);
+  const organizationId = String(store.organizationId);
   const installations = (await WorkerInstallationModel.find({ organizationId, storeId })
     .select("workerInstallationId")
     .lean()) as Doc[];
@@ -363,14 +365,9 @@ export async function deleteStore(admin: InternalAdminActor, organizationId: str
  *   and named in the audit.
  * 503 TUNNEL_NOT_CONFIGURED and 502 TUNNEL_PROVISION_FAILED carry the current `tunnel`.
  */
-export async function retryStoreTunnel(
-  admin: InternalAdminActor,
-  organizationId: string,
-  storeId: string,
-  body: { label?: string }
-) {
-  const store = await requireStore(organizationId, storeId);
-  const org = await requireOrganization(organizationId);
+export async function retryStoreTunnel(admin: InternalAdminActor, storeId: string, body: { label?: string }) {
+  const store = await requireStore(storeId);
+  const organizationId = String(store.organizationId);
   let outcome: TunnelOutcome;
   let action: string;
   const metadata: Doc = {};
@@ -388,7 +385,7 @@ export async function retryStoreTunnel(
     if (explicit && (await tunnelLabelInUse(explicit, exceptStoreId))) throw labelTaken(explicit);
     const label =
       explicit ||
-      (await freeTunnelLabel(toDnsLabel(`${String(org.slug)}-${String(store.name)}`) || toDnsLabel(storeId), exceptStoreId));
+      (await freeTunnelLabel(toDnsLabel(String(store.name)) || toDnsLabel(storeId), exceptStoreId));
     outcome = await provisionStoreTunnel(storeId, label);
     action = "store.tunnel.provision";
     Object.assign(metadata, { label, retry: true, ...(legacy ? { replacedLegacyTunnel: legacy, tunnelNeedsManualCleanup: legacy } : {}) });
@@ -401,7 +398,7 @@ export async function retryStoreTunnel(
     targetId: storeId,
     metadata: { ...metadata, status: outcome.status, ...(outcome.status === "failed" ? { error: outcome.message } : {}) }
   });
-  const tunnel = tunnelView(await requireStore(organizationId, storeId));
+  const tunnel = tunnelView(await requireStore(storeId));
   if (outcome.status === "not_configured") {
     throw new ControlPlaneError(503, "TUNNEL_NOT_CONFIGURED", outcome.message ?? "Cloudflare is not configured", false, { tunnel });
   }
@@ -418,8 +415,8 @@ export async function retryStoreTunnel(
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 
-export async function getStoreSettings(organizationId: string, storeId: string) {
-  const store = await requireStore(organizationId, storeId);
+export async function getStoreSettings(storeId: string) {
+  const store = await requireStore(storeId);
   return {
     settings: normalizeStoreSettings(store.settings),
     settingsVersion: readSettingsVersion(store),
@@ -434,7 +431,6 @@ export async function getStoreSettings(organizationId: string, storeId: string) 
  */
 export async function updateStoreSettings(
   admin: InternalAdminActor,
-  organizationId: string,
   storeId: string,
   update: StoreSettingsUpdate,
   baseVersion: number | undefined
@@ -446,7 +442,8 @@ export async function updateStoreSettings(
       "Send the settingsVersion you read (in the body or as If-Match)"
     );
   }
-  const store = await requireStore(organizationId, storeId);
+  const store = await requireStore(storeId);
+  const organizationId = String(store.organizationId);
   const current = normalizeStoreSettings(store.settings);
   const version = readSettingsVersion(store);
   const conflict = () =>
@@ -468,7 +465,7 @@ export async function updateStoreSettings(
     { $set: { settings, settingsVersion: version + 1 } }
   );
   if (written.matchedCount === 0) {
-    const latest = await requireStore(organizationId, storeId);
+    const latest = await requireStore(storeId);
     throw new ControlPlaneError(409, "SETTINGS_VERSION_CONFLICT", "These settings changed since you opened them; review and save again", false, {
       settings: normalizeStoreSettings(latest.settings),
       settingsVersion: readSettingsVersion(latest)

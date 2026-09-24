@@ -7,7 +7,7 @@ import { publicId } from "@/lib/control-plane-security";
 import { getStoreSetup } from "@/lib/setup";
 import { lookupOrganization } from "@/lib/control-plane";
 import { listStores, updateStoreSettings } from "@/lib/tenant-stores";
-import { POST as issueSetupKey } from "@/app/api/v1/admin/organizations/[organizationId]/stores/[storeId]/setup-keys/route";
+import { POST as issueSetupKey } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/route";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/store-notify")>()),
@@ -50,7 +50,7 @@ beforeEach(async () => {
 describe("a lottery PC is not a StoreDesk PC", () => {
   it("leaves the store's setup status alone", async () => {
     await addLotteryPc();
-    const setup = await getStoreSetup(organizationId, storeId);
+    const setup = await getStoreSetup(storeId);
     expect(setup.installations).toHaveLength(0);
     expect(setup.installation).toBeNull();
   });
@@ -81,7 +81,7 @@ describe("a lottery PC is not a StoreDesk PC", () => {
   it("still lets the StoreDesk PC be the one that counts", async () => {
     await addLotteryPc();
     await activatePc(organizationId, storeId);
-    const setup = await getStoreSetup(organizationId, storeId);
+    const setup = await getStoreSetup(storeId);
     expect(setup.installations).toHaveLength(1);
     const lookup = await lookupOrganization("example-retail");
     expect(lookup.stores[0]?.setup).toBe("active");
@@ -104,7 +104,7 @@ describe("installations written before the lottery app existed", () => {
     expect(row?.product).toBe("storedesk");
 
     await WorkerInstallationModel.updateOne({ workerInstallationId }, { $unset: { product: 1 } });
-    const setup = await getStoreSetup(organizationId, storeId);
+    const setup = await getStoreSetup(storeId);
     expect(setup.installations).toHaveLength(1);
     const lookup = await lookupOrganization("example-retail");
     expect(lookup.stores[0]?.setup).toBe("active");
@@ -115,7 +115,6 @@ describe("the org-tag lookup tells the lottery app what it needs", () => {
   it("says a store sells lottery, is switched on for the app, and is licensed", async () => {
     await updateStoreSettings(
       admin,
-      organizationId,
       storeId,
       { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null } },
       1
@@ -128,7 +127,6 @@ describe("the org-tag lookup tells the lottery app what it needs", () => {
   it("answers that the app is on the moment the store sells lottery — one switch, not two", async () => {
     await updateStoreSettings(
       admin,
-      organizationId,
       storeId,
       { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null } },
       1
