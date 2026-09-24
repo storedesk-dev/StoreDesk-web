@@ -121,14 +121,15 @@ async function fixture(options: { lotteryPages?: boolean; userStatus?: string } 
   await LicenseModel.create({
     licenseId: publicId("lic"),
     organizationId,
-    licenseNumber: "SD-ORG-7K3Q92",
-    scope: "organization",
+    licenseNumber: "SD-STR-7K3Q92",
+    scope: "store",
+    storeId,
     plan: "standard",
     status: "active",
     startsAt: new Date(),
     entitlementExpiresAt: new Date(Date.now() + 86_400_000 * 30),
     offlineGraceDays: 7,
-    coverageKey: `org:${organizationId}`
+    coverageKey: `store:${storeId}`
   });
 
   await AppUserModel.create({
@@ -168,7 +169,7 @@ describe("what the control plane tells the lottery cloud", () => {
     const projection = (await buildStoreProjection(storeId))!;
 
     expect(projection.store).toMatchObject({ id: storeId, name: "Store 42", time_zone: "America/New_York", cloud_mode: "cloud" });
-    expect(projection.licence).toMatchObject({ status: "active", number: "SD-ORG-7K3Q92", scope: "organization", offline_grace_days: 7 });
+    expect(projection.licence).toMatchObject({ status: "active", number: "SD-STR-7K3Q92", scope: "store", offline_grace_days: 7 });
     expect(projection.users).toEqual([
       { id: appUserId, email: "dana@example.com", name: "Dana Patel", status: "active", password_hash: PASSWORD_HASH }
     ]);

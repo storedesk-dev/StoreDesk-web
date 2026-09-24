@@ -7,9 +7,8 @@ type Ctx = { params: Promise<{ organizationId: string; licenseId: string }> };
 
 /**
  * Plan, status (suspend / resume / cancel), `renewDays`, end date, PCs per
- * store, grace, notes. 409 LICENSE_MODE_MISMATCH for a license that doesn't
- * fit the organization's mode. Audited; every store the license covers is
- * notified.
+ * store, grace, notes. 409 LICENSE_CANCELLED for a cancelled license, which is
+ * final. Audited; the store it covers is notified.
  */
 export async function PATCH(req: Request, ctx: Ctx) {
   try {

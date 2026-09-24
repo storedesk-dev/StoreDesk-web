@@ -203,8 +203,8 @@ export async function redeemSetupKey(body: RedeemBody) {
   }
   // The store's covering license (from the organization's licensing mode)
   // decides, not the one the key was issued under.
-  const coverage = await coverageFor(store, org);
-  const problem = licenseProblem(coverage.license, coverage.mode);
+  const coverage = await coverageFor(store);
+  const problem = licenseProblem(coverage.license);
   if (problem) {
     // 402 STORE_UNLICENSED / SUBSCRIPTION_INACTIVE, forwarded by the store
     // server to the desktop wizard — so the message is store-facing, not the

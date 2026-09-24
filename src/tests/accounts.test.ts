@@ -18,36 +18,37 @@ setupMemoryMongo();
 const PASSWORD = "counter-top-8";
 const later = () => new Date(Date.now() + 86_400_000 * 30);
 
-async function organization(name: string, slug: string, mode: "master" | "storeWise" = "master") {
+async function organization(name: string, slug: string) {
   const organizationId = publicId("org");
-  await OrganizationModel.create({ organizationId, name, slug, status: "active", licensing: { mode } });
+  await OrganizationModel.create({ organizationId, name, slug, status: "active" });
   return organizationId;
 }
 
-async function store(organizationId: string, name: string, extra: Record<string, unknown> = {}) {
+async function store(organizationId: string, name: string, options: { unlicensed?: boolean } = {}) {
   const storeId = publicId("str");
   await TenantStoreModel.create({
     storeId,
     organizationId,
     name,
     status: "active",
-    settings: { capabilities: { lottery: true }, timeZone: "America/New_York", ...extra }
+    settings: { capabilities: { lottery: true }, timeZone: "America/New_York" }
   });
+  if (!options.unlicensed) await licence(organizationId, storeId);
   return storeId;
 }
 
-async function licence(organizationId: string, scope: "organization" | "store", storeId?: string) {
+async function licence(organizationId: string, storeId: string) {
   await LicenseModel.create({
     licenseId: publicId("lic"),
     organizationId,
-    licenseNumber: `SD-${scope === "organization" ? "ORG" : "STR"}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-    scope,
-    ...(storeId ? { storeId } : {}),
+    licenseNumber: `SD-STR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+    scope: "store",
+    storeId,
     plan: "standard",
     status: "active",
     startsAt: new Date(),
     entitlementExpiresAt: later(),
-    coverageKey: scope === "organization" ? `org:${organizationId}` : `store:${storeId}`
+    coverageKey: `store:${storeId}`
   });
 }
 
@@ -81,7 +82,6 @@ beforeEach(() => resetRateLimitsForTests());
 describe("what one account can reach", () => {
   it("answers every store of an organization for a person assigned to all of them", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await licence(org, "organization");
     await store(org, "Store 42");
     await store(org, "Store 7");
     const dana = await person("dana@example.com");
@@ -97,7 +97,6 @@ describe("what one account can reach", () => {
 
   it("answers one store for a person assigned to only that one", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await licence(org, "organization");
     const one = await store(org, "Store 42");
     await store(org, "Store 7");
     const sam = await person("sam@example.com");
@@ -111,7 +110,6 @@ describe("what one account can reach", () => {
 
   it("lets the store's own assignment win over the organization's, the way a store server reads it", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await licence(org, "organization");
     const one = await store(org, "Store 42");
     const dana = await person("dana@example.com");
     await assign(dana, org, "org_admin");
@@ -123,10 +121,8 @@ describe("what one account can reach", () => {
 
   it("gathers one person's two organizations, which is what the picker is for", async () => {
     const first = await organization("Patel Retail", "patel-retail");
-    const second = await organization("Highway Stores", "highway", "storeWise");
-    await licence(first, "organization");
-    const highwayStore = await store(second, "Highway 1");
-    await licence(second, "store", highwayStore);
+    const second = await organization("Highway Stores", "highway");
+    await store(second, "Highway 1");
     await store(first, "Store 42");
 
     const dana = await person("dana@example.com");
@@ -139,8 +135,8 @@ describe("what one account can reach", () => {
   });
 
   it("says a store is not covered rather than hiding it, so the reason can be read on screen", async () => {
-    const org = await organization("Patel Retail", "patel-retail", "storeWise");
-    await store(org, "Store 42");
+    const org = await organization("Patel Retail", "patel-retail");
+    await store(org, "Store 42", { unlicensed: true });
     const dana = await person("dana@example.com");
     await assign(dana, org);
 
@@ -152,7 +148,6 @@ describe("what one account can reach", () => {
 describe("signing in with an email and nothing else", () => {
   it("answers the person and their stores, and says what to do next", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await licence(org, "organization");
     await store(org, "Store 42");
     const dana = await person("dana@example.com");
     await assign(dana, org);
@@ -167,7 +162,6 @@ describe("signing in with an email and nothing else", () => {
 
   it("asks for a store when there is more than one", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await licence(org, "organization");
     await store(org, "Store 42");
     await store(org, "Store 7");
     const dana = await person("dana@example.com");
@@ -189,7 +183,6 @@ describe("signing in with an email and nothing else", () => {
 
   it("returns no password hash to anybody, ever", async () => {
     const org = await organization("Patel Retail", "patel-retail");
-    await licence(org, "organization");
     await store(org, "Store 42");
     const dana = await person("dana@example.com");
     await assign(dana, org);

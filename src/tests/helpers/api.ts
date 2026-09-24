@@ -1,6 +1,7 @@
 import {
   AuditEventModel,
   InternalAdminModel,
+  LicenseModel,
   WorkerCredentialModel,
   WorkerInstallationModel
 } from "@/models/ControlPlane";
@@ -61,22 +62,24 @@ export async function lastAudit(action: string) {
   return AuditEventModel.findOne({ action }).sort({ _id: -1 }).lean();
 }
 
-/** A master-license organization (standard, 1 PC per store) with one store, which the master covers. */
+/** An organization with one licensed store (standard, 1 PC). A licence covers a store, and only one. */
 export async function seedOrganization(
   admin: InternalAdminActor,
   options: { slug?: string; name?: string; maxPcsPerStore?: number; maxWorkerInstallations?: number; storeName?: string } = {}
 ) {
-  const { organization, license } = await createOrganization(admin, {
+  const { organization } = await createOrganization(admin, {
     name: options.name ?? "Example Retail",
-    slug: options.slug ?? "example-retail",
-    license: { plan: "standard", maxPcsPerStore: options.maxPcsPerStore ?? options.maxWorkerInstallations ?? 1 }
+    slug: options.slug ?? "example-retail"
   });
   const { store } = await createStore(admin, organization.organizationId, {
     name: options.storeName ?? "Store 42",
     storeNumber: "42",
-    contactEmail: "store42@example.invalid"
+    contactEmail: "store42@example.invalid",
+    storeLicense: { plan: "standard", maxPcsPerStore: options.maxPcsPerStore ?? options.maxWorkerInstallations ?? 1 }
   });
-  return { organization, license: license!, store };
+  // createStore issues it but does not hand it back; the tests want the row.
+  const license = (await LicenseModel.findOne({ storeId: store.storeId }).lean()) as Record<string, unknown>;
+  return { organization, license, store };
 }
 
 /** An activated store PC with a worker credential, as if its setup key had been redeemed. */

@@ -45,14 +45,15 @@ describe("seedDevData", () => {
       "viewer"
     ]);
 
-    expect(org?.licensing).toEqual({ mode: "master" });
+    expect(org?.licensing).toBeUndefined();
     const corner = await OrganizationModel.findOne({ slug: "corner-mart" }).lean();
-    expect(corner).toMatchObject({ name: "Corner Mart Group", licensing: { mode: "storeWise" } });
+    expect(corner).toMatchObject({ name: "Corner Mart Group" });
+    expect(corner?.licensing).toBeUndefined();
 
-    const master = await LicenseModel.findOne({ scope: "organization" }).lean();
-    const storeLicense = await LicenseModel.findOne({ scope: "store" }).lean();
-    expect(master).toMatchObject({ organizationId: org?.organizationId, status: "active", plan: "standard" });
-    expect(storeLicense).toMatchObject({ organizationId: corner?.organizationId, status: "active" });
+    // Four licenses, one per licensed store, and none of any other kind.
+    const licenses = await LicenseModel.find({}).lean();
+    expect(licenses).toHaveLength(4);
+    expect(licenses.every((license) => license.scope === "store" && license.storeId)).toBe(true);
 
     const byName = async (prefix: string) => (await TenantStoreModel.findOne({ name: new RegExp(`^${prefix}`) }).lean())!;
     const main = await byName("Store 42");
@@ -60,14 +61,20 @@ describe("seedDevData", () => {
     const hwy = await byName("Store 88");
     const five = await byName("Store 5 ");
     const six = await byName("Store 6 ");
-    for (const store of [main, elm, hwy]) expect((await coveringLicense(store))?.licenseId).toBe(master?.licenseId);
-    expect((await coveringLicense(five))?.licenseId).toBe(storeLicense?.licenseId);
+    // Each store's covering license is its own, and no two stores share one.
+    const covering = new Map<string, string>();
+    for (const store of [main, elm, hwy, five]) {
+      const license = await coveringLicense(store);
+      expect(license?.storeId).toBe(store.storeId);
+      covering.set(String(store.storeId), String(license?.licenseId));
+    }
+    expect(new Set(covering.values()).size).toBe(4);
     expect(await coveringLicense(six)).toBeNull();
     expect(seed.stores.map((store) => store.license)).toEqual([
-      `master license ${master?.licenseNumber}`,
-      `master license ${master?.licenseNumber}`,
-      `master license ${master?.licenseNumber}`,
-      `own license ${storeLicense?.licenseNumber}`,
+      `own license ${(await coveringLicense(main))?.licenseNumber}`,
+      `own license ${(await coveringLicense(elm))?.licenseNumber}`,
+      `own license ${(await coveringLicense(hwy))?.licenseNumber}`,
+      `own license ${(await coveringLicense(five))?.licenseNumber}`,
       "Unlicensed"
     ]);
     expect(seed.organizations.map((entry) => entry.slug)).toEqual(["example-retail", "corner-mart"]);

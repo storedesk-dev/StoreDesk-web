@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { z } from "zod";
-import { abortTransaction, commitTransaction, connectDb, startTransaction, withSession } from "@/lib/db";
+import { connectDb } from "@/lib/db";
 import { LicenseModel, OrganizationModel, TenantStoreModel, WorkerInstallationModel } from "@/models/ControlPlane";
 import { ControlPlaneError, publicId } from "@/lib/control-plane-security";
 import { productFilter, STOREDESK } from "@/lib/products";
@@ -10,29 +10,25 @@ import { scheduleNotify } from "@/lib/store-notify";
 import type { InternalAdminActor } from "@/lib/admin-auth";
 
 /**
- * Licenses (docs/design/control-plane-admin.md, "Licenses"). Each
- * organization has ONE licensing mode (`Organization.licensing.mode`):
+ * Licenses. **One store, one license** — there is no other shape.
  *
- * - `master`: one non-cancelled license with scope "organization" — the master
- *   license — covers every store of the organization, including stores added
- *   later. No store limit.
- * - `storeWise`: each store has at most one non-cancelled store license; a
- *   store without one is Unlicensed. No organization license exists.
+ * A store has at most one non-cancelled license; a store without one is Unlicensed.
  *
- * Coverage is derived, never stored: `coveringFrom(mode, store, licenses)` is
- * the one rule, and activation (redeem, key issue), the access sync's
- * `subscription` block, the dashboard and every view read through it. (Stores
- * used to carry a `licenseId`; the migration removes it.)
+ * There used to be a second shape: a `master` license on the organization covering every store
+ * under it, with each organization carrying a mode saying which of the two applied. It is gone
+ * (D-22). The market is single store, single billing, on its own cycle — so the grouping earned
+ * nothing, and the mode was a second question every read had to answer before it could answer the
+ * first.
  *
- * "One non-cancelled per scope" is enforced by a unique partial index on
- * `coverageKey` (`org:<organizationId>` / `store:<storeId>`), set while a
- * license is not cancelled.
+ * Coverage is derived, never stored: `coveringFrom(store, licenses)` is the one rule, and
+ * activation (redeem, key issue), the access sync's `subscription` block, the dashboard and every
+ * view read through it. (Stores used to carry a `licenseId`; the migration removes it.)
+ *
+ * "One non-cancelled per store" is enforced by a unique partial index on `coverageKey`
+ * (`store:<storeId>`), set while a license is not cancelled.
  */
 
 type Doc = Record<string, unknown>;
-export type LicenseScope = "organization" | "store";
-export type LicensingMode = "master" | "storeWise";
-export const LICENSING_MODES = ["master", "storeWise"] as const;
 
 export const ENTITLED_STATUSES = ["trialing", "active"];
 export const LICENSE_STATUSES = ["trialing", "active", "suspended", "cancelled", "expired"] as const;
@@ -44,16 +40,17 @@ const DEFAULT_GRACE = 7;
 
 /** Crockford base32: no I, L, O or U, so a number read aloud or typed is never ambiguous. */
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+/** `SD-ORG-` was a master licence's prefix. Still matched, so an old number is read, never issued. */
 export const LICENSE_NUMBER = /^SD-(ORG|STR)-[0-9A-HJKMNP-TV-Z]{6}$/;
 
-export function newLicenseNumber(scope: LicenseScope): string {
+export function newLicenseNumber(): string {
   let code = "";
   for (let i = 0; i < 6; i += 1) code += CROCKFORD[randomInt(CROCKFORD.length)];
-  return `${scope === "organization" ? "SD-ORG" : "SD-STR"}-${code}`;
+  return `SD-STR-${code}`;
 }
 
-export function coverageKeyFor(scope: LicenseScope, organizationId: string, storeId: string | null): string {
-  return scope === "organization" ? `org:${organizationId}` : `store:${storeId}`;
+export function coverageKeyFor(storeId: string): string {
+  return `store:${storeId}`;
 }
 
 // ── Coverage: the one rule ───────────────────────────────────────────────────
@@ -74,97 +71,51 @@ export function isEntitled(license: Doc | null | undefined, now = new Date()): b
   return ENTITLED_STATUSES.includes(String(license.status)) && Boolean(ends && ends > now);
 }
 
-/** The mode stored on the organization, or null on a record the migration has not reached. */
-export function storedMode(org: Doc | null | undefined): LicensingMode | null {
-  const mode = (org?.licensing as Doc | undefined)?.mode;
-  return mode === "master" || mode === "storeWise" ? mode : null;
-}
-
 /**
- * The organization's mode: as stored, else (a record the migration has not
- * reached) master when it has a non-cancelled organization license.
- * `licenses` are the organization's non-cancelled licenses.
+ * THE coverage rule, and now it is one line of thought: a store is covered by its own
+ * non-cancelled license, or by nothing.
  */
-export function modeOf(org: Doc | null | undefined, licenses: Doc[]): LicensingMode {
-  const stored = storedMode(org);
-  if (stored) return stored;
-  const masterKey = coverageKeyFor("organization", String(org?.organizationId ?? ""), null);
-  return licenses.some((license) => license.coverageKey === masterKey) ? "master" : "storeWise";
+export function coveringFrom(store: Doc, licenses: Doc[]): Doc | null {
+  const key = coverageKeyFor(String(store.storeId));
+  return licenses.find((license) => license.coverageKey === key && license.status !== "cancelled") ?? null;
 }
 
-/**
- * THE coverage rule. Master mode: the organization's master license. Store-wise:
- * the store's own license. Anything else — a store license in master mode, an
- * organization license in store-wise mode, a cancelled license — covers nothing.
- */
-export function coveringFrom(mode: LicensingMode, store: Doc, licenses: Doc[]): Doc | null {
-  const organizationId = String(store.organizationId);
-  const key =
-    mode === "master"
-      ? coverageKeyFor("organization", organizationId, null)
-      : coverageKeyFor("store", organizationId, String(store.storeId));
-  return (
-    licenses.find(
-      (license) => license.coverageKey === key && license.organizationId === organizationId && license.status !== "cancelled"
-    ) ?? null
-  );
-}
+export type Coverage = { license: Doc | null };
 
-export type Coverage = { mode: LicensingMode; license: Doc | null };
-
-/** A store's mode and covering license (null: Unlicensed). Pass the organization if it is at hand. */
-export async function coverageFor(store: Doc, org?: Doc | null): Promise<Coverage> {
+/** A store's covering license, or null when it is Unlicensed. */
+export async function coverageFor(store: Doc): Promise<Coverage> {
   await connectDb();
-  const organizationId = String(store.organizationId);
-  const [orgDoc, licenses] = (await Promise.all([
-    org ?? OrganizationModel.findOne({ organizationId }).select("organizationId licensing").lean(),
-    LicenseModel.find({
-      coverageKey: {
-        $in: [coverageKeyFor("organization", organizationId, null), coverageKeyFor("store", organizationId, String(store.storeId))]
-      }
-    }).lean()
-  ])) as [Doc | null, Doc[]];
-  const mode = modeOf(orgDoc ?? { organizationId }, licenses);
-  return { mode, license: coveringFrom(mode, store, licenses) };
+  const licenses = (await LicenseModel.find({ coverageKey: coverageKeyFor(String(store.storeId)) }).lean()) as Doc[];
+  return { license: coveringFrom(store, licenses) };
 }
 
-export async function coveringLicense(store: Doc, org?: Doc | null): Promise<Doc | null> {
-  return (await coverageFor(store, org)).license;
+export async function coveringLicense(store: Doc): Promise<Doc | null> {
+  return (await coverageFor(store)).license;
 }
 
-/** Modes and non-cancelled licenses of many organizations, to answer coverage for many stores at once. */
+/** Non-cancelled licenses for many stores at once, so a list page is one query rather than N. */
 export async function coverageIndex(filter: Doc = {}) {
   await connectDb();
-  const [orgs, licenses] = (await Promise.all([
-    OrganizationModel.find(filter).select("organizationId licensing").lean(),
-    LicenseModel.find({ ...filter, coverageKey: { $type: "string" } }).lean()
-  ])) as [Doc[], Doc[]];
-  const byOrg = new Map<string, Doc[]>();
+  const licenses = (await LicenseModel.find({ ...filter, coverageKey: { $type: "string" } }).lean()) as Doc[];
+  const byStore = new Map<string, Doc[]>();
   for (const license of licenses) {
-    const list = byOrg.get(String(license.organizationId)) ?? [];
+    const storeId = String(license.storeId ?? "");
+    const list = byStore.get(storeId) ?? [];
     list.push(license);
-    byOrg.set(String(license.organizationId), list);
+    byStore.set(storeId, list);
   }
-  const modes = new Map(orgs.map((org) => [String(org.organizationId), modeOf(org, byOrg.get(String(org.organizationId)) ?? [])]));
-  const mode = (organizationId: string): LicensingMode => modes.get(organizationId) ?? "storeWise";
   return {
     licenses,
-    mode,
-    licensesOf: (organizationId: string) => byOrg.get(organizationId) ?? [],
-    /** The master license of a master-mode organization, else null. */
-    master: (organizationId: string) =>
-      mode(organizationId) === "master"
-        ? (byOrg.get(organizationId) ?? []).find((license) => license.scope === "organization") ?? null
-        : null,
-    licenseFor: (store: Doc) => coveringFrom(mode(String(store.organizationId)), store, byOrg.get(String(store.organizationId)) ?? [])
+    licensesOf: (storeId: string) => byStore.get(storeId) ?? [],
+    licenseFor: (store: Doc) => coveringFrom(store, byStore.get(String(store.storeId)) ?? [])
   };
 }
 
 /** Covering licenses for many stores, keyed by storeId. */
 export async function coveringLicenses(stores: Doc[]): Promise<Map<string, Doc>> {
-  const organizationIds = [...new Set(stores.map((store) => String(store.organizationId)))];
-  if (!organizationIds.length) return new Map();
-  const index = await coverageIndex({ organizationId: { $in: organizationIds } });
+  const storeIds = stores.map((store) => String(store.storeId));
+  if (!storeIds.length) return new Map();
+  const index = await coverageIndex({ storeId: { $in: storeIds } });
   const result = new Map<string, Doc>();
   for (const store of stores) {
     const license = index.licenseFor(store);
@@ -176,15 +127,9 @@ export async function coveringLicenses(stores: Doc[]): Promise<Map<string, Doc>>
 export type LicenseProblem = { code: "STORE_UNLICENSED" | "LICENSE_INACTIVE"; message: string };
 
 /** Why a store is not entitled, in words an operator can act on; null when it is. */
-export function licenseProblem(license: Doc | null, mode: LicensingMode = "storeWise", now = new Date()): LicenseProblem | null {
+export function licenseProblem(license: Doc | null, now = new Date()): LicenseProblem | null {
   if (!license) {
-    return {
-      code: "STORE_UNLICENSED",
-      message:
-        mode === "master"
-          ? "This organization has no master license. Add one on the organization's Licenses tab."
-          : "This store has no license. Issue it a store license on its License tab."
-    };
+    return { code: "STORE_UNLICENSED", message: "This store has no license. Issue it one on its License tab." };
   }
   const number = String(license.licenseNumber);
   const status = String(license.status);
@@ -204,13 +149,13 @@ export async function expireLapsedLicenses(filter: Doc = {}): Promise<number> {
   return Number(result.modifiedCount ?? 0);
 }
 
-/** What a store view shows about its covering license. `scope` "organization" is the master license. */
+/** What a store view shows about its covering license. */
 export function licenseSummary(license: Doc | null | undefined) {
   if (!license) return null;
   return {
     licenseId: String(license.licenseId),
     licenseNumber: String(license.licenseNumber),
-    scope: String(license.scope) as LicenseScope,
+    scope: String(license.scope),
     plan: String(license.plan),
     status: String(license.status),
     entitlementExpiresAt: iso(license.entitlementExpiresAt),
@@ -228,7 +173,7 @@ export function licenseView(license: Doc, covered: CoveredStore[] = [], storeNam
     licenseId: String(license.licenseId),
     licenseNumber: String(license.licenseNumber),
     organizationId: String(license.organizationId),
-    scope: String(license.scope) as LicenseScope,
+    scope: String(license.scope),
     storeId: license.storeId ? String(license.storeId) : null,
     storeName,
     plan: String(license.plan),
@@ -239,7 +184,7 @@ export function licenseView(license: Doc, covered: CoveredStore[] = [], storeNam
     offlineGraceDays: typeof license.offlineGraceDays === "number" ? license.offlineGraceDays : DEFAULT_GRACE,
     maxPcsPerStore: Number(license.maxPcsPerStore ?? DEFAULT_PCS),
     notes: license.notes ? String(license.notes) : null,
-    /** Master: every store of the organization. Store license: its store. Cancelled: none. */
+    /** Its store — or none at all, when the license is cancelled. */
     coveredStores: covered,
     createdAt: iso(license.createdAt),
     updatedAt: iso(license.updatedAt)
@@ -277,17 +222,10 @@ const ONE_END_DATE = { message: "Give entitlementDays or entitlementExpiresAt, n
 export const NewLicenseSchema = z.object(newLicenseShape).strict().refine(oneEndDate, ONE_END_DATE);
 export type NewLicense = z.output<typeof NewLicenseSchema>;
 
-/** The master license created with a new organization, or when switching to master. */
-export const MasterLicenseSchema = NewLicenseSchema;
-
 export const LicenseCreateSchema = z
-  .object({ scope: z.enum(["organization", "store"]), storeId: z.string().trim().min(1).max(80).optional(), ...newLicenseShape })
+  .object({ storeId: z.string().trim().min(1).max(80), ...newLicenseShape })
   .strict()
-  .refine(oneEndDate, ONE_END_DATE)
-  .refine((body) => (body.scope === "store" ? Boolean(body.storeId) : !body.storeId), {
-    message: "a store license names its store; the master license names none",
-    path: ["storeId"]
-  });
+  .refine(oneEndDate, ONE_END_DATE);
 export type LicenseCreate = z.output<typeof LicenseCreateSchema>;
 
 const patchShape = {
@@ -323,30 +261,11 @@ export const StoreLicenseSchema = z
   });
 export type StoreLicenseBody = z.output<typeof StoreLicenseSchema>;
 
-/** `POST …/licensing/mode`. */
-export const LicensingModeSchema = z
-  .object({
-    mode: z.enum(LICENSING_MODES),
-    dryRun: z.boolean().optional(),
-    /** master → storeWise: give every store a copy of the master (default), or leave them Unlicensed. */
-    copyToStores: z.boolean().optional(),
-    /** storeWise → master: the new master license. */
-    master: MasterLicenseSchema.optional()
-  })
-  .strict();
-export type LicensingModeChange = z.output<typeof LicensingModeSchema>;
-
 // ── Writing ──────────────────────────────────────────────────────────────────
 
 function duplicateOn(error: unknown, field: string): boolean {
   const record = error as { code?: unknown; keyPattern?: Record<string, unknown>; keyValue?: Record<string, unknown> };
   return record?.code === 11000 && Boolean((record.keyPattern && field in record.keyPattern) || (record.keyValue && field in record.keyValue));
-}
-
-const MODE_LABEL: Record<LicensingMode, string> = { master: "on a master license", storeWise: "store-wise" };
-
-export function modeMismatch(message: string, mode: LicensingMode): ControlPlaneError {
-  return new ControlPlaneError(409, "LICENSE_MODE_MISMATCH", message, false, { licensingMode: mode });
 }
 
 function storeLicenseExists(existing: Doc | null): ControlPlaneError {
@@ -362,12 +281,17 @@ function licenseTerms(input: NewLicense, now = new Date()) {
   return { startsAt: now, entitlementExpiresAt: ends };
 }
 
-/** A license document, without its id and number (given at insert). */
-function licenseDoc(organizationId: string, scope: LicenseScope, storeId: string | null, input: NewLicense): Doc {
+/**
+ * A license document, without its id and number (given at insert).
+ *
+ * `scope` is still written, and it is always "store". The column stays because old master rows
+ * are still in the database and still readable; nothing new is ever written with another value.
+ */
+function licenseDoc(organizationId: string, storeId: string, input: NewLicense): Doc {
   return {
     organizationId,
-    scope,
-    ...(storeId ? { storeId } : {}),
+    scope: "store",
+    storeId,
     plan: input.plan,
     status: input.status ?? (input.plan === "trial" ? "trialing" : "active"),
     ...licenseTerms(input),
@@ -375,16 +299,15 @@ function licenseDoc(organizationId: string, scope: LicenseScope, storeId: string
     maxStores: 1,
     maxPcsPerStore: input.maxPcsPerStore ?? DEFAULT_PCS,
     ...(input.notes ? { notes: input.notes } : {}),
-    coverageKey: coverageKeyFor(scope, organizationId, storeId)
+    coverageKey: coverageKeyFor(storeId)
   };
 }
 
 async function insertLicense(doc: Doc): Promise<Doc> {
   await connectDb();
-  const scope = doc.scope as LicenseScope;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
-      const created = await LicenseModel.create({ ...doc, licenseId: publicId("lic"), licenseNumber: newLicenseNumber(scope) });
+      const created = await LicenseModel.create({ ...doc, licenseId: publicId("lic"), licenseNumber: newLicenseNumber() });
       return created.toObject() as Doc;
     } catch (error) {
       if (duplicateOn(error, "licenseNumber")) continue;
@@ -401,21 +324,8 @@ async function requireOrg(organizationId: string): Promise<Doc> {
   return org;
 }
 
-/** The organization's licensing mode (read from the organization, pass it if at hand). */
-export async function organizationMode(organizationId: string, org?: Doc | null): Promise<LicensingMode> {
-  const doc = org ?? (await requireOrg(organizationId));
-  const stored = storedMode(doc);
-  if (stored) return stored;
-  return (await LicenseModel.exists({ coverageKey: coverageKeyFor("organization", organizationId, null) })) ? "master" : "storeWise";
-}
-
-export async function masterLicense(organizationId: string): Promise<Doc | null> {
-  await connectDb();
-  return (await LicenseModel.findOne({ coverageKey: coverageKeyFor("organization", organizationId, null), organizationId }).lean()) as Doc | null;
-}
-
 async function ownStoreLicense(organizationId: string, storeId: string): Promise<Doc | null> {
-  return (await LicenseModel.findOne({ coverageKey: coverageKeyFor("store", organizationId, storeId), organizationId }).lean()) as Doc | null;
+  return (await LicenseModel.findOne({ coverageKey: coverageKeyFor(storeId), organizationId }).lean()) as Doc | null;
 }
 
 async function storesOf(organizationId: string): Promise<CoveredStore[]> {
@@ -423,13 +333,20 @@ async function storesOf(organizationId: string): Promise<CoveredStore[]> {
   return stores.map((store) => ({ storeId: String(store.storeId), name: String(store.name) }));
 }
 
-/** The stores a (non-cancelled) license covers under the current mode. */
-async function coveredBy(license: Doc, mode: LicensingMode): Promise<CoveredStore[]> {
-  if (license.status === "cancelled") return [];
-  const organizationId = String(license.organizationId);
-  if (license.scope === "organization") return mode === "master" ? storesOf(organizationId) : [];
-  if (mode !== "storeWise") return [];
-  const store = (await TenantStoreModel.findOne({ organizationId, storeId: license.storeId }).select("storeId name").lean()) as Doc | null;
+/**
+ * The store a (non-cancelled) license covers — one, or none.
+ *
+ * An old master row covers nothing: it names no store, and there is no longer a mode under which
+ * it could stand for all of them. It is shown in the list so nobody wonders where it went.
+ */
+async function coveredBy(license: Doc): Promise<CoveredStore[]> {
+  if (license.status === "cancelled" || !license.storeId) return [];
+  const store = (await TenantStoreModel.findOne({
+    organizationId: String(license.organizationId),
+    storeId: license.storeId
+  })
+    .select("storeId name")
+    .lean()) as Doc | null;
   return store ? [{ storeId: String(store.storeId), name: String(store.name) }] : [];
 }
 
@@ -444,17 +361,6 @@ function auditLicense(admin: InternalAdminActor, action: string, license: Doc, m
   });
 }
 
-/** Refuse a store license the organization's mode doesn't allow. */
-async function assertStoreWise(organizationId: string, org?: Doc | null): Promise<void> {
-  const mode = await organizationMode(organizationId, org);
-  if (mode !== "storeWise") {
-    throw modeMismatch(
-      "This organization is on a master license that covers every store; store licenses are only for store-wise organizations.",
-      mode
-    );
-  }
-}
-
 /** Check a new store license's terms before anything is written (store create). */
 export function checkNewLicense(input: NewLicense): void {
   licenseTerms(input);
@@ -466,7 +372,7 @@ export async function issueStoreLicense(admin: InternalAdminActor, organizationI
   if (existing) throw storeLicenseExists(existing);
   let license: Doc;
   try {
-    license = await insertLicense(licenseDoc(organizationId, "store", store.storeId, input));
+    license = await insertLicense(licenseDoc(organizationId, store.storeId, input));
   } catch (error) {
     if (duplicateOn(error, "coverageKey")) throw storeLicenseExists(null);
     throw error;
@@ -476,95 +382,50 @@ export async function issueStoreLicense(admin: InternalAdminActor, organizationI
   return licenseView(license, [store], store.name);
 }
 
-/**
- * `POST …/licenses`: the master license (master mode, none yet) or a store's
- * license (store-wise mode). Anything else is 409 LICENSE_MODE_MISMATCH.
- */
+/** `POST …/licenses`: a store's license. There is no other kind. */
 export async function createLicense(admin: InternalAdminActor, organizationId: string, body: LicenseCreate) {
-  const org = await requireOrg(organizationId);
-  if (body.scope === "store") {
-    await assertStoreWise(organizationId, org);
-    const store = (await TenantStoreModel.findOne({ organizationId, storeId: body.storeId }).select("storeId name").lean()) as Doc | null;
-    if (!store) throw new ControlPlaneError(400, "STORE_UNKNOWN", "storeId: not a store of this organization");
-    return issueStoreLicense(admin, organizationId, { storeId: String(store.storeId), name: String(store.name) }, body);
-  }
-  const mode = await organizationMode(organizationId, org);
-  if (mode !== "master") {
-    throw modeMismatch("This organization is store-wise: each store has its own license. Switch it to a master license instead.", mode);
-  }
-  const existing = await masterLicense(organizationId);
-  if (existing) {
-    throw modeMismatch(
-      `This organization already has its master license (${String(existing.licenseNumber)}). Renew or edit it instead.`,
-      mode
-    );
-  }
-  let license: Doc;
-  try {
-    license = await insertLicense(licenseDoc(organizationId, "organization", null, body));
-  } catch (error) {
-    if (duplicateOn(error, "coverageKey")) throw modeMismatch("This organization already has its master license.", mode);
-    throw error;
-  }
-  await auditLicense(admin, "license.create", license, { plan: license.plan, entitlementExpiresAt: license.entitlementExpiresAt });
-  scheduleNotify({ organizationId, reason: "license.change" });
-  return licenseView(license, await storesOf(organizationId));
+  await requireOrg(organizationId);
+  const store = (await TenantStoreModel.findOne({ organizationId, storeId: body.storeId }).select("storeId name").lean()) as Doc | null;
+  if (!store) throw new ControlPlaneError(400, "STORE_UNKNOWN", "storeId: not a store of this organization");
+  return issueStoreLicense(admin, organizationId, { storeId: String(store.storeId), name: String(store.name) }, body);
 }
 
-/** The organization's mode and every license (cancelled ones too), the master first, each with the stores it covers. */
-export async function listLicenses(organizationId: string): Promise<{ licensingMode: LicensingMode; licenses: LicenseView[] }> {
-  const org = await requireOrg(organizationId);
+/** Every license of an organization's stores, cancelled ones too, newest first, each with its store. */
+export async function listLicenses(organizationId: string): Promise<{ licenses: LicenseView[] }> {
+  await requireOrg(organizationId);
   await expireLapsedLicenses({ organizationId });
   const [licenses, stores] = (await Promise.all([
-    LicenseModel.find({ organizationId }).sort({ scope: 1, createdAt: -1 }).lean(),
+    LicenseModel.find({ organizationId }).sort({ createdAt: -1 }).lean(),
     storesOf(organizationId)
   ])) as [Doc[], CoveredStore[]];
-  const mode = modeOf(org, licenses.filter((license) => typeof license.coverageKey === "string"));
   const names = new Map(stores.map((store) => [store.storeId, store.name]));
   return {
-    licensingMode: mode,
     licenses: licenses.map((license) => {
-      const live = license.status !== "cancelled";
+      const storeId = license.storeId ? String(license.storeId) : null;
+      // A cancelled licence covers nothing, and neither does an old master row: it names no store.
       const covered =
-        !live
-          ? []
-          : license.scope === "organization"
-            ? mode === "master"
-              ? stores
-              : []
-            : mode === "storeWise" && names.has(String(license.storeId))
-              ? [{ storeId: String(license.storeId), name: names.get(String(license.storeId))! }]
-              : [];
-      return licenseView(license, covered, license.storeId ? (names.get(String(license.storeId)) ?? null) : null);
+        license.status !== "cancelled" && storeId && names.has(storeId)
+          ? [{ storeId, name: names.get(storeId)! }]
+          : [];
+      return licenseView(license, covered, storeId ? (names.get(storeId) ?? null) : null);
     })
   };
 }
 
 /**
  * `PATCH …/licenses/{licenseId}`: plan, status (suspend / resume / cancel),
- * renew, end date, PCs per store (not below the busiest covered store), grace,
- * notes. A cancelled license is final; cancelling the master leaves every
- * store Unlicensed, cancelling a store license leaves its store Unlicensed.
- * A license that doesn't fit the organization's mode is 409
- * LICENSE_MODE_MISMATCH. Every store it covers is notified.
+ * renew, end date, PCs per store (not below what its store already has), grace,
+ * notes. A cancelled license is final, and cancelling one leaves its store
+ * Unlicensed. The store is notified.
  */
 export async function updateLicense(admin: InternalAdminActor, organizationId: string, licenseId: string, body: LicensePatch) {
-  const org = await requireOrg(organizationId);
+  await requireOrg(organizationId);
   const current = (await LicenseModel.findOne({ organizationId, licenseId }).lean()) as Doc | null;
   if (!current) throw notFound("License");
   if (current.status === "cancelled") {
     throw new ControlPlaneError(409, "LICENSE_CANCELLED", "A cancelled license can't be changed; create a new one.");
   }
-  const mode = await organizationMode(organizationId, org);
-  if ((mode === "master") !== (current.scope === "organization")) {
-    throw modeMismatch(
-      mode === "master"
-        ? "This organization is on a master license; this store license covers nothing. Cancel it, or switch the organization to store-wise."
-        : "This organization is store-wise; its old master license covers nothing. Cancel it, or switch the organization to a master license.",
-      mode
-    );
-  }
-  const covered = await coveredBy(current, mode);
+  const covered = await coveredBy(current);
   const now = new Date();
   const set: Doc = {};
   const unset: Doc = {};
@@ -653,15 +514,11 @@ export async function updateLicense(admin: InternalAdminActor, organizationId: s
   return licenseView(updated, body.status === "cancelled" ? [] : covered, updated.storeId ? (covered[0]?.name ?? null) : null);
 }
 
-/**
- * `PUT …/stores/{store}/license` — store-wise only (409 LICENSE_MODE_MISMATCH
- * on a master license): issue the store's license when it has none, else edit it.
- */
+/** `PUT …/stores/{store}/license`: issue the store's license when it has none, else edit it. */
 export async function upsertStoreLicense(admin: InternalAdminActor, organizationId: string, storeId: string, body: StoreLicenseBody) {
-  const org = await requireOrg(organizationId);
+  await requireOrg(organizationId);
   const store = (await TenantStoreModel.findOne({ organizationId, storeId }).select("storeId name").lean()) as Doc | null;
   if (!store) throw notFound("Store");
-  await assertStoreWise(organizationId, org);
   const own = await ownStoreLicense(organizationId, storeId);
   if (!own) {
     if (!body.plan) throw new ControlPlaneError(400, "REQUEST_INVALID", "plan: this store has no license yet; give its plan and end date");
@@ -693,196 +550,3 @@ export async function upsertStoreLicense(admin: InternalAdminActor, organization
   return { created: false, license };
 }
 
-// ── Switching mode ───────────────────────────────────────────────────────────
-
-type CoverageNote = {
-  scope: LicenseScope;
-  /** Null for a license the change would create (a dry run has no number yet). */
-  licenseNumber: string | null;
-  plan: string;
-  status: string;
-  entitlementExpiresAt: string | null;
-};
-
-const note = (license: Doc, numbered = true): CoverageNote => ({
-  scope: String(license.scope) as LicenseScope,
-  licenseNumber: numbered && license.licenseNumber ? String(license.licenseNumber) : null,
-  plan: String(license.plan),
-  status: String(license.status),
-  entitlementExpiresAt: iso(license.entitlementExpiresAt)
-});
-
-const withNote = (existing: unknown, text: string) =>
-  (typeof existing === "string" && existing.trim() ? `${existing.trim()}\n${text}` : text).slice(0, 1000);
-
-export const SUPERSEDED_BY_MASTER = "superseded by master license";
-const REPLACED_BY_STORE_LICENSES = "replaced by store licenses (switched to store-wise)";
-const DROPPED_FOR_STORE_WISE = "cancelled when the organization switched to store-wise";
-
-/**
- * `POST …/licensing/mode`: switch between master and store-wise.
- * - master → storeWise: each store gets a copy of the master (plan, status,
- *   end, grace, PCs) unless `copyToStores: false`; the master is cancelled.
- * - storeWise → master: `master` gives the new master's terms; every store
- *   license is cancelled, "superseded by master license".
- * `dryRun` answers the effect per store without writing. The real run is one
- * transaction, audited, and notifies every store. 409 LICENSING_MODE_UNCHANGED
- * when the organization is already in that mode.
- */
-export async function changeLicensingMode(admin: InternalAdminActor, organizationId: string, body: LicensingModeChange) {
-  const org = await requireOrg(organizationId);
-  const from = await organizationMode(organizationId, org);
-  const to = body.mode;
-  if (from === to) {
-    throw new ControlPlaneError(409, "LICENSING_MODE_UNCHANGED", `The organization is already ${MODE_LABEL[to]}.`);
-  }
-  if (to === "master" && !body.master) {
-    throw new ControlPlaneError(400, "MASTER_LICENSE_REQUIRED", "master: give the new master license's plan and end date");
-  }
-  await expireLapsedLicenses({ organizationId });
-  const [stores, live] = (await Promise.all([
-    storesOf(organizationId),
-    LicenseModel.find({ organizationId, coverageKey: { $type: "string" } }).lean()
-  ])) as [CoveredStore[], Doc[]];
-  const master = live.find((license) => license.scope === "organization") ?? null;
-  const storeLicense = new Map(live.filter((license) => license.scope === "store").map((license) => [String(license.storeId), license]));
-  const copyToStores = to === "storeWise" ? body.copyToStores !== false : false;
-
-  const creates: Doc[] = [];
-  const cancels: Array<{ license: Doc; reason: string }> = [];
-  const rows: Array<{ storeId: string; name: string; before: CoverageNote | null; after: CoverageNote | null; createsLicense: boolean }> = [];
-
-  if (to === "storeWise") {
-    if (master) cancels.push({ license: master, reason: copyToStores ? REPLACED_BY_STORE_LICENSES : DROPPED_FOR_STORE_WISE });
-    for (const store of stores) {
-      const kept = storeLicense.get(store.storeId) ?? null;
-      let after: Doc | null = kept;
-      if (!kept && copyToStores && master) {
-        after = {
-          organizationId,
-          scope: "store",
-          storeId: store.storeId,
-          plan: master.plan,
-          status: master.status,
-          startsAt: new Date(),
-          entitlementExpiresAt: master.entitlementExpiresAt,
-          offlineGraceDays: master.offlineGraceDays ?? DEFAULT_GRACE,
-          maxStores: 1,
-          maxPcsPerStore: master.maxPcsPerStore ?? DEFAULT_PCS,
-          notes: `Copied from master license ${String(master.licenseNumber)}`,
-          coverageKey: coverageKeyFor("store", organizationId, store.storeId)
-        };
-        creates.push(after);
-      }
-      rows.push({ storeId: store.storeId, name: store.name, before: master ? note(master) : null, after: after ? note(after, after === kept) : null, createsLicense: Boolean(after && after !== kept) });
-    }
-  } else {
-    for (const license of live) cancels.push({ license, reason: SUPERSEDED_BY_MASTER });
-    const doc = licenseDoc(organizationId, "organization", null, body.master!);
-    creates.push(doc);
-    for (const store of stores) {
-      const before = storeLicense.get(store.storeId) ?? null;
-      rows.push({ storeId: store.storeId, name: store.name, before: before ? note(before) : null, after: note(doc, false), createsLicense: false });
-    }
-  }
-
-  const plan = {
-    from,
-    to,
-    copyToStores,
-    stores: rows,
-    licenses: {
-      created: creates.map((doc) => ({ ...note(doc, false), storeId: doc.storeId ? String(doc.storeId) : null })),
-      cancelled: cancels.map(({ license, reason }) => ({
-        licenseId: String(license.licenseId),
-        licenseNumber: String(license.licenseNumber),
-        scope: String(license.scope) as LicenseScope,
-        storeId: license.storeId ? String(license.storeId) : null,
-        reason
-      }))
-    }
-  };
-  if (body.dryRun) return { dryRun: true, ...plan };
-
-  // One transaction: the mode, the cancellations, the new licenses.
-  await LicenseModel.init();
-  let inserted: Doc[] = [];
-  for (let attempt = 0; ; attempt += 1) {
-    const session = await startTransaction();
-    try {
-      const moved = await OrganizationModel.updateOne(
-        { organizationId, $or: [{ "licensing.mode": from }, { "licensing.mode": { $exists: false } }] },
-        { $set: { "licensing.mode": to } },
-        withSession(session)
-      );
-      if (!moved.matchedCount) throw changedMeanwhile();
-      for (const { license, reason } of cancels) {
-        const done = await LicenseModel.updateOne(
-          { licenseId: license.licenseId, coverageKey: { $type: "string" } },
-          { $set: { status: "cancelled", notes: withNote(license.notes, reason) }, $unset: { coverageKey: 1 } },
-          withSession(session)
-        );
-        if (!done.matchedCount) throw changedMeanwhile();
-      }
-      inserted = creates.map((doc) => ({
-        ...doc,
-        licenseId: publicId("lic"),
-        licenseNumber: newLicenseNumber(doc.scope as LicenseScope)
-      }));
-      if (inserted.length) await LicenseModel.insertMany(inserted, withSession(session));
-      await commitTransaction(session);
-      break;
-    } catch (error) {
-      await abortTransaction(session);
-      if (session && attempt < 2 && duplicateOn(error, "licenseNumber")) continue;
-      if (duplicateOn(error, "coverageKey")) throw changedMeanwhile();
-      throw error;
-    }
-  }
-
-  const number = new Map(inserted.map((doc) => [String(doc.storeId ?? "master"), String(doc.licenseNumber)]));
-  const newMaster = inserted.find((doc) => doc.scope === "organization") ?? null;
-  await auditAdmin(admin, {
-    organizationId,
-    action: "organization.licensing.change",
-    targetType: "organization",
-    targetId: organizationId,
-    metadata: {
-      from,
-      to,
-      copyToStores,
-      created: inserted.map((doc) => doc.licenseNumber),
-      cancelled: cancels.map(({ license }) => license.licenseNumber)
-    }
-  });
-  for (const { license, reason } of cancels) {
-    await auditLicense(admin, "license.cancel", license, { reason, previousStatus: license.status });
-  }
-  for (const doc of inserted) {
-    await auditLicense(admin, "license.create", doc, { plan: doc.plan, entitlementExpiresAt: doc.entitlementExpiresAt, reason: `licensing switched to ${to}` });
-  }
-  scheduleNotify({ organizationId, reason: "license.change" });
-
-  return {
-    dryRun: false,
-    ...plan,
-    stores: rows.map((row) => ({
-      ...row,
-      after: row.after
-        ? { ...row.after, licenseNumber: row.after.licenseNumber ?? number.get(to === "master" ? "master" : row.storeId) ?? null }
-        : null
-    })),
-    licenses: {
-      ...plan.licenses,
-      created: plan.licenses.created.map((entry) => ({
-        ...entry,
-        licenseNumber: number.get(entry.storeId ?? "master") ?? null
-      }))
-    },
-    master: newMaster ? licenseView(newMaster, stores) : null
-  };
-}
-
-function changedMeanwhile(): ControlPlaneError {
-  return new ControlPlaneError(409, "LICENSING_MODE_CHANGED", "The organization's licenses changed meanwhile; review and try again.");
-}

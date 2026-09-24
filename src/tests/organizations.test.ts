@@ -79,7 +79,7 @@ describe("POST /organizations", () => {
     expect(res.body.organization.slug).toBe("cafe-expres-1");
   });
 
-  it("creates the organization license in the same request", async () => {
+  it("issues no license: a license covers a store, and there are no stores yet", async () => {
     const res = await call(
       create,
       request("POST", ORGS, {
@@ -92,10 +92,10 @@ describe("POST /organizations", () => {
       })
     );
     expect(res.status).toBe(201);
-    expect(res.body.organization.licensingMode).toBe("master");
-    expect(res.body.license).toMatchObject({ scope: "organization", plan: "trial", status: "trialing", maxPcsPerStore: 1 });
-    expect(res.body.license.licenseNumber).toMatch(/^SD-ORG-/);
-    expect(await lastAudit("license.create")).toBeTruthy();
+    expect(res.body.license).toBeNull();
+    expect(res.body.organization).not.toHaveProperty("licensingMode");
+    expect(await LicenseModel.countDocuments({ organizationId: res.body.organization.organizationId })).toBe(0);
+    expect(await lastAudit("license.create")).toBeFalsy();
   });
 
   it.each(["-bad", "bad-", "bad tag", "a".repeat(41), "under_score", "dots.here"])(
@@ -121,8 +121,8 @@ describe("POST /organizations", () => {
 });
 
 describe("GET /organizations and /organizations/{org}", () => {
-  it("lists organizations with their counts and organization license", async () => {
-    const { organization, license } = await seedOrganization(admin);
+  it("lists organizations with their counts, licensed stores and unlicensed ones", async () => {
+    const { organization } = await seedOrganization(admin);
     const res = await call(list, request("GET", ORGS, { token: admin.token }));
     expect(res.status).toBe(200);
     expect(res.body.organizations).toHaveLength(1);
@@ -130,12 +130,11 @@ describe("GET /organizations and /organizations/{org}", () => {
       organizationId: organization.organizationId,
       storeCount: 1,
       userCount: 0,
-      licensingMode: "master",
-      storeLicenseCount: 0,
-      unlicensedStoreCount: 0,
-      license: { licenseNumber: license.licenseNumber, status: "active" }
+      storeLicenseCount: 1,
+      unlicensedStoreCount: 0
     });
-    expect(res.body.organizations[0].license.entitlementExpiresAt).toMatch(/^\d{4}-/);
+    const row = res.body.organizations[0];
+    expect(row.storeLicenseCount + row.unlicensedStoreCount).toBe(row.storeCount);
   });
 
   it("shows one organization with counts, or 404", async () => {
@@ -143,8 +142,7 @@ describe("GET /organizations and /organizations/{org}", () => {
     const res = await call(detail, request("GET", "/", { token: admin.token }), { organizationId: organization.organizationId });
     expect(res.status).toBe(200);
     expect(res.body.counts).toEqual({ stores: 1, roles: 4, users: 0, licenses: 1, unlicensedStores: 0 });
-    expect(res.body.organization.licensingMode).toBe("master");
-    expect(res.body.license).toMatchObject({ status: "active", coveredStores: [expect.objectContaining({ name: "Store 42" })] });
+    expect(res.body.organization).not.toHaveProperty("licensingMode");
     const missing = await call(detail, request("GET", "/", { token: admin.token }), { organizationId: "org_nope" });
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe("RESOURCE_NOT_FOUND");

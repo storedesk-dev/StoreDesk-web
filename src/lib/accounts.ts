@@ -16,7 +16,7 @@ import {
   sha256,
   verifySecret
 } from "@/lib/control-plane-security";
-import { coveringFrom, isEntitled, type LicensingMode } from "@/lib/licenses";
+import { coveringFrom, isEntitled } from "@/lib/licenses";
 import { readOrganizationRoles } from "@/lib/roles";
 import { writeAudit } from "@/lib/audit";
 import { scheduleAppUserNotify } from "@/lib/store-notify";
@@ -124,7 +124,6 @@ export async function reachableFor(appUserId: string): Promise<ReachableOrganiza
     const organizationId = text(organization.organizationId);
     const mine = assignments.filter((assignment) => text(assignment.organizationId) === organizationId);
     if (!mine.length) continue;
-    const mode = ((organization.licensing as Doc | undefined)?.mode as LicensingMode) ?? "storeWise";
     const orgWide = mine.find(allStores) ?? null;
 
     const reachable: ReachableStore[] = [];
@@ -136,7 +135,7 @@ export async function reachableFor(appUserId: string): Promise<ReachableOrganiza
       const roleId = text(assignment.role);
       const settings = (store.settings as Doc | undefined) ?? {};
       const capabilities = (settings.capabilities as Doc | undefined) ?? {};
-      const covering = coveringFrom(mode, store, licences);
+      const covering = coveringFrom(store, licences);
 
       reachable.push({
         storeId,

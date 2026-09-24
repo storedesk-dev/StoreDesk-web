@@ -38,14 +38,14 @@ async function loadContext(organizationId: string, storeId: string) {
   const store = await requireStore(organizationId, storeId);
   await expireLapsedLicenses({ organizationId });
   const [coverage, installations] = (await Promise.all([
-    coverageFor(store, org),
+    coverageFor(store),
     // StoreDesk PCs only: a lottery PC is a separate product and must not appear in this store's
     // setup status, its PC count or its replace-PC flow.
     WorkerInstallationModel.find({ organizationId, storeId, ...productFilter(STOREDESK) })
       .sort({ createdAt: -1 })
       .lean()
   ])) as [Awaited<ReturnType<typeof coverageFor>>, Doc[]];
-  return { org, store, license: coverage.license, licensingMode: coverage.mode, installations };
+  return { org, store, license: coverage.license, installations };
 }
 
 function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | null {
@@ -56,7 +56,7 @@ function whyBlocked(ctx: Awaited<ReturnType<typeof loadContext>>): Blocked | nul
     return { status: 409, code: "STORE_SUSPENDED", message: `The store is ${String(ctx.store.status)}; reactivate it first.` };
   }
   // The store's covering license: STORE_UNLICENSED or LICENSE_INACTIVE.
-  const problem = licenseProblem(ctx.license, ctx.licensingMode);
+  const problem = licenseProblem(ctx.license);
   if (problem) return { status: 402, code: problem.code, message: problem.message };
   if (ctx.store.tunnelRotationRequired === true) {
     return {
@@ -141,7 +141,6 @@ export async function getStoreSetup(organizationId: string, storeId: string) {
     tunnel,
     remote,
     license: licenseSummary(ctx.license),
-    licensingMode: ctx.licensingMode,
     keyBlockedReason: blocked?.message ?? null,
     keyBlockedCode: blocked?.code ?? null,
     emailConfigured: isEmailConfigured(),

@@ -92,7 +92,7 @@ describe("GET /api/v1/admin/organizations/{org}/audit", () => {
 
     const rest = await call(audit, request("GET", `/?limit=50&cursor=${first.body.nextCursor}`, { token: admin.token }), params);
     const all = [...first.body.events, ...rest.body.events].map((event: { action: string }) => event.action);
-    expect(all).toEqual(["store.tunnel.provision", "store.create", "license.create", "organization.create"]);
+    expect(all).toEqual(["store.tunnel.provision", "license.create", "store.create", "organization.create"]);
     expect(rest.body.nextCursor).toBeNull();
 
     const pulls = await call(audit, request("GET", `/?action=edge.access_sync`, { token: admin.token }), params);

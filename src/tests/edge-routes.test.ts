@@ -63,18 +63,19 @@ vi.mock("@/models/ControlPlane", () => {
       find: many
     },
     LicenseModel: {
-      // The master license, found by its coverage key.
+      // The store's own licence, found by its coverage key (D-22: there is no other kind).
       find: () =>
         h.query(() => [
           {
             licenseId: "lic_1",
-            licenseNumber: "SD-ORG-7K3Q92",
+            licenseNumber: "SD-STR-7K3Q92",
             organizationId: "org_1",
-            scope: "organization",
+            scope: "store",
+            storeId: "store_1",
             status: "trialing",
             entitlementExpiresAt: new Date("2030-02-01T00:00:00Z"),
             offlineGraceDays: 5,
-            coverageKey: "org:org_1"
+            coverageKey: "store:store_1"
           }
         ])
     },
@@ -176,8 +177,8 @@ describe("GET /api/v1/edge/sync/access", () => {
       status: "trialing",
       entitlementExpiresAt: "2030-02-01T00:00:00.000Z",
       offlineGraceDays: 5,
-      licenseNumber: "SD-ORG-7K3Q92",
-      scope: "organization"
+      licenseNumber: "SD-STR-7K3Q92",
+      scope: "store"
     });
     expect(body.users).toHaveLength(2);
     expect(body.users[0]).toMatchObject({ appUserId: "appu_1", passwordHash: h.HASH, assignment: { assignmentId: "asg_1", role: "org_admin" } });

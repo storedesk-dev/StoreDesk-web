@@ -207,13 +207,14 @@ describe("where it shows", () => {
         remote: { status: "offline", since: "2026-09-12T20:14:00.000Z" }
       },
       {
+        // Created with no license of its own, so it is not covered: Store 42's does not reach it.
         storeId: noTunnel.storeId,
         name: "Store 90",
         storeNumber: null,
         tunnelUrl: null,
         setup: "none",
         lottery: { hasLottery: false, appEnabled: false, pc: null },
-        licence: { covered: true, status: "active" },
+        licence: { covered: false, status: null },
         remote: { status: "unknown", since: null }
       }
     ]);

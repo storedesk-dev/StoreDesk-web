@@ -32,9 +32,7 @@ import {
   coveringLicenses,
   expireLapsedLicenses,
   issueStoreLicense,
-  licenseSummary,
-  modeMismatch,
-  organizationMode
+  licenseSummary
 } from "@/lib/licenses";
 import {
   freeTunnelLabel,
@@ -175,8 +173,7 @@ export async function getStoreDetail(organizationId: string, storeId: string) {
   const [installations, coverage] = await Promise.all([primaryInstallations([storeId]), coverageFor(store)]);
   return {
     store: storeView(store, installations.get(storeId) ?? null, coverage.license),
-    license: licenseSummary(coverage.license),
-    licensingMode: coverage.mode
+    license: licenseSummary(coverage.license)
   };
 }
 
@@ -196,7 +193,7 @@ export const StoreCreateSchema = z.object({
   /**
    * Store-wise organizations only: issue the store's license now (plan, end).
    * Left out: the store starts Unlicensed. In master mode the master license
-   * covers the new store and this is refused (409 LICENSE_MODE_MISMATCH).
+   * covers the new store: each store has its own license or none (D-22).
    */
   storeLicense: NewLicenseSchema.optional(),
   /** The tunnel hostname label; defaults to `<org tag>-<store name>`. `slug` is the older name. */
@@ -233,13 +230,7 @@ export async function createStore(
     throw new ControlPlaneError(409, "ORGANIZATION_SUSPENDED", "The organization is suspended; reactivate it first");
   }
   await expireLapsedLicenses({ organizationId });
-  const mode = await organizationMode(organizationId, org);
-  if (body.storeLicense) {
-    if (mode !== "storeWise") {
-      throw modeMismatch("This organization's master license covers every store, including new ones; send no store license.", mode);
-    }
-    checkNewLicense(body.storeLicense);
-  }
+  if (body.storeLicense) checkNewLicense(body.storeLicense);
 
   const storeId = publicId("store");
   // A label the operator chose must be free; a derived one gets -2, -3, … .
@@ -273,7 +264,7 @@ export async function createStore(
     action: "store.create",
     targetType: "store",
     targetId: storeId,
-    metadata: { name: body.name, licensingMode: mode, storeLicense: Boolean(body.storeLicense) }
+    metadata: { name: body.name, storeLicense: Boolean(body.storeLicense) }
   });
   if (body.storeLicense) await issueStoreLicense(admin, organizationId, { storeId, name: body.name }, body.storeLicense);
 

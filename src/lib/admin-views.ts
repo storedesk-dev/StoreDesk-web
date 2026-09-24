@@ -232,7 +232,7 @@ export async function dashboard() {
   // Only licenses that cover under their organization's mode: the master of a
   // master-mode organization, the store licenses of a store-wise one.
   const licenses = index.licenses.filter(
-    (license) => (index.mode(String(license.organizationId)) === "master") === (license.scope === "organization")
+    (license) => license.status !== "cancelled" && Boolean(license.storeId)
   );
   const live = installations.filter((row) => LIVE_INSTALL.includes(String(row.status)));
   const online = live.filter((row) => row.lastSeenAt && now - new Date(String(row.lastSeenAt)).getTime() <= ONLINE_WINDOW_MS);

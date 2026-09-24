@@ -7,7 +7,7 @@ import {
   UserAssignmentModel,
   WorkerInstallationModel
 } from "@/models/ControlPlane";
-import { coveringFrom, isEntitled, type LicensingMode } from "@/lib/licenses";
+import { coveringFrom, isEntitled } from "@/lib/licenses";
 import { readOrganizationRoles } from "@/lib/roles";
 import { LOTTERY } from "@/lib/products";
 
@@ -83,8 +83,7 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
   ])) as [Doc | null, Doc[], Doc[], Doc | null];
   if (!organization) return null;
 
-  const mode = ((organization.licensing as Doc | undefined)?.mode as LicensingMode) ?? "storeWise";
-  const covering = coveringFrom(mode, store, licences);
+  const covering = coveringFrom(store, licences);
   const roles = (await readOrganizationRoles(organizationId)) ?? [];
   const pagesOfRole = new Map(
     roles.map((role) => [

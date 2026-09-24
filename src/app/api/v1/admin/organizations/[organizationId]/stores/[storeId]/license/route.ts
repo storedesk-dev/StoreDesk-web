@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ organizationId: string; storeId: string }> };
 /**
  * Store-wise organizations: issue the store's license when it has none
  * (`{plan, entitlementDays | entitlementExpiresAt, …}`), else edit it (the
- * license PATCH fields). 409 LICENSE_MODE_MISMATCH on a master license.
+ * license PATCH fields).
  * Answers the store as `GET …/stores/{store}` does, plus `created`.
  */
 export async function PUT(req: Request, ctx: Ctx) {

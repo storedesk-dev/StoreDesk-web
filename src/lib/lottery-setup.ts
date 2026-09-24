@@ -38,7 +38,7 @@ const OPEN_KEY = ["queued", "shown", "sent", "delivery_failed"];
 const LIVE = ["active", "degraded", "updating", "rollback"];
 
 /** Why a store cannot run the lottery app. The app shows these words; the picker greys the row. */
-function whyBlocked(org: Doc, store: Doc, license: Doc | null, mode: Parameters<typeof licenseProblem>[1]) {
+function whyBlocked(org: Doc, store: Doc, license: Doc | null) {
   if (org.status === "suspended") {
     return { status: 409, code: "ORGANIZATION_SUSPENDED", message: "The organization is suspended." };
   }
@@ -56,7 +56,7 @@ function whyBlocked(org: Doc, store: Doc, license: Doc | null, mode: Parameters<
       message: "This store isn't set up for lottery. Ask your StoreDesk contact to switch it on."
     };
   }
-  const problem = licenseProblem(license, mode);
+  const problem = licenseProblem(license);
   if (problem) return { status: 402, code: problem.code, message: problem.message };
   return null;
 }
@@ -65,8 +65,8 @@ async function loadStore(organizationId: string, storeId: string) {
   const org = await requireOrganization(organizationId);
   const store = await requireStore(organizationId, storeId);
   await expireLapsedLicenses({ organizationId });
-  const coverage = await coverageFor(store, org);
-  const blocked = whyBlocked(org, store, coverage.license, coverage.mode);
+  const coverage = await coverageFor(store);
+  const blocked = whyBlocked(org, store, coverage.license);
   if (blocked) throw new ControlPlaneError(blocked.status, blocked.code, blocked.message);
   return { org, store, coverage };
 }

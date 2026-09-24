@@ -53,23 +53,22 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
   });
   const admin: InternalAdminActor = { adminId, email: adminEmail };
 
-  // ── Example Retail: master license ─────────────────────────────────────────
-  const { organization, license } = await createOrganization(admin, {
+  // ── Example Retail ─────────────────────────────────────────────────────────
+  // Every store gets its own licence now (D-22); an organization starts with none.
+  const { organization } = await createOrganization(admin, {
     name: "Example Retail",
     slug: "example-retail",
-    billingEmail: "billing@example-retail.test",
-    licensingMode: "master",
-    license: { plan: "standard", entitlementDays: 365, maxPcsPerStore: 1, offlineGraceDays: 7 }
+    billingEmail: "billing@example-retail.test"
   });
   const organizationId = organization.organizationId;
-  const masterNumber = license!.licenseNumber;
 
   const { store: main } = await createStore(admin, organizationId, {
     name: "Store 42 · Main St",
     storeNumber: "42",
     address: "42 Main St, Atlanta, GA 30303",
     contactEmail: "store42@example-retail.test",
-    timeZone: "America/New_York"
+    timeZone: "America/New_York",
+    storeLicense: { plan: "standard", entitlementDays: 365, maxPcsPerStore: 1, offlineGraceDays: 7 }
   });
   await updateStoreSettings(
     admin,
@@ -87,13 +86,15 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
     storeNumber: "17",
     address: "17 Elm Ave, Decatur, GA 30030",
     contactEmail: "store17@example-retail.test",
-    timeZone: "America/New_York"
+    timeZone: "America/New_York",
+    storeLicense: { plan: "standard", entitlementDays: 365, maxPcsPerStore: 1, offlineGraceDays: 7 }
   });
   const { store: hwy } = await createStore(admin, organizationId, {
     name: "Store 88 · Hwy 9",
     storeNumber: "88",
     address: "8800 Hwy 9, Alpharetta, GA 30004",
-    timeZone: "America/New_York"
+    timeZone: "America/New_York",
+    storeLicense: { plan: "standard", entitlementDays: 365, maxPcsPerStore: 1, offlineGraceDays: 7 }
   });
 
   const owner = "owner@example-retail.test";
@@ -123,12 +124,11 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
   // A key waiting on Store 42's PC, so the dashboard has something to show.
   const key = await issueStoreSetupKey(admin, organizationId, main.storeId, { deliver: "show" });
 
-  // ── Corner Mart Group: store-wise ──────────────────────────────────────────
+  // ── Corner Mart Group ──────────────────────────────────────────────────────
   const { organization: corner } = await createOrganization(admin, {
     name: "Corner Mart Group",
     slug: "corner-mart",
-    billingEmail: "accounts@corner-mart.test",
-    licensingMode: "storeWise"
+    billingEmail: "accounts@corner-mart.test"
   });
   const { store: five } = await createStore(admin, corner.organizationId, {
     name: "Store 5 · Oak St",
@@ -144,25 +144,20 @@ export async function seedDevData(options: SeedOptions = {}): Promise<SeedResult
     timeZone: "America/New_York"
   });
 
-  const onMaster = `master license ${masterNumber}`;
+  const own = (store: { license?: { licenseNumber: string } | null }) =>
+    store.license ? `own license ${store.license.licenseNumber}` : "Unlicensed";
   return {
     admin: { email: adminEmail, password: adminPassword },
     organizations: [
-      { organizationId, name: organization.name, slug: organization.slug, licensing: `master license ${masterNumber} (covers every store)` },
-      { organizationId: corner.organizationId, name: corner.name, slug: corner.slug, licensing: "store-wise (a license per store)" }
+      { organizationId, name: organization.name, slug: organization.slug, licensing: "a license per store" },
+      { organizationId: corner.organizationId, name: corner.name, slug: corner.slug, licensing: "a license per store" }
     ],
     stores: [
-      { storeId: main.storeId, organization: organization.name, name: main.name, features: "fuel, lottery, Google Sheets", license: onMaster },
-      { storeId: elm.storeId, organization: organization.name, name: elm.name, features: "none", license: onMaster },
-      { storeId: hwy.storeId, organization: organization.name, name: hwy.name, features: "none", license: onMaster },
-      {
-        storeId: five.storeId,
-        organization: corner.name,
-        name: five.name,
-        features: "none",
-        license: `own license ${five.license?.licenseNumber ?? ""}`
-      },
-      { storeId: six.storeId, organization: corner.name, name: six.name, features: "none", license: "Unlicensed" }
+      { storeId: main.storeId, organization: organization.name, name: main.name, features: "fuel, lottery, Google Sheets", license: own(main) },
+      { storeId: elm.storeId, organization: organization.name, name: elm.name, features: "none", license: own(elm) },
+      { storeId: hwy.storeId, organization: organization.name, name: hwy.name, features: "none", license: own(hwy) },
+      { storeId: five.storeId, organization: corner.name, name: five.name, features: "none", license: own(five) },
+      { storeId: six.storeId, organization: corner.name, name: six.name, features: "none", license: own(six) }
     ],
     users: [
       { email: owner, kind: "managed", role: "Organization Admin", where: "every Example Retail store", password: userPassword },

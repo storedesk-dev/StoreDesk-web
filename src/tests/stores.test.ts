@@ -55,12 +55,8 @@ afterEach(() => {
 });
 
 async function orgWithLicense() {
-  const { organization, license } = await createOrganization(admin, {
-    name: "Example Retail",
-    slug: "example-retail",
-    license: { plan: "standard", maxPcsPerStore: 1 }
-  });
-  return { organizationId: organization.organizationId, licenseId: license!.licenseId };
+  const { organization } = await createOrganization(admin, { name: "Example Retail", slug: "example-retail" });
+  return { organizationId: organization.organizationId, licenseId: null };
 }
 
 function createStoreCall(organizationId: string, body: unknown) {
@@ -162,20 +158,24 @@ describe("POST …/stores", () => {
     expect(refused.body.tunnel).toMatchObject({ status: "failed", message: "quota" });
   });
 
-  it("a master-license organization covers every new store; a store license is refused there", async () => {
-    const { organizationId, licenseId } = await orgWithLicense();
+  it("each store gets its own license; no license ever covers a second store", async () => {
+    const { organizationId } = await orgWithLicense();
+    const ids = new Set<string>();
     for (const name of ["One", "Two", "Three"]) {
-      const created = await createStoreCall(organizationId, { name });
+      const created = await createStoreCall(organizationId, { name, storeLicense: { plan: "trial" } });
       expect(created.status).toBe(201);
-      expect(created.body.store.license).toMatchObject({ licenseId, scope: "organization" });
+      expect(created.body.store.license).toMatchObject({ scope: "store" });
+      ids.add(created.body.store.license.licenseId);
     }
-    const own = await createStoreCall(organizationId, { name: "Four", storeLicense: { plan: "trial" } });
-    expect(own.status).toBe(409);
-    expect(own.body.error.code).toBe("LICENSE_MODE_MISMATCH");
+    expect(ids.size).toBe(3);
+    // A fourth store asked for none stays unlicensed: a sibling's license does not reach it.
+    const bare = await createStoreCall(organizationId, { name: "Four" });
+    expect(bare.status).toBe(201);
+    expect(bare.body.store).toMatchObject({ licenseId: null, license: null });
   });
 
   it("store-wise: issues the store's license now or leaves it Unlicensed; a suspended organization is refused", async () => {
-    const { organization } = await createOrganization(admin, { name: "Corner Mart", slug: "corner-mart", licensingMode: "storeWise" });
+    const { organization } = await createOrganization(admin, { name: "Corner Mart", slug: "corner-mart" });
     const unlicensed = await createStoreCall(organization.organizationId, { name: "S" });
     expect(unlicensed.status).toBe(201);
     expect(unlicensed.body.store).toMatchObject({ licenseId: null, license: null });
@@ -219,7 +219,7 @@ describe("GET, PATCH, PUT and DELETE …/stores/{store}", () => {
       organizationId: organization.organizationId,
       storeId: store.storeId
     });
-    expect(shown.body.license).toMatchObject({ licenseId: license.licenseId, scope: "organization" });
+    expect(shown.body.license).toMatchObject({ licenseId: license.licenseId, scope: "store" });
     expect(listed.body.stores[0].license.licenseNumber).toBe(license.licenseNumber);
     expect((await call(detail, request("GET", "/", { token: admin.token }), { organizationId: organization.organizationId, storeId: "store_nope" })).status).toBe(404);
   });

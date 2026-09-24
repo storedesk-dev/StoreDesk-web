@@ -17,12 +17,11 @@ export async function GET(req: Request, ctx: Ctx) {
 }
 
 /**
- * Create a license that fits the organization's mode: `{scope:
- * "organization", plan, entitlementDays | entitlementExpiresAt,
- * maxPcsPerStore, offlineGraceDays, notes}` — the master license, master mode,
- * none yet — or `{scope: "store", storeId, …}` — a store's license,
- * store-wise mode. 409 LICENSE_MODE_MISMATCH otherwise (a second master
- * included); 409 LICENSE_EXISTS for a store that has one.
+ * Issue a store's license: `{storeId, plan, entitlementDays |
+ * entitlementExpiresAt, maxPcsPerStore, offlineGraceDays, notes}`. A license
+ * covers one store and nothing else (D-22), so 400 STORE_UNKNOWN for a store
+ * outside this organization and 409 LICENSE_EXISTS for one that already has a
+ * license — renew or edit that one instead.
  */
 export async function POST(req: Request, ctx: Ctx) {
   try {
