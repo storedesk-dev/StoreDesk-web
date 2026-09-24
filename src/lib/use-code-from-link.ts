@@ -37,7 +37,4 @@ export function useCodeFromLink(): string | null {
   return code;
 }
 
-/** The link an e-mail sends somebody to. The code rides in the fragment, for the reasons above. */
-export function linkWithCode(base: string, code: string): string {
-  return `${base}#c=${encodeURIComponent(code)}`;
-}
+

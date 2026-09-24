@@ -1,6 +1,6 @@
 import { SITE } from "@/lib/site";
 import { DEFAULT_FROM, renderEmail, renderText, type EmailSpec } from "@/lib/email-theme";
-import { linkWithCode } from "@/lib/use-code-from-link";
+import { linkWithCode } from "@/lib/email-links";
 
 /**
  * Setup keys expire on a clock the recipient can read. Rendered in Eastern time
