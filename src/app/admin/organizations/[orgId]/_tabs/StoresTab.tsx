@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage, type License, type LicensingMode, type NewLicenseInput } from "../../../_lib/api";
+import { api, errorMessage, type NewLicenseInput } from "../../../_lib/api";
 import { US_TIME_ZONES, relativeTime, timeZoneLabel } from "../../../_lib/format";
 import {
   Button,
@@ -36,9 +36,8 @@ export function StoresTab({ orgId, refreshOrg }: OrgTabProps) {
   if (loading && !data) return <Spinner />;
   if (!data) return null;
 
-  const storeHref = (storeId: string) =>
-    `/admin/organizations/${encodeURIComponent(orgId)}/stores/${encodeURIComponent(storeId)}`;
-  const master = data.licenses.find((l) => l.scope === "organization" && l.status !== "cancelled") ?? null;
+  // A store answers on its own id now (D-22).
+  const storeHref = (storeId: string) => `/admin/stores/${encodeURIComponent(storeId)}`;
 
   return (
     <div className="space-y-3">
@@ -109,8 +108,6 @@ export function StoresTab({ orgId, refreshOrg }: OrgTabProps) {
       <NewStoreDialog
         open={creating}
         orgId={orgId}
-        mode={data.licensingMode}
-        master={master}
         onClose={() => setCreating(false)}
         onCreated={(storeId) => {
           refreshOrg();
@@ -124,15 +121,11 @@ export function StoresTab({ orgId, refreshOrg }: OrgTabProps) {
 function NewStoreDialog({
   open,
   orgId,
-  mode,
-  master,
   onClose,
   onCreated
 }: {
   open: boolean;
   orgId: string;
-  mode: LicensingMode;
-  master: License | null;
   onClose: () => void;
   onCreated: (storeId: string) => void;
 }) {
@@ -159,7 +152,7 @@ function NewStoreDialog({
     setError(null);
   }, [open]);
 
-  const issuing = mode === "storeWise" && issue;
+  const issuing = issue;
   const canSubmit = name.trim().length > 0 && !busy && (!issuing || validNewLicense(newLicense));
 
   async function submit() {
@@ -246,25 +239,15 @@ function NewStoreDialog({
         </Field>
         <fieldset className="col-span-2">
           <legend className="mb-1.5 text-[13px] font-semibold text-slate-700">License</legend>
-          {mode === "master" ? (
-            master ? (
-              <Notice tone="blue">
-                Covered by the master license <code className="font-mono">{master.licenseNumber}</code>, like every store.
-              </Notice>
-            ) : (
-              <Notice tone="amber">This organization has no master license in force; the store will be Unlicensed until one is added.</Notice>
-            )
-          ) : (
-            <div className="space-y-2" role="radiogroup" aria-label="The store's license">
-              {option(true, "Issue a store license now", "A license that covers only this store.")}
-              {issue ? (
-                <div className="ml-6">
-                  <NewLicenseFields value={newLicense} onChange={setNewLicense} />
-                </div>
-              ) : null}
-              {option(false, "No license yet", "The PC can't activate and sign-in is refused until the store has a license.")}
-            </div>
-          )}
+          <div className="space-y-2" role="radiogroup" aria-label="The store's license">
+            {option(true, "Issue a store license now", "A license that covers only this store.")}
+            {issue ? (
+              <div className="ml-6">
+                <NewLicenseFields value={newLicense} onChange={setNewLicense} />
+              </div>
+            ) : null}
+            {option(false, "No license yet", "The PC can't activate and sign-in is refused until the store has a license.")}
+          </div>
         </fieldset>
         {error ? (
           <div className="col-span-2">

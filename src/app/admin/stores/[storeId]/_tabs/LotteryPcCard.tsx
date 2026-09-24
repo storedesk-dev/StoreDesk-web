@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { KeyRound } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage } from "../../../../../_lib/api";
-import { formatDateTime, relativeTime } from "../../../../../_lib/format";
-import { Button, Card, DefinitionList, ErrorBanner, SecretBox, Spinner, useLoad } from "../../../../../_components/ui";
+import { api, errorMessage } from "../../../_lib/api";
+import { formatDateTime, relativeTime } from "../../../_lib/format";
+import { Button, Card, DefinitionList, ErrorBanner, SecretBox, Spinner, useLoad } from "../../../_components/ui";
 
 /**
  * Store · PC & phones · StoreDesk Lottery: the key that sets up the store's lottery PC.
@@ -15,16 +15,16 @@ import { Button, Card, DefinitionList, ErrorBanner, SecretBox, Spinner, useLoad 
  * one. The server refuses the key where the store does not sell lottery or has no licence in force,
  * and says why.
  */
-export function LotteryPcCard({ orgId, storeId }: { orgId: string; storeId: string }) {
+export function LotteryPcCard({ storeId }: { storeId: string }) {
   const { toast } = useToast();
-  const { data, error, loading, reload } = useLoad(() => api.getLotteryPc(orgId, storeId), [orgId, storeId]);
+  const { data, error, loading, reload } = useLoad(() => api.getLotteryPc(storeId), [storeId]);
   const [issuing, setIssuing] = useState(false);
   const [issued, setIssued] = useState<string | null>(null);
 
   async function issue() {
     setIssuing(true);
     try {
-      const res = await api.issueLotterySetupKey(orgId, storeId);
+      const res = await api.issueLotterySetupKey(storeId);
       setIssued(res.setupKey);
       toast("Lottery setup key issued", "success");
       void reload();

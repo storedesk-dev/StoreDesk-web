@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import {
+  OrganizationModel,
   LicenseModel,
   SetupKeyModel,
   TenantStoreModel,
@@ -165,6 +166,29 @@ export async function listStores(organizationId: string) {
   return stores.map((store) =>
     storeView(store, installations.get(String(store.storeId)) ?? null, licenses.get(String(store.storeId)) ?? null)
   );
+}
+
+/**
+ * Every store, newest name first, each with its PC and its covering license.
+ *
+ * This is the admin console's front page (D-22): there is no organization to drill through, so the
+ * list is flat and the operator searches it. The organization's name rides along only as something
+ * to search by and show — it is not a grouping, and it goes when the entity does (S6).
+ */
+export async function listAllStores() {
+  await connectDb();
+  await expireLapsedLicenses({});
+  const stores = (await TenantStoreModel.find({}).sort({ name: 1 }).lean()) as Doc[];
+  const [installations, licenses, organizations] = await Promise.all([
+    primaryInstallations(stores.map((store) => String(store.storeId))),
+    coveringLicenses(stores),
+    OrganizationModel.find({}).select("organizationId name").lean() as Promise<Doc[]>
+  ]);
+  const names = new Map(organizations.map((org) => [String(org.organizationId), String(org.name)]));
+  return stores.map((store) => ({
+    ...storeView(store, installations.get(String(store.storeId)) ?? null, licenses.get(String(store.storeId)) ?? null),
+    organizationName: names.get(String(store.organizationId)) ?? null
+  }));
 }
 
 export async function getStoreDetail(storeId: string) {

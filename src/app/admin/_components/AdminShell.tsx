@@ -4,13 +4,16 @@ import Link from "next/link";
 import { BrandLockup } from "./BrandLockup";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Building2, LayoutDashboard, LogOut, Search } from "lucide-react";
-import { api, type OrganizationSummary } from "../_lib/api";
+import { Building2, LayoutDashboard, LogOut, Search, Store } from "lucide-react";
+import { api, type Store as StoreRecord } from "../_lib/api";
 import { cx } from "./ui";
-import { OrgStatusChip } from "./status";
+import { StoreStatusChip } from "./status";
 
+// Stores first: a store is the tenant, and the console opens on all of them (D-22). Organizations
+// stay in the nav only until S6 moves users and roles onto the store, which is all they still hold.
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/stores", label: "Stores", icon: Store, exact: false },
   { href: "/admin/organizations", label: "Organizations", icon: Building2, exact: false }
 ];
 
@@ -109,12 +112,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** Global search: organizations by name or org tag. Loads the list on first focus. */
+/** Global search: a store by its name, its number or the business it belongs to. */
 function OrgSearch() {
   const router = useRouter();
   const pathname = usePathname();
   const [query, setQuery] = useState("");
-  const [orgs, setOrgs] = useState<OrganizationSummary[] | null>(null);
+  const [orgs, setOrgs] = useState<Array<StoreRecord & { organizationName: string | null }> | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -137,8 +140,8 @@ function OrgSearch() {
   async function ensureLoaded() {
     if (orgs || failed) return;
     try {
-      const data = await api.listOrganizations();
-      setOrgs(data.organizations ?? []);
+      const data = await api.listAllStores();
+      setOrgs(data.stores ?? []);
     } catch {
       setFailed(true);
     }
@@ -148,14 +151,16 @@ function OrgSearch() {
     const q = query.trim().toLowerCase();
     if (!q || !orgs) return [];
     return orgs
-      .filter((o) => o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q))
+      .filter((o) =>
+        [o.name, o.storeNumber, o.organizationName].some((field) => String(field ?? "").toLowerCase().includes(q))
+      )
       .slice(0, 8);
   }, [orgs, query]);
 
-  function go(org: OrganizationSummary) {
+  function go(store: StoreRecord) {
     setOpen(false);
     setQuery("");
-    router.push(`/admin/organizations/${encodeURIComponent(org.organizationId)}`);
+    router.push(`/admin/stores/${encodeURIComponent(store.storeId)}`);
   }
 
   const showList = open && query.trim().length > 0;
@@ -163,7 +168,7 @@ function OrgSearch() {
   return (
     <div ref={boxRef} className="relative">
       <label htmlFor={`${listId}-input`} className="sr-only">
-        Search organizations by name or org tag
+        Search stores by name, number or business
       </label>
       <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
       <input
@@ -174,7 +179,7 @@ function OrgSearch() {
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={showList && results[active] ? `${listId}-${active}` : undefined}
-        placeholder="Search organizations by name or tag"
+        placeholder="Search stores"
         autoComplete="off"
         value={query}
         onFocus={() => {
@@ -206,19 +211,19 @@ function OrgSearch() {
         <ul
           id={listId}
           role="listbox"
-          aria-label="Organizations"
+          aria-label="Stores"
           className="absolute right-0 top-full z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg"
         >
           {failed ? (
-            <li className="px-3 py-2 text-sm text-red-600">Couldn&apos;t load organizations.</li>
+            <li className="px-3 py-2 text-sm text-red-600">Couldn&apos;t load stores.</li>
           ) : !orgs ? (
             <li className="px-3 py-2 text-sm text-slate-500">Loading…</li>
           ) : results.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-slate-500">No organization matches “{query.trim()}”.</li>
+            <li className="px-3 py-2 text-sm text-slate-500">No store matches “{query.trim()}”.</li>
           ) : (
             results.map((org, i) => (
               <li
-                key={org.organizationId}
+                key={org.storeId}
                 id={`${listId}-${i}`}
                 role="option"
                 aria-selected={i === active}
@@ -233,10 +238,13 @@ function OrgSearch() {
                 )}
               >
                 <span className="min-w-0">
-                  <span className="block truncate font-semibold">{org.name}</span>
-                  <span className="block truncate font-mono text-[11.5px] text-slate-500">{org.slug}</span>
+                  <span className="block truncate font-semibold">
+                    {org.storeNumber ? `Store ${org.storeNumber} · ` : ""}
+                    {org.name}
+                  </span>
+                  <span className="block truncate text-[11.5px] text-slate-500">{org.organizationName ?? "—"}</span>
                 </span>
-                <OrgStatusChip status={org.status} />
+                <StoreStatusChip status={org.status} />
               </li>
             ))
           )}

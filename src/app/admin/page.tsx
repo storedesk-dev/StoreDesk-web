@@ -45,7 +45,7 @@ export default function DashboardPage() {
     if (!item.storeId) return;
     setRetrying(item.storeId);
     try {
-      const res = await api.retryTunnel(item.organizationId, item.storeId);
+      const res = await api.retryTunnel(item.storeId);
       toast(
         res.tunnel?.status === "ok" ? `Tunnel ready for ${item.storeName ?? "the store"}` : "Tunnel retry started",
         "success"

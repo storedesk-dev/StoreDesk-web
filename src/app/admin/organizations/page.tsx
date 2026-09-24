@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
-import { ApiError, api, type LicensePlan, type LicensingMode } from "../_lib/api";
+import { ApiError, api } from "../_lib/api";
 import { daysLeftLabel, daysUntil, formatDate, orgTagProblem, suggestOrgTag } from "../_lib/format";
 import {
   Button,
@@ -16,12 +16,11 @@ import {
   Input,
   Notice,
   PageHeader,
-  Select,
   Spinner,
   table,
   useLoad
 } from "../_components/ui";
-import { LicenseStatusChip, OrgStatusChip } from "../_components/status";
+import { OrgStatusChip } from "../_components/status";
 
 export default function OrganizationsPage() {
   return (
@@ -125,19 +124,16 @@ function OrganizationsList() {
                       <OrgStatusChip status={org.status} />
                     </td>
                     <td className={table.td}>
-                      {org.licensingMode === "master" ? (
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold">Master</span>
-                          {org.license ? <LicenseStatusChip status={org.license.status} /> : <span className="text-xs font-semibold text-red-700">none in force</span>}
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold sd-num">
+                          {org.storeLicenseCount} licensed
                         </span>
-                      ) : (
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold">Store-wise</span>
-                          <span className="text-xs text-slate-500 sd-num">
-                            {org.storeLicenseCount} store license{org.storeLicenseCount === 1 ? "" : "s"}
+                        {org.unlicensedStoreCount ? (
+                          <span className="sd-num text-xs font-semibold text-red-700">
+                            {org.unlicensedStoreCount} unlicensed
                           </span>
-                        </span>
-                      )}
+                        ) : null}
+                      </span>
                     </td>
                     <td className={`${table.td} text-right`}>
                       {org.storeCount ?? 0}
@@ -177,8 +173,6 @@ function OrganizationsList() {
   );
 }
 
-const PLAN_DEFAULT_DAYS: Record<LicensePlan, number> = { trial: 30, standard: 365, custom: 365 };
-
 function NewOrganizationDialog({
   open,
   onClose,
@@ -193,11 +187,6 @@ function NewOrganizationDialog({
   const [tag, setTag] = useState("");
   const [tagEdited, setTagEdited] = useState(false);
   const [billingEmail, setBillingEmail] = useState("");
-  const [mode, setMode] = useState<LicensingMode>("master");
-  const [plan, setPlan] = useState<LicensePlan>("standard");
-  const [days, setDays] = useState("365");
-  const [pcsPerStore, setPcsPerStore] = useState("1");
-  const [grace, setGrace] = useState("7");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tagTaken, setTagTaken] = useState<string | null>(null);
@@ -209,11 +198,6 @@ function NewOrganizationDialog({
     setTag("");
     setTagEdited(false);
     setBillingEmail("");
-    setMode("master");
-    setPlan("standard");
-    setDays("365");
-    setPcsPerStore("1");
-    setGrace("7");
     setError(null);
     setTagTaken(null);
     setTouchedTag(false);
@@ -221,13 +205,7 @@ function NewOrganizationDialog({
 
   const effectiveTag = tagEdited ? tag : suggestOrgTag(name);
   const tagError = tagTaken === effectiveTag ? "That org tag is already used by another organization." : orgTagProblem(effectiveTag);
-  const numbersOk =
-    mode === "storeWise" ||
-    [days, pcsPerStore].every((v) => Number.isInteger(Number(v)) && Number(v) >= 1) &&
-      Number.isInteger(Number(grace)) &&
-      Number(grace) >= 0 &&
-      Number(grace) <= 30;
-  const canSubmit = name.trim().length > 0 && !tagError && numbersOk && !busy;
+  const canSubmit = name.trim().length > 0 && !tagError && !busy;
 
   async function submit() {
     if (!canSubmit) {
@@ -240,17 +218,7 @@ function NewOrganizationDialog({
       const res = await api.createOrganization({
         name: name.trim(),
         slug: effectiveTag,
-        billingEmail: billingEmail.trim() || undefined,
-        licensingMode: mode,
-        license:
-          mode === "master"
-            ? {
-                plan,
-                entitlementDays: Number(days),
-                maxPcsPerStore: Number(pcsPerStore),
-                offlineGraceDays: Number(grace)
-              }
-            : undefined
+        billingEmail: billingEmail.trim() || undefined
       });
       toast(`${res.organization.name} created`, "success");
       onClose();
@@ -328,59 +296,9 @@ function NewOrganizationDialog({
           )}
         </Field>
 
-        <fieldset className="rounded-md border border-slate-200 p-3">
-          <legend className="px-1 text-[13px] font-semibold text-slate-700">Licensing</legend>
-          <div className="space-y-1.5" role="radiogroup" aria-label="Licensing mode">
-            <label className="flex items-start gap-2 text-sm">
-              <input type="radio" name="org-licensing" className="mt-0.5 h-4 w-4 accent-[#1A63F4]" checked={mode === "master"} onChange={() => setMode("master")} />
-              <span>
-                <span className="font-semibold">Master license</span>
-                <span className="block text-[12.5px] text-slate-600">One license covers every store, including stores added later.</span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input type="radio" name="org-licensing" className="mt-0.5 h-4 w-4 accent-[#1A63F4]" checked={mode === "storeWise"} onChange={() => setMode("storeWise")} />
-              <span>
-                <span className="font-semibold">Store-wise</span>
-                <span className="block text-[12.5px] text-slate-600">Each store gets its own license when it is added.</span>
-              </span>
-            </label>
-          </div>
-          {mode === "master" ? (
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Field label="Plan">
-                {(p) => (
-                  <Select
-                    {...p}
-                    value={plan}
-                    onChange={(e) => {
-                      const next = e.target.value as LicensePlan;
-                      setPlan(next);
-                      setDays(String(PLAN_DEFAULT_DAYS[next]));
-                    }}
-                  >
-                    <option value="trial">Trial</option>
-                    <option value="standard">Standard</option>
-                    <option value="custom">Custom</option>
-                  </Select>
-                )}
-              </Field>
-              <Field label="Length (days)">
-                {(p) => <Input {...p} type="number" min={1} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} />}
-              </Field>
-              <Field label="PCs per store">
-                {(p) => <Input {...p} type="number" min={1} inputMode="numeric" value={pcsPerStore} onChange={(e) => setPcsPerStore(e.target.value)} />}
-              </Field>
-              <Field label="Offline grace (days)" hint="0–30">
-                {(p) => <Input {...p} type="number" min={0} max={30} inputMode="numeric" value={grace} onChange={(e) => setGrace(e.target.value)} />}
-              </Field>
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-slate-500">
-              You issue each store its license when you add it, or later from the Licenses tab. You can switch modes at any time.
-            </p>
-          )}
-        </fieldset>
+        <p className="text-xs text-slate-500">
+          A license covers one store, so each store gets its own when you add it (D-22).
+        </p>
         {error ? <Notice tone="red">{error}</Notice> : null}
         <button type="submit" hidden aria-hidden tabIndex={-1} />
       </form>

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import type { StoreCapability } from "@/config/pages";
-import { Button, Card, Chip, ErrorBanner, Notice, Spinner, Switch, cx } from "../../../../../_components/ui";
+import { Button, Card, Chip, ErrorBanner, Notice, Spinner, Switch, cx } from "../../../_components/ui";
 import { useStoreSettings, type StoreTabProps } from "./shared";
 
 /**
@@ -32,8 +32,8 @@ type Draft = {
   storeDeskApp: boolean;
 };
 
-export function FeaturesTab({ orgId, storeId }: StoreTabProps) {
-  const settings = useStoreSettings(orgId, storeId);
+export function FeaturesTab({ storeId }: StoreTabProps) {
+  const settings = useStoreSettings(storeId);
   const [draft, setDraft] = useState<Draft>({
     caps: { fuel: null, lottery: null, coam: null, ebt: null, moneyOrder: null, prepaidGift: null },
     googleSheets: false,

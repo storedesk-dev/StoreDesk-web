@@ -24,7 +24,6 @@ import {
 } from "../../_components/ui";
 import { OrgStatusChip } from "../../_components/status";
 import { OverviewTab } from "./_tabs/OverviewTab";
-import { LicensesTab } from "./_tabs/LicensesTab";
 import { StoresTab } from "./_tabs/StoresTab";
 import { RolesTab } from "./_tabs/RolesTab";
 import { UsersTab } from "./_tabs/UsersTab";
@@ -32,8 +31,9 @@ import { ActivityTab } from "./_tabs/ActivityTab";
 
 import type { OrgTabProps } from "./_tabs/types";
 
-type TabKey = "overview" | "licenses" | "stores" | "roles" | "users" | "activity";
-const TAB_KEYS: TabKey[] = ["overview", "licenses", "stores", "roles", "users", "activity"];
+// Licences live on the store now (D-22), so there is no tab for them here.
+type TabKey = "overview" | "stores" | "roles" | "users" | "activity";
+const TAB_KEYS: TabKey[] = ["overview", "stores", "roles", "users", "activity"];
 
 export default function OrganizationPage() {
   return (
@@ -51,9 +51,9 @@ function OrganizationDetail() {
   const { toast } = useToast();
   const detail = useLoad(() => api.getOrganization(orgId), [orgId]);
 
-  // `?tab=subscription` links from before licenses land on Licenses.
+  // Old links to the licences tab land on the stores, where each licence now lives.
   const rawTab = search.get("tab");
-  const requested = (rawTab === "subscription" ? "licenses" : rawTab) as TabKey | null;
+  const requested = (rawTab === "subscription" || rawTab === "licenses" ? "stores" : rawTab) as TabKey | null;
   const tab: TabKey = requested && TAB_KEYS.includes(requested) ? requested : "overview";
   const setTab = (key: TabKey) => router.replace(`${pathname}?tab=${key}`, { scroll: false });
 
@@ -122,7 +122,6 @@ function OrganizationDetail() {
         onChange={setTab}
         tabs={[
           { key: "overview", label: "Overview" },
-          { key: "licenses", label: "Licenses", count: counts?.licenses },
           { key: "stores", label: "Stores", count: counts?.stores },
           { key: "roles", label: "Roles", count: counts?.roles },
           { key: "users", label: "Users", count: counts?.users },
@@ -131,7 +130,6 @@ function OrganizationDetail() {
       />
       <TabPanel id={tab}>
         {tab === "overview" ? <OverviewTab {...tabProps} goTo={setTab} /> : null}
-        {tab === "licenses" ? <LicensesTab {...tabProps} /> : null}
         {tab === "stores" ? <StoresTab {...tabProps} /> : null}
         {tab === "roles" ? <RolesTab {...tabProps} /> : null}
         {tab === "users" ? <UsersTab {...tabProps} /> : null}

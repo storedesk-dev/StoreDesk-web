@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage } from "../../../../../_lib/api";
-import { Button, Card, Chip, ErrorBanner, Field, Input, Notice, Spinner, useLoad } from "../../../../../_components/ui";
+import { api, errorMessage } from "../../../_lib/api";
+import { Button, Card, Chip, ErrorBanner, Field, Input, Notice, Spinner, useLoad } from "../../../_components/ui";
 import type { StoreTabProps } from "./shared";
 
-export function RegisterTab({ orgId, storeId }: StoreTabProps) {
+export function RegisterTab({ storeId }: StoreTabProps) {
   const { toast } = useToast();
-  const { data, setData, error, loading, reload } = useLoad(() => api.getPosCredentials(orgId, storeId), [orgId, storeId]);
+  const { data, setData, error, loading, reload } = useLoad(() => api.getPosCredentials(storeId), [storeId]);
   const [host, setHost] = useState("");
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +32,7 @@ export function RegisterTab({ orgId, storeId }: StoreTabProps) {
     if (!canSave) return;
     setSaving(true);
     try {
-      const res = await api.savePosCredentials(orgId, storeId, {
+      const res = await api.savePosCredentials(storeId, {
         posIpAddress: host.trim(),
         posUsername: user.trim(),
         ...(password ? { posPassword: password } : {})

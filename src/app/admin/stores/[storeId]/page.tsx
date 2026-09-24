@@ -4,10 +4,10 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { api } from "../../../../_lib/api";
-import { relativeTime } from "../../../../_lib/format";
-import { ErrorBanner, Spinner, TabPanel, Tabs, useLoad } from "../../../../_components/ui";
-import { PcChip, StoreLicenseChip, StoreStatusChip, pcState } from "../../../../_components/status";
+import { api } from "../../_lib/api";
+import { relativeTime } from "../../_lib/format";
+import { ErrorBanner, Spinner, TabPanel, Tabs, useLoad } from "../../_components/ui";
+import { PcChip, StoreLicenseChip, StoreStatusChip, pcState } from "../../_components/status";
 import type { StoreTabProps } from "./_tabs/shared";
 import { StoreOverviewTab } from "./_tabs/StoreOverviewTab";
 import { FeaturesTab } from "./_tabs/FeaturesTab";
@@ -28,18 +28,13 @@ export default function StorePage() {
 }
 
 function StoreDetail() {
-  const { orgId, storeId } = useParams<{ orgId: string; storeId: string }>();
+  const { storeId } = useParams<{ storeId: string }>();
   const search = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const detail = useLoad(async () => {
-    const [store, org] = await Promise.all([
-      api.getStore(orgId, storeId),
-      api.getOrganization(orgId).catch(() => null)
-    ]);
-    return { store: store.store, org: org?.organization ?? null };
-  }, [orgId, storeId]);
+  // A store answers on its own id, with nothing above it to fetch alongside (D-22).
+  const detail = useLoad(async () => ({ store: (await api.getStore(storeId)).store }), [storeId]);
 
   // Integrations are switches on the Features tab now; old links land there.
   const rawTab = search.get("tab");
@@ -47,12 +42,10 @@ function StoreDetail() {
   const tab: TabKey = requested && TAB_KEYS.includes(requested) ? requested : "overview";
   const setTab = (key: TabKey) => router.replace(`${pathname}?tab=${key}`, { scroll: false });
 
-  const orgHref = `/admin/organizations/${encodeURIComponent(orgId)}`;
-
   if (detail.error && !detail.data) {
     return (
       <div className="space-y-4">
-        <Link href={`${orgHref}?tab=stores`} className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-500 hover:text-[#111827]">
+        <Link href="/admin/stores" className="inline-flex items-center gap-1 text-[13px] font-semibold text-slate-500 hover:text-[#111827]">
           <ChevronLeft className="h-4 w-4" aria-hidden /> Stores
         </Link>
         <ErrorBanner error={detail.error} onRetry={detail.reload} />
@@ -61,19 +54,15 @@ function StoreDetail() {
   }
   if (!detail.data) return <Spinner />;
 
-  const { store, org } = detail.data;
-  const props: StoreTabProps = { orgId, storeId, store, org, refreshStore: () => void detail.reload() };
+  const { store } = detail.data;
+  const props: StoreTabProps = { storeId, store, refreshStore: () => void detail.reload() };
   const state = pcState(store.installation);
 
   return (
     <div>
-      <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 text-[13px] font-semibold text-slate-500">
-        <Link href="/admin/organizations" className="hover:text-[#111827]">Organizations</Link>
-        <span aria-hidden>/</span>
-        <Link href={orgHref} className="hover:text-[#111827]">{org?.name ?? "Organization"}</Link>
-        <span aria-hidden>/</span>
-        <Link href={`${orgHref}?tab=stores`} className="hover:text-[#111827]">Stores</Link>
-      </nav>
+      <Link href="/admin/stores" className="mb-3 inline-flex items-center gap-1 text-[13px] font-semibold text-slate-500 hover:text-[#111827]">
+        <ChevronLeft className="h-4 w-4" aria-hidden /> Stores
+      </Link>
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">

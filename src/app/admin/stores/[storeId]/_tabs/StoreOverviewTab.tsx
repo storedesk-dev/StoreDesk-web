@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage, type Store, type StoreStatus } from "../../../../../_lib/api";
-import { US_TIME_ZONES, formatDate, timeZoneLabel } from "../../../../../_lib/format";
+import { api, errorMessage, type Store, type StoreStatus } from "../../../_lib/api";
+import { US_TIME_ZONES, formatDate, timeZoneLabel } from "../../../_lib/format";
 import {
   Button,
   Card,
@@ -17,14 +17,14 @@ import {
   Notice,
   Select,
   Spinner
-} from "../../../../../_components/ui";
-import { StoreLicenseChip, StoreStatusChip } from "../../../../../_components/status";
+} from "../../../_components/ui";
+import { StoreLicenseChip, StoreStatusChip } from "../../../_components/status";
 import { useStoreSettings, type StoreTabProps } from "./shared";
 
-export function StoreOverviewTab({ orgId, storeId, store, refreshStore }: StoreTabProps) {
+export function StoreOverviewTab({ storeId, store, refreshStore }: StoreTabProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const settings = useStoreSettings(orgId, storeId);
+  const settings = useStoreSettings(storeId);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [timeZone, setTimeZone] = useState<string>("");
@@ -119,7 +119,7 @@ export function StoreOverviewTab({ orgId, storeId, store, refreshStore }: StoreT
         store={store}
         onClose={() => setEditing(false)}
         onSave={async (patch) => {
-          await api.updateStore(orgId, storeId, patch);
+          await api.updateStore(storeId, patch);
           toast("Store saved", "success");
           refreshStore();
         }}
@@ -133,9 +133,9 @@ export function StoreOverviewTab({ orgId, storeId, store, refreshStore }: StoreT
         destructive
         typeToConfirm={store.name}
         onConfirm={async () => {
-          await api.deleteStore(orgId, storeId);
+          await api.deleteStore(storeId);
           toast(`${store.name} deleted`, "success");
-          router.push(`/admin/organizations/${encodeURIComponent(orgId)}?tab=stores`);
+          router.push("/admin/stores");
         }}
       >
         <p>The store PC stops working immediately and phones can no longer reach it. This can&apos;t be undone.</p>

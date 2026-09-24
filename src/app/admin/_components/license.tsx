@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage, type License, type LicensePlan, type LicensingMode, type NewLicenseInput } from "../_lib/api";
+import { api, errorMessage, type License, type LicensePlan, type NewLicenseInput } from "../_lib/api";
 import { daysLeftLabel, daysUntil, formatDate, plural } from "../_lib/format";
 import { Button, Card, ConfirmDialog, DefinitionList, Dialog, Field, Input, Notice, Select, Textarea } from "./ui";
 import { RowMenu } from "./Menu";
@@ -11,20 +11,13 @@ import { LicenseStatusChip } from "./status";
 
 /**
  * Licenses in the admin console (docs/design/control-plane-admin.md,
- * "Licenses"). An organization is either on a master license (one license
- * covers every store) or store-wise (a license per store). These are the
- * dialogs to create, edit and renew a license, and the actions (renew,
- * suspend, resume, cancel) shared by the organization's Licenses tab and a
- * store's License tab.
+ * "Licenses"). A license covers one store and nothing else (D-22). These are
+ * the dialogs to issue, edit and renew one, and the actions — renew, suspend,
+ * resume, cancel — on a store's License tab.
  */
 
 export const PLAN_LABEL: Record<LicensePlan, string> = { trial: "Trial", standard: "Standard", custom: "Custom" };
 export const PLAN_DEFAULT_DAYS: Record<LicensePlan, number> = { trial: 30, standard: 365, custom: 365 };
-export const MODE_LABEL: Record<LicensingMode, string> = {
-  master: "Master license · one license covers every store",
-  storeWise: "Store-wise · each store has its own license"
-};
-
 export const inForce = (license: { status: string } | null | undefined) =>
   license?.status === "active" || license?.status === "trialing";
 
@@ -96,10 +89,7 @@ export function validNewLicense(value: NewLicenseInput): boolean {
   return Number.isInteger(days) && days >= 1 && days <= 3650;
 }
 
-/**
- * Create the master license, issue a store's license (pick the store), or
- * edit one (plan, PCs per store, grace, notes).
- */
+/** Issue a store's license (pick the store), or edit one: plan, PCs per store, grace, notes. */
 export function LicenseFormDialog({
   open,
   mode,
@@ -109,7 +99,7 @@ export function LicenseFormDialog({
   onSubmit
 }: {
   open: boolean;
-  mode: "master" | "store" | "edit";
+  mode: "store" | "edit";
   license?: License;
   /** For `store`: the stores that can be issued a license. */
   stores?: Array<{ storeId: string; name: string }>;
@@ -163,13 +153,11 @@ export function LicenseFormDialog({
 
   const single = mode === "store" && stores.length === 1 ? stores[0] : null;
   const title =
-    mode === "master"
-      ? "Add master license"
-      : mode === "store"
-        ? single
-          ? `Issue a license to ${single.name}`
-          : "Issue a store license"
-        : `Edit ${license?.licenseNumber ?? "license"}`;
+    mode === "store"
+      ? single
+        ? `Issue a license to ${single.name}`
+        : "Issue a store license"
+      : `Edit ${license?.licenseNumber ?? "license"}`;
 
   return (
     <Dialog
@@ -177,20 +165,14 @@ export function LicenseFormDialog({
       onClose={onClose}
       dismissable={!busy}
       title={title}
-      description={
-        mode === "master"
-          ? "Covers every store of the organization, including stores added later."
-          : mode === "store"
-            ? "Covers exactly this one store."
-            : undefined
-      }
+      description={mode === "store" ? "Covers exactly this one store." : undefined}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
           <Button variant="primary" type="submit" form="license-form" busy={busy} disabled={!valid}>
-            {mode === "edit" ? "Save" : mode === "master" ? "Add master license" : "Issue license"}
+            {mode === "edit" ? "Save" : "Issue license"}
           </Button>
         </>
       }
@@ -465,7 +447,7 @@ export function LicenseCard({
   license: License;
   title: string;
   onChanged: () => void;
-  /** The master is replaced by switching mode, not cancelled from its card. */
+  /** A cancelled license is final, so the card asks before it offers this. */
   allowCancel?: boolean;
   showCovered?: boolean;
 }) {

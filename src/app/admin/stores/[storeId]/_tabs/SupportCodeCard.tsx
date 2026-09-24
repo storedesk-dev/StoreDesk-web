@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { LifeBuoy } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage, type SupportCodeStatus } from "../../../../../_lib/api";
-import { formatDateTime, relativeTime } from "../../../../../_lib/format";
-import { Button, Card, Chip, ErrorBanner, SecretBox, Spinner, useLoad, type Tone } from "../../../../../_components/ui";
+import { api, errorMessage, type SupportCodeStatus } from "../../../_lib/api";
+import { formatDateTime, relativeTime } from "../../../_lib/format";
+import { Button, Card, Chip, ErrorBanner, SecretBox, Spinner, useLoad, type Tone } from "../../../_components/ui";
 
 const STATUS: Record<SupportCodeStatus, { label: string; tone: Tone }> = {
   active: { label: "Active", tone: "blue" },
@@ -19,9 +19,9 @@ const STATUS: Record<SupportCodeStatus, { label: string; tone: Tone }> = {
  * the store so its PC, stuck at sign-in, unlocks troubleshooting (logs,
  * resetting activation). 30 minutes, once, this store only.
  */
-export function SupportCodeCard({ orgId, storeId }: { orgId: string; storeId: string }) {
+export function SupportCodeCard({ storeId }: { storeId: string }) {
   const { toast } = useToast();
-  const { data, error, loading, reload } = useLoad(() => api.listSupportCodes(orgId, storeId), [orgId, storeId]);
+  const { data, error, loading, reload } = useLoad(() => api.listSupportCodes(storeId), [storeId]);
   const [issuing, setIssuing] = useState(false);
   const [issued, setIssued] = useState<{ code: string; expiresAt: string | null } | null>(null);
   const [revoking, setRevoking] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function SupportCodeCard({ orgId, storeId }: { orgId: string; storeId: st
   async function issue() {
     setIssuing(true);
     try {
-      const res = await api.issueSupportCode(orgId, storeId);
+      const res = await api.issueSupportCode(storeId);
       setIssued({ code: res.code, expiresAt: res.supportCode.expiresAt });
       toast("Support code issued", "success");
       void reload();
@@ -43,7 +43,7 @@ export function SupportCodeCard({ orgId, storeId }: { orgId: string; storeId: st
   async function revoke(supportCodeId: string) {
     setRevoking(supportCodeId);
     try {
-      await api.revokeSupportCode(orgId, storeId, supportCodeId);
+      await api.revokeSupportCode(storeId, supportCodeId);
       toast("Support code revoked", "success");
       void reload();
     } catch (e) {

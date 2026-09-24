@@ -2,14 +2,12 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage, isConflict, type Organization, type Store, type StoreSettings } from "../../../../../_lib/api";
-import { useLoad } from "../../../../../_components/ui";
+import { api, errorMessage, isConflict, type Store, type StoreSettings } from "../../../_lib/api";
+import { useLoad } from "../../../_components/ui";
 
 export interface StoreTabProps {
-  orgId: string;
   storeId: string;
   store: Store;
-  org: Organization | null;
   refreshStore: () => void;
 }
 
@@ -49,19 +47,19 @@ export function withDefaults(s: Partial<StoreSettings> | null | undefined): Stor
  * The store's settings document with a versioned save. A 409 means someone
  * (another operator, or the store) saved first: say so and reload the latest.
  */
-export function useStoreSettings(orgId: string, storeId: string) {
+export function useStoreSettings(storeId: string) {
   const { toast } = useToast();
   const load = useLoad(async () => {
-    const res = await api.getStoreSettings(orgId, storeId);
+    const res = await api.getStoreSettings(storeId);
     return { ...res, settings: withDefaults(res.settings) };
-  }, [orgId, storeId]);
+  }, [storeId]);
   const [saving, setSaving] = useState(false);
 
   async function save(mutate: (current: StoreSettings) => StoreSettings, success: string): Promise<boolean> {
     if (!load.data) return false;
     setSaving(true);
     try {
-      const res = await api.saveStoreSettings(orgId, storeId, load.data.settingsVersion, mutate(load.data.settings));
+      const res = await api.saveStoreSettings(storeId, load.data.settingsVersion, mutate(load.data.settings));
       load.setData({
         ...load.data,
         ...res,

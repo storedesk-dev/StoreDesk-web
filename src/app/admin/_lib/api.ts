@@ -14,10 +14,8 @@ import type { StoreCapability } from "@/config/pages";
 export type OrgStatus = "active" | "suspended" | "pending";
 export type LicenseStatus = "trialing" | "active" | "suspended" | "cancelled" | "expired";
 export type LicensePlan = "trial" | "standard" | "custom";
-/** "organization" is the master license. */
+/** Always "store" on anything issued since D-22; older rows may still say "organization". */
 export type LicenseScope = "organization" | "store";
-/** One licensing mode per organization: one master license for every store, or a license per store. */
-export type LicensingMode = "master" | "storeWise";
 export type StoreStatus = "pending" | "active" | "suspended" | "closed";
 export type InstallationStatus =
   | "not_installed"
@@ -40,7 +38,6 @@ export interface Organization {
   slug: string;
   billingEmail?: string | null;
   status: OrgStatus;
-  licensingMode: LicensingMode;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -137,28 +134,6 @@ export interface CoverageNote {
   plan: LicensePlan;
   status: LicenseStatus;
   entitlementExpiresAt: string | null;
-}
-
-export interface LicensingModeInput {
-  mode: LicensingMode;
-  dryRun?: boolean;
-  /** master → storeWise: copy the master to each store (default) or leave them Unlicensed. */
-  copyToStores?: boolean;
-  /** storeWise → master: the new master license. */
-  master?: NewLicenseInput;
-}
-
-export interface LicensingModeResult {
-  dryRun: boolean;
-  from: LicensingMode;
-  to: LicensingMode;
-  copyToStores: boolean;
-  stores: Array<{ storeId: string; name: string; before: CoverageNote | null; after: CoverageNote | null; createsLicense: boolean }>;
-  licenses: {
-    created: Array<CoverageNote & { storeId: string | null }>;
-    cancelled: Array<{ licenseId: string; licenseNumber: string; scope: LicenseScope; storeId: string | null; reason: string }>;
-  };
-  master?: License | null;
 }
 
 export interface StoreInstallationSummary {
@@ -262,7 +237,6 @@ export interface StoreSetup {
   tunnel: StoreTunnel;
   remote?: RemoteStatus;
   license?: StoreLicenseSummary | null;
-  licensingMode?: LicensingMode;
   /** Why a key cannot be issued right now (unlicensed, license ended, no tunnel, …), or null. */
   keyBlockedReason?: string | null;
   keyBlockedCode?: string | null;
@@ -532,7 +506,7 @@ const enc = encodeURIComponent;
 const ADMIN = "/api/v1/admin";
 const org = (orgId: string) => `${ADMIN}/organizations/${enc(orgId)}`;
 // A store answers on its own id (D-22): the organization is no longer in the path.
-const store = (_orgId: string, storeId: string) => `${ADMIN}/stores/${enc(storeId)}`;
+const store = (storeId: string) => `${ADMIN}/stores/${enc(storeId)}`;
 const user = (orgId: string, appUserId: string) => `${org(orgId)}/users/${enc(appUserId)}`;
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -556,9 +530,6 @@ export const api = {
     name: string;
     slug: string;
     billingEmail?: string;
-    licensingMode: LicensingMode;
-    /** The master license (master mode, required there). */
-    license?: NewLicenseInput;
   }) =>
     request<{ organization: Organization; license?: License | null }>("POST", `${ADMIN}/organizations`, input),
   getOrganization: (orgId: string) => request<OrganizationDetail>("GET", org(orgId)),
@@ -571,9 +542,7 @@ export const api = {
 
   // Licenses
   listLicenses: (orgId: string) =>
-    request<{ licensingMode: LicensingMode; licenses: License[] }>("GET", `${org(orgId)}/licenses`),
-  changeLicensingMode: (orgId: string, input: LicensingModeInput) =>
-    request<LicensingModeResult>("POST", `${org(orgId)}/licensing/mode`, input),
+    request<{ licenses: License[] }>("GET", `${org(orgId)}/licenses`),
   createLicense: (orgId: string, input: LicenseCreateInput) =>
     request<{ license: License }>("POST", `${org(orgId)}/licenses`, input),
   updateLicense: (orgId: string, licenseId: string, patch: LicensePatch) =>
@@ -581,6 +550,9 @@ export const api = {
 
   // Stores
   listStores: (orgId: string) => request<{ stores: Store[] }>("GET", `${org(orgId)}/stores`),
+  /** Every store, flat: the console's front page (D-22). */
+  listAllStores: () =>
+    request<{ stores: Array<Store & { organizationName: string | null }> }>("GET", `${ADMIN}/stores`),
   createStore: (
     orgId: string,
     input: {
@@ -593,10 +565,9 @@ export const api = {
       storeLicense?: NewLicenseInput;
     }
   ) => request<{ store: Store }>("POST", `${org(orgId)}/stores`, input),
-  getStore: (orgId: string, storeId: string) =>
-    request<{ store: Store; license: StoreLicenseSummary | null; licensingMode: LicensingMode }>("GET", store(orgId, storeId)),
+  getStore: (storeId: string) =>
+    request<{ store: Store; license: StoreLicenseSummary | null }>("GET", store(storeId)),
   updateStore: (
-    orgId: string,
     storeId: string,
     patch: Partial<{
       name: string;
@@ -605,73 +576,72 @@ export const api = {
       contactEmail: string;
       status: StoreStatus;
     }>
-  ) => request<{ store: Store }>("PATCH", store(orgId, storeId), patch),
-  deleteStore: (orgId: string, storeId: string) =>
-    request<{ deleted: string }>("DELETE", store(orgId, storeId)),
-  upsertStoreLicense: (orgId: string, storeId: string, input: StoreLicenseInput) =>
-    request<{ store: Store; license: StoreLicenseSummary | null; licensingMode: LicensingMode; created: boolean }>(
+  ) => request<{ store: Store }>("PATCH", store(storeId), patch),
+  deleteStore: (storeId: string) =>
+    request<{ deleted: string }>("DELETE", store(storeId)),
+  upsertStoreLicense: (storeId: string, input: StoreLicenseInput) =>
+    request<{ store: Store; license: StoreLicenseSummary | null; created: boolean }>(
       "PUT",
-      `${store(orgId, storeId)}/license`,
+      `${store(storeId)}/license`,
       input
     ),
 
   // Store settings (features, integrations, time zone)
-  getStoreSettings: (orgId: string, storeId: string) =>
-    request<StoreSettingsResponse>("GET", `${store(orgId, storeId)}/settings`),
-  saveStoreSettings: (orgId: string, storeId: string, settingsVersion: number, settings: StoreSettings) =>
-    request<StoreSettingsResponse>("PUT", `${store(orgId, storeId)}/settings`, {
+  getStoreSettings: (storeId: string) =>
+    request<StoreSettingsResponse>("GET", `${store(storeId)}/settings`),
+  saveStoreSettings: (storeId: string, settingsVersion: number, settings: StoreSettings) =>
+    request<StoreSettingsResponse>("PUT", `${store(storeId)}/settings`, {
       settingsVersion,
       settings
     }),
 
   // Register
-  getPosCredentials: (orgId: string, storeId: string) =>
-    request<PosCredentials>("GET", `${store(orgId, storeId)}/pos-credentials`),
+  getPosCredentials: (storeId: string) =>
+    request<PosCredentials>("GET", `${store(storeId)}/pos-credentials`),
   savePosCredentials: (
-    orgId: string,
     storeId: string,
     input: { posIpAddress: string; posUsername: string; posPassword?: string }
-  ) => request<PosCredentials>("PUT", `${store(orgId, storeId)}/pos-credentials`, input),
+  ) => request<PosCredentials>("PUT", `${store(storeId)}/pos-credentials`, input),
 
   // PC & phones
-  getStoreSetup: (orgId: string, storeId: string) =>
-    request<StoreSetup>("GET", `${store(orgId, storeId)}/setup`),
-  issueSetupKey: (orgId: string, storeId: string, deliver: "show" | "email") =>
-    request<IssuedSetupKey>("POST", `${store(orgId, storeId)}/setup-keys`, { deliver }),
+  getStoreSetup: (storeId: string) =>
+    request<StoreSetup>("GET", `${store(storeId)}/setup`),
+  issueSetupKey: (storeId: string, deliver: "show" | "email") =>
+    request<IssuedSetupKey>("POST", `${store(storeId)}/setup-keys`, { deliver }),
   /** The store's StoreDesk Lottery PC, if one is set up. */
-  getLotteryPc: (orgId: string, storeId: string) =>
-    request<{ installation: LotteryPc | null }>("GET", `${store(orgId, storeId)}/lottery/setup-keys`),
+  getLotteryPc: (storeId: string) =>
+    request<{ installation: LotteryPc | null }>("GET", `${store(storeId)}/lottery/setup-keys`),
   /** Audited `lottery.setup_key.issue`. The key is in this answer only. */
-  issueLotterySetupKey: (orgId: string, storeId: string) =>
-    request<{ setupKey: string; keyId: string; storeName: string }>("POST", `${store(orgId, storeId)}/lottery/setup-keys`, {}),
+  issueLotterySetupKey: (storeId: string) =>
+    request<{ setupKey: string; keyId: string; storeName: string }>("POST", `${store(storeId)}/lottery/setup-keys`, {}),
   /** Audited `setup_key.reveal`; call only on an explicit click. */
-  revealSetupKey: (orgId: string, storeId: string) =>
-    request<{ keyId: string; setupKey: string; workerInstallationId: string }>("GET", `${store(orgId, storeId)}/setup-keys/current`),
-  rotateSetupKey: (orgId: string, storeId: string) =>
-    request<{ keyId: string; setupKey: string; readable: boolean; workerInstallationId: string }>("POST", `${store(orgId, storeId)}/setup-keys/rotate`, {}),
-  replacePc: (orgId: string, storeId: string) =>
-    request<{ installation: StoreInstallationSummary }>("POST", `${store(orgId, storeId)}/replace-pc`),
+  revealSetupKey: (storeId: string) =>
+    request<{ keyId: string; setupKey: string; workerInstallationId: string }>("GET", `${store(storeId)}/setup-keys/current`),
+  rotateSetupKey: (storeId: string) =>
+    request<{ keyId: string; setupKey: string; readable: boolean; workerInstallationId: string }>("POST", `${store(storeId)}/setup-keys/rotate`, {}),
+  replacePc: (storeId: string) =>
+    request<{ installation: StoreInstallationSummary }>("POST", `${store(storeId)}/replace-pc`),
   /**
    * Let the next activation with this store's setup key take over from the PC
    * that is running now. Expires in 24 h, used up by that activation, audited
    * `installation.replacement_allowed`.
    */
-  allowPcReplacement: (orgId: string, storeId: string) =>
-    request<{ allowed: true; allowedUntil: string }>("POST", `${store(orgId, storeId)}/replacement-approval`),
-  retryTunnel: (orgId: string, storeId: string) =>
-    request<{ tunnel: StoreTunnel }>("POST", `${store(orgId, storeId)}/tunnel`),
+  allowPcReplacement: (storeId: string) =>
+    request<{ allowed: true; allowedUntil: string }>("POST", `${store(storeId)}/replacement-approval`),
+  retryTunnel: (storeId: string) =>
+    request<{ tunnel: StoreTunnel }>("POST", `${store(storeId)}/tunnel`),
 
   // Support codes
-  listSupportCodes: (orgId: string, storeId: string) =>
-    request<{ supportCodes: SupportCode[] }>("GET", `${store(orgId, storeId)}/support-codes`),
-  issueSupportCode: (orgId: string, storeId: string) =>
-    request<{ code: string; supportCode: SupportCode }>("POST", `${store(orgId, storeId)}/support-codes`),
-  revokeSupportCode: (orgId: string, storeId: string, supportCodeId: string) =>
-    request<{ supportCode: SupportCode }>("DELETE", `${store(orgId, storeId)}/support-codes/${enc(supportCodeId)}`),
+  listSupportCodes: (storeId: string) =>
+    request<{ supportCodes: SupportCode[] }>("GET", `${store(storeId)}/support-codes`),
+  issueSupportCode: (storeId: string) =>
+    request<{ code: string; supportCode: SupportCode }>("POST", `${store(storeId)}/support-codes`),
+  revokeSupportCode: (storeId: string, supportCodeId: string) =>
+    request<{ supportCode: SupportCode }>("DELETE", `${store(storeId)}/support-codes/${enc(supportCodeId)}`),
 
   // Access preview
-  accessPreview: (orgId: string, storeId: string) =>
-    request<AccessPreview>("GET", `${store(orgId, storeId)}/access-preview`),
+  accessPreview: (storeId: string) =>
+    request<AccessPreview>("GET", `${store(storeId)}/access-preview`),
 
   // Roles
   listRoles: (orgId: string) => request<{ roles: Role[] }>("GET", `${org(orgId)}/roles`),

@@ -5,22 +5,21 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { api } from "../../../_lib/api";
 import { formatDate, plural } from "../../../_lib/format";
 import { Card, CopyButton, DefinitionList, ErrorBanner, Spinner, useLoad } from "../../../_components/ui";
-import { LicenseStatusChip, OrgStatusChip, PcChip, StoreLicenseChip, pcState } from "../../../_components/status";
-import { LicenseEnds, MODE_LABEL, PLAN_LABEL, inForce } from "../../../_components/license";
+import { OrgStatusChip, PcChip, StoreLicenseChip, pcState } from "../../../_components/status";
+import { inForce } from "../../../_components/license";
 import type { OrgTabProps } from "./types";
 
-type Goto = (tab: "licenses" | "stores" | "roles" | "users" | "activity") => void;
+type Goto = (tab: "stores" | "roles" | "users" | "activity") => void;
 
 export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) {
   const { data, error, loading, reload } = useLoad(
     async () => {
-      const [licenses, stores, roles, users] = await Promise.all([
-        api.listLicenses(orgId),
+      const [stores, roles, users] = await Promise.all([
         api.listStores(orgId),
         api.listRoles(orgId).catch(() => ({ roles: [] })),
         api.listUsers(orgId).catch(() => ({ users: [] }))
       ]);
-      return { licensingMode: licenses.licensingMode, licenses: licenses.licenses, stores: stores.stores, roles: roles.roles, users: users.users };
+      return { stores: stores.stores, roles: roles.roles, users: users.users };
     },
     [orgId]
   );
@@ -29,8 +28,6 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
   if (loading && !data) return <Spinner />;
   if (!data) return null;
 
-  const orgLicense = data.licenses.find((l) => l.scope === "organization" && l.status !== "cancelled") ?? null;
-  const storeLicenses = data.licenses.filter((l) => l.scope === "store" && l.status !== "cancelled");
   const unlicensed = data.stores.filter((s) => !s.license);
   const licensedInForce = data.stores.filter((s) => inForce(s.license)).length;
   const activePcs = data.stores.filter((s) => ["online", "offline"].includes(pcState(s.installation))).length;
@@ -39,7 +36,7 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
     {
       done: data.stores.length > 0 && licensedInForce === data.stores.length,
       label: data.stores.length ? `${licensedInForce} of ${plural(data.stores.length, "store")} licensed` : "License the stores",
-      tab: "licenses" as const
+      tab: "stores" as const
     },
     { done: data.stores.length > 0, label: data.stores.length ? `${plural(data.stores.length, "store")}` : "Add the first store", tab: "stores" as const },
     { done: data.roles.length > 0, label: data.roles.length ? `${plural(data.roles.length, "role")}` : "Set up roles", tab: "roles" as const },
@@ -71,32 +68,16 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
 
       <Card
         title="Licenses"
+        description="A license covers one store, and is managed on that store."
         actions={
-          <button type="button" onClick={() => goTo("licenses")} className="text-[13px] font-semibold text-[#0E43D8] hover:underline">
-            Manage
+          <button type="button" onClick={() => goTo("stores")} className="text-[13px] font-semibold text-[#0E43D8] hover:underline">
+            Stores
           </button>
         }
       >
         <DefinitionList
           rows={[
-            { label: "Licensing", value: MODE_LABEL[data.licensingMode] },
-            ...(data.licensingMode === "master"
-              ? [
-                  {
-                    label: "Master license",
-                    value: orgLicense ? (
-                      <span className="flex flex-wrap items-center gap-2">
-                        <code className="font-mono text-[12.5px]">{orgLicense.licenseNumber}</code>
-                        <span>{PLAN_LABEL[orgLicense.plan] ?? orgLicense.plan}</span>
-                        <LicenseStatusChip status={orgLicense.status} />
-                      </span>
-                    ) : (
-                      <span className="font-semibold text-red-700">None in force</span>
-                    )
-                  },
-                  ...(orgLicense ? [{ label: "Ends", value: <LicenseEnds license={orgLicense} /> }] : [])
-                ]
-              : [{ label: "Store licenses", value: <span className="sd-num">{storeLicenses.length}</span> }]),
+            { label: "Licensed stores", value: <span className="sd-num">{licensedInForce}</span> },
             {
               label: "Unlicensed stores",
               value: (

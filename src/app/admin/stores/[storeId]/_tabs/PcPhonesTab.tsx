@@ -3,8 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { Eye, KeyRound, Mail, RefreshCw, Replace, RotateCw, ShieldCheck } from "lucide-react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage, type IssuedSetupKey, type SetupKeyStatus } from "../../../../../_lib/api";
-import { formatDateTime, relativeTime } from "../../../../../_lib/format";
+import { api, errorMessage, type IssuedSetupKey, type SetupKeyStatus } from "../../../_lib/api";
+import { formatDateTime, relativeTime } from "../../../_lib/format";
 import {
   Button,
   Card,
@@ -16,8 +16,8 @@ import {
   SecretBox,
   Spinner,
   useLoad
-} from "../../../../../_components/ui";
-import { PcChip, RemoteChip, TunnelChip } from "../../../../../_components/status";
+} from "../../../_components/ui";
+import { PcChip, RemoteChip, TunnelChip } from "../../../_components/status";
 import type { StoreTabProps } from "./shared";
 import { SupportCodeCard } from "./SupportCodeCard";
 import { LotteryPcCard } from "./LotteryPcCard";
@@ -32,9 +32,9 @@ const KEY_STATUS: Record<SetupKeyStatus, string> = {
   revoked: "cancelled"
 };
 
-export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabProps) {
+export function PcPhonesTab({ storeId, store, refreshStore }: StoreTabProps) {
   const { toast } = useToast();
-  const { data, error, loading, reload } = useLoad(() => api.getStoreSetup(orgId, storeId), [orgId, storeId]);
+  const { data, error, loading, reload } = useLoad(() => api.getStoreSetup(storeId), [storeId]);
   const [issuing, setIssuing] = useState<"show" | "email" | null>(null);
   const [issued, setIssued] = useState<IssuedSetupKey | null>(null);
   const [replacing, setReplacing] = useState(false);
@@ -55,7 +55,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
   async function issue(deliver: "show" | "email") {
     setIssuing(deliver);
     try {
-      const res = await api.issueSetupKey(orgId, storeId, deliver);
+      const res = await api.issueSetupKey(storeId, deliver);
       if (deliver === "show") {
         setIssued(res);
         setRevealed(null);
@@ -75,7 +75,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
   async function showKey() {
     setRevealing(true);
     try {
-      const res = await api.revealSetupKey(orgId, storeId);
+      const res = await api.revealSetupKey(storeId);
       setIssued(null);
       setRevealed(res.setupKey);
     } catch (e) {
@@ -88,7 +88,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
   async function retryTunnel() {
     setRetrying(true);
     try {
-      const res = await api.retryTunnel(orgId, storeId);
+      const res = await api.retryTunnel(storeId);
       toast(
         data?.tunnel.status === "ok" ? "Tunnel rotated; a replaced PC can no longer use it" : res.tunnel?.status === "ok" ? "Tunnel ready" : "Tunnel retry started",
         "success"
@@ -110,7 +110,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
   async function allowReplacement() {
     setAllowing(true);
     try {
-      const res = await api.allowPcReplacement(orgId, storeId);
+      const res = await api.allowPcReplacement(storeId);
       toast(`The next activation may replace this PC (until ${formatDateTime(res.allowedUntil)})`, "success");
       void reload();
     } catch (e) {
@@ -243,9 +243,9 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
         />
       </Card>
 
-      <SupportCodeCard orgId={orgId} storeId={storeId} />
+      <SupportCodeCard storeId={storeId} />
 
-      <LotteryPcCard orgId={orgId} storeId={storeId} />
+      <LotteryPcCard storeId={storeId} />
 
       <Card title="Phones" description="Phones reach the store PC through StoreDesk's secure tunnel.">
         <DefinitionList
@@ -308,7 +308,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
         confirmLabel="Replace PC"
         destructive
         onConfirm={async () => {
-          await api.replacePc(orgId, storeId);
+          await api.replacePc(storeId);
           setIssued(null);
           setRevealed(null);
           toast(data.setupKey?.reusable ? "PC reset — set up the new PC with the store's setup key" : "PC reset — issue a setup key for the new PC", "success");
@@ -329,7 +329,7 @@ export function PcPhonesTab({ orgId, storeId, store, refreshStore }: StoreTabPro
         confirmLabel="Rotate key"
         destructive
         onConfirm={async () => {
-          const res = await api.rotateSetupKey(orgId, storeId);
+          const res = await api.rotateSetupKey(storeId);
           setIssued(null);
           setRevealed(res.setupKey);
           toast("Setup key rotated", "success");
