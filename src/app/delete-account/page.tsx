@@ -56,7 +56,7 @@ export default function DeleteAccountPage() {
             <p>
               Email <a className="font-semibold text-[#1A63F4] hover:underline" href={MAILTO}>{SITE.email}</a> from the
               address on the account, and say it is a deletion request. Tell us the name on the account and, if you
-              know it, your organization tag. If you are the owner and want the whole organization removed, say so.
+              know it, your store number. If you are the owner and want every store removed, say so.
             </p>
             <p>
               We reply to confirm it is you before anything is deleted. If you cannot write from the address on the
@@ -76,7 +76,7 @@ export default function DeleteAccountPage() {
           <LegalSection id="removed" index={2} icon={<UserCheck className="h-4.5 w-4.5" />} title="What is deleted">
             <p>Your StoreDesk account: your name, your email, your password and the devices you signed in on.</p>
             <p>
-              If you ask for the whole organization: its stores, its store PC registrations, its licence, its people,
+              If you ask for a store: the store itself, its PC registrations, its licence, its people,
               and the register address and password we hold for it. The tunnel that let your phones reach the store is
               removed with it.
             </p>

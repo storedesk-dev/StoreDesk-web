@@ -41,7 +41,7 @@ export const FAQ: FaqEntry[] = [
   {
     question: "Where is my sales data kept?",
     answer:
-      "On the back-office PC in your store. Your price book, supplier costs, transactions and sales history never reach StoreDesk. The account we hold covers your organisation, your stores, your licence and which PCs are connected.",
+      "On the back-office PC in your store. Your price book, supplier costs, transactions and sales history never reach StoreDesk. The account we hold covers your stores, each store's licence and which PCs are connected.",
     href: "/privacy"
   },
   {

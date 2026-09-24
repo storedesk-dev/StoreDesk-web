@@ -63,7 +63,7 @@ export default function PrivacyPage() {
               note: "What a licence needs, and nothing else.",
               icon: <Building2 className="h-5 w-5" />,
               items: [
-                "Your organisation, and the stores it has",
+                "Your business name, and the stores you run",
                 "People: name, email, role",
                 "Which store PCs are connected",
                 "Licence and plan",
