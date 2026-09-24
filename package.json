@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "ci": "npm run lint && npm run test && npm run build",
+    "deploy": "npm run ci && vercel --prod",
     "dev:local": "tsx scripts/dev-local.ts"
   },
   "dependencies": {

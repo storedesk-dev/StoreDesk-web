@@ -1,14 +1,12 @@
 name: CI
 
-# Public repo: runs cost no Actions minutes, so develop and production are
-# both checked. Docs-only pushes are skipped. See docs/ci.md in the parent repo.
+# Checks only: nothing here deploys. Private repo (D-15), so runs bill: production
+# and on demand only; the hooks gate develop. Docs-only pushes are skipped.
+# Deploying is by hand (`npm run deploy`). See docs/ci.md in the parent repo.
 
 on:
   push:
-    branches: [production, develop]
-    paths-ignore: ['**.md', 'docs/**']
-  pull_request:
-    branches: [production, develop]
+    branches: [production]
     paths-ignore: ['**.md', 'docs/**']
   workflow_dispatch:
 
