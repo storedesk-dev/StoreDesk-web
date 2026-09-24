@@ -178,7 +178,7 @@ export async function migrateStoreScopedLicenses(): Promise<StoreLicenseReport> 
         issued += 1;
       } catch (error) {
         // The unique coverageKey index: another instance got there first, which is the right answer.
-        if (!String((error as { message?: string }).message ?? "").includes("coverageKey")) throw error;
+        if (!String((error as { message?: string }).message ?? "").includes("duplicate key")) throw error;
         alreadyCovered += 1;
       }
     }
@@ -231,16 +231,23 @@ export async function migrateStoreScopedAccess(): Promise<StoreAccessReport> {
       };
       const already = await UserAssignmentModel.findOne(key).lean();
       if (already) continue;
-      await UserAssignmentModel.create({
-        ...key,
-        assignmentId: publicId("assign"),
-        organizationId: String(row.organizationId),
-        role: String(row.role),
-        scopes: Array.isArray(row.scopes) ? row.scopes : ["relay:request"],
-        status: String(row.status ?? "active"),
-        createdByAdminId: String(row.createdByAdminId ?? "")
-      });
-      expanded += 1;
+      try {
+        await UserAssignmentModel.create({
+          ...key,
+          assignmentId: publicId("assign"),
+          organizationId: String(row.organizationId),
+          role: String(row.role),
+          scopes: Array.isArray(row.scopes) ? row.scopes : ["relay:request"],
+          status: String(row.status ?? "active"),
+          createdByAdminId: String(row.createdByAdminId ?? "")
+        });
+        expanded += 1;
+      } catch (error) {
+        // Several instances cold-start at once and all run this. The unique index on
+        // (appUserId, storeId, workerInstallationId) settles it: whoever lost already wrote the
+        // row this one wanted, so that is the right answer, not a failure to retry the whole run.
+        if (!String((error as { message?: string }).message ?? "").includes("duplicate key")) throw error;
+      }
     }
     await UserAssignmentModel.deleteOne({ assignmentId: row.assignmentId });
   }
