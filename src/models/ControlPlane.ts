@@ -182,6 +182,8 @@ const TenantStoreSchema = new Schema(
     /** The version the cloud has actually taken. Behind means the hourly reconcile re-pushes. */
     projectionPushedVersion: { type: Number, default: 0 },
     settingsVersion: { type: Number, min: 1, default: 1 },
+    /** The store's roles. They hang off the store, like everything else it owns (D-22). */
+    roles: { type: [Schema.Types.Mixed], default: undefined },
     tunnelUrl: { type: String, trim: true },
     /** Hostname label the tunnel was (or will be) created under. */
     tunnelLabel: { type: String, trim: true },

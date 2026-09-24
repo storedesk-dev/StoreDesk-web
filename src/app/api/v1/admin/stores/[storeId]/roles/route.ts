@@ -6,15 +6,15 @@ import { jsonError, notFound, parseBody } from "@/lib/http";
 import { ControlPlaneError } from "@/lib/control-plane-security";
 import { ALL_PAGES } from "@/config/pages";
 import { UserAssignmentModel } from "@/models/ControlPlane";
-import { ROLE_ID, RoleAccessKeysSchema, createRole, readOrganizationRoles, unknownPageKeys } from "@/lib/roles";
+import { ROLE_ID, RoleAccessKeysSchema, createRole, readStoreRoles, unknownPageKeys } from "@/lib/roles";
 import { TEMPLATE_IDS, templateAccessKeys, templateSummaries } from "@/lib/role-templates";
 import { scheduleNotify } from "@/lib/store-notify";
 
-type Ctx = { params: Promise<{ organizationId: string }> };
+type Ctx = { params: Promise<{ storeId: string }> };
 
-async function userCounts(organizationId: string): Promise<Map<string, number>> {
+async function userCounts(storeId: string): Promise<Map<string, number>> {
   const rows = (await UserAssignmentModel.aggregate([
-    { $match: { organizationId, status: "active" } },
+    { $match: { storeId, status: "active" } },
     { $group: { _id: { role: "$role", user: "$appUserId" } } },
     { $group: { _id: "$_id.role", count: { $sum: 1 } } }
   ])) as Array<{ _id: string; count: number }>;
@@ -29,10 +29,10 @@ async function userCounts(organizationId: string): Promise<Map<string, number>> 
 export async function GET(req: Request, ctx: Ctx) {
   try {
     await requireInternalAdmin(req);
-    const { organizationId } = await ctx.params;
-    const roles = await readOrganizationRoles(organizationId);
+    const { storeId } = await ctx.params;
+    const roles = await readStoreRoles(storeId);
     if (!roles) throw notFound("Organization");
-    const counts = await userCounts(organizationId);
+    const counts = await userCounts(storeId);
     return NextResponse.json({
       roles: roles.map((role) => ({ ...role, userCount: counts.get(role.roleId) ?? 0 })),
       templates: templateSummaries()
@@ -73,26 +73,26 @@ function roleIdFrom(name: string, taken: Set<string>): string {
 export async function POST(req: Request, ctx: Ctx) {
   try {
     const admin = await requireInternalAdmin(req);
-    const { organizationId } = await ctx.params;
+    const { storeId } = await ctx.params;
     const body = await parseBody(req, RoleCreateSchema);
-    const existing = await readOrganizationRoles(organizationId);
+    const existing = await readStoreRoles(storeId);
     if (!existing) throw notFound("Organization");
     const roleId = body.roleId ?? roleIdFrom(body.roleName, new Set(existing.map((role) => role.roleId)));
     const template = body.template ?? body.templateId ?? "blank";
     const accessKeys = body.accessKeys ?? templateAccessKeys(template);
-    const outcome = await createRole(organizationId, { roleId, roleName: body.roleName, accessKeys });
+    const outcome = await createRole(storeId, { roleId, roleName: body.roleName, accessKeys });
     if (outcome.status === "not_found") throw notFound("Organization");
     if (outcome.status === "exists") {
       throw new ControlPlaneError(409, "ROLE_EXISTS", `A role with the id "${roleId}" already exists`);
     }
     await auditAdmin(admin, {
-      organizationId,
+      storeId,
       action: "role.create",
       targetType: "role",
       targetId: roleId,
       metadata: { roleName: body.roleName, template: body.accessKeys ? null : template }
     });
-    scheduleNotify({ organizationId, reason: "role.create" });
+    scheduleNotify({ storeId, reason: "role.create" });
     const unknown = unknownPageKeys(outcome.role.accessKeys, ALL_PAGES);
     return NextResponse.json(
       { role: { ...outcome.role, userCount: 0 }, ...(unknown.length ? { warnings: { unknownPageKeys: unknown } } : {}) },

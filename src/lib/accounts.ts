@@ -16,7 +16,7 @@ import {
   verifySecret
 } from "@/lib/control-plane-security";
 import { isEntitled } from "@/lib/licenses";
-import { readOrganizationRoles } from "@/lib/roles";
+import { rolesPersistingOrgAdmin } from "@/lib/roles";
 import { writeAudit } from "@/lib/audit";
 import { scheduleAppUserNotify } from "@/lib/store-notify";
 import type { App } from "@/config/pages";
@@ -97,16 +97,15 @@ export async function reachableFor(appUserId: string): Promise<ReachableStore[]>
     LicenseModel.find({ storeId: { $in: storeIds }, status: { $ne: "cancelled" } }).lean()
   ])) as [Doc[], Doc[]];
 
-  // Roles are still written on the organization (they move to the store in S6),
-  // so they are read per organization and applied per store.
-  const organizationIds = [...new Set(stores.map((store) => text(store.organizationId)).filter(Boolean))];
+  // Roles belong to the store (D-22), and the stores are already in hand.
   const roleNames = new Map<string, Map<string, string>>();
   const rolePages = new Map<string, Map<string, Record<string, string[]>>>();
-  for (const organizationId of organizationIds) {
-    const roles = (await readOrganizationRoles(organizationId)) ?? [];
-    roleNames.set(organizationId, new Map(roles.map((role) => [role.roleId, role.roleName])));
+  for (const store of stores) {
+    const storeId = text(store.storeId);
+    const roles = await rolesPersistingOrgAdmin(storeId, store);
+    roleNames.set(storeId, new Map(roles.map((role) => [role.roleId, role.roleName])));
     rolePages.set(
-      organizationId,
+      storeId,
       new Map(
         roles.map((role) => [
           role.roleId,
@@ -127,8 +126,6 @@ export async function reachableFor(appUserId: string): Promise<ReachableStore[]>
     const storeId = text(store.storeId);
     const assignment = byStore.get(storeId);
     if (!assignment) continue;
-    const organizationId = text(store.organizationId);
-
     const roleId = text(assignment.role);
     const settings = (store.settings as Doc | undefined) ?? {};
     const capabilities = (settings.capabilities as Doc | undefined) ?? {};
@@ -140,8 +137,8 @@ export async function reachableFor(appUserId: string): Promise<ReachableStore[]>
       storeNumber: store.storeNumber ? text(store.storeNumber) : null,
       timeZone: settings.timeZone ? text(settings.timeZone) : null,
       status: text(store.status),
-      role: { roleId, roleName: roleNames.get(organizationId)?.get(roleId) ?? null },
-      pages: (rolePages.get(organizationId)?.get(roleId) ?? {}) as Partial<Record<App, string[]>>,
+      role: { roleId, roleName: roleNames.get(storeId)?.get(roleId) ?? null },
+      pages: (rolePages.get(storeId)?.get(roleId) ?? {}) as Partial<Record<App, string[]>>,
       lottery: { sells: capabilities.lottery === true },
       licence: {
         covered: covering !== null && isEntitled(covering),

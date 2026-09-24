@@ -9,17 +9,16 @@ import { OrgStatusChip, PcChip, StoreLicenseChip, pcState } from "../../../_comp
 import { inForce } from "../../../_components/license";
 import type { OrgTabProps } from "./types";
 
-type Goto = (tab: "stores" | "roles" | "users" | "activity") => void;
+type Goto = (tab: "stores" | "users" | "activity") => void;
 
 export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) {
   const { data, error, loading, reload } = useLoad(
     async () => {
-      const [stores, roles, users] = await Promise.all([
+      const [stores, users] = await Promise.all([
         api.listStores(orgId),
-        api.listRoles(orgId).catch(() => ({ roles: [] })),
         api.listUsers(orgId).catch(() => ({ users: [] }))
       ]);
-      return { stores: stores.stores, roles: roles.roles, users: users.users };
+      return { stores: stores.stores, users: users.users };
     },
     [orgId]
   );
@@ -39,7 +38,6 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
       tab: "stores" as const
     },
     { done: data.stores.length > 0, label: data.stores.length ? `${plural(data.stores.length, "store")}` : "Add the first store", tab: "stores" as const },
-    { done: data.roles.length > 0, label: data.roles.length ? `${plural(data.roles.length, "role")}` : "Set up roles", tab: "roles" as const },
     { done: data.users.length > 0, label: data.users.length ? `${plural(data.users.length, "user")}` : "Add users", tab: "users" as const },
     {
       done: data.stores.length > 0 && activePcs === data.stores.length,

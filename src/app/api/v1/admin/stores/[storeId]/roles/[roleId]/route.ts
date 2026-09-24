@@ -6,10 +6,10 @@ import { ControlPlaneError, publicId } from "@/lib/control-plane-security";
 import { ALL_PAGES } from "@/config/pages";
 import { UserAssignmentModel } from "@/models/ControlPlane";
 import { AdminRoleUpdateSchema, deleteRole, unknownPageKeys, updateRole } from "@/lib/roles";
-import { requireOrganization } from "@/lib/organizations";
+import { requireStore } from "@/lib/tenant-stores";
 import { scheduleNotify } from "@/lib/store-notify";
 
-type Ctx = { params: Promise<{ organizationId: string; roleId: string }> };
+type Ctx = { params: Promise<{ storeId: string; roleId: string }> };
 
 /**
  * Save one role on top of the version the editor read (P3): `{baseVersion,
@@ -21,9 +21,9 @@ export async function PUT(req: Request, ctx: Ctx) {
   const correlationId = publicId("corr");
   try {
     const admin = await requireInternalAdmin(req);
-    const { organizationId, roleId } = await ctx.params;
+    const { storeId, roleId } = await ctx.params;
     const body = await parseBody(req, AdminRoleUpdateSchema);
-    const outcome = await updateRole(organizationId, roleId, body);
+    const outcome = await updateRole(storeId, roleId, body);
     if (outcome.status === "not_found") {
       throw new ControlPlaneError(404, "ROLE_NOT_FOUND", "Role not found");
     }
@@ -37,14 +37,14 @@ export async function PUT(req: Request, ctx: Ctx) {
       );
     }
     await auditAdmin(admin, {
-      organizationId,
+      storeId,
       action: "role.update",
       targetType: "role",
       targetId: roleId,
       correlationId,
       metadata: { baseVersion: body.baseVersion, version: outcome.role.version, roleName: body.roleName }
     });
-    scheduleNotify({ organizationId, reason: "role.update" });
+    scheduleNotify({ storeId, reason: "role.update" });
     const unknown = unknownPageKeys(outcome.role.accessKeys, ALL_PAGES);
     return NextResponse.json({
       role: outcome.role,
@@ -59,9 +59,9 @@ export async function PUT(req: Request, ctx: Ctx) {
 export async function DELETE(req: Request, ctx: Ctx) {
   try {
     const admin = await requireInternalAdmin(req);
-    const { organizationId, roleId } = await ctx.params;
-    await requireOrganization(organizationId);
-    const users = await UserAssignmentModel.distinct("appUserId", { organizationId, role: roleId, status: "active" });
+    const { storeId, roleId } = await ctx.params;
+    await requireStore(storeId);
+    const users = await UserAssignmentModel.distinct("appUserId", { storeId, role: roleId, status: "active" });
     if (users.length) {
       throw new ControlPlaneError(
         409,
@@ -71,16 +71,16 @@ export async function DELETE(req: Request, ctx: Ctx) {
         { userCount: users.length }
       );
     }
-    const outcome = await deleteRole(organizationId, roleId);
+    const outcome = await deleteRole(storeId, roleId);
     if (outcome.status === "not_found") throw notFound("Role");
     await auditAdmin(admin, {
-      organizationId,
+      storeId,
       action: "role.delete",
       targetType: "role",
       targetId: roleId,
       metadata: { roleName: outcome.role.roleName, version: outcome.role.version }
     });
-    scheduleNotify({ organizationId, reason: "role.delete" });
+    scheduleNotify({ storeId, reason: "role.delete" });
     return NextResponse.json({ deleted: roleId });
   } catch (error) {
     return jsonError(error);

@@ -47,8 +47,9 @@ export type NotifyReason =
   | "device.revoke";
 
 export type NotifyInput = {
-  organizationId: string;
-  /** Narrow to these stores / installations; none given means the whole organization. */
+  /** Kept while the column exists (S6 drops it); never used to scope anything. */
+  organizationId?: string;
+  /** The stores to tell. An input that names none, and no installation, reaches nobody. */
   storeId?: string;
   storeIds?: string[];
   workerInstallationIds?: string[];
@@ -106,16 +107,15 @@ function notifyUrl(tunnelUrl: string): string | null {
 /** Active installations in scope whose store has a tunnel URL and that hold an active credential. */
 export async function loadNotifyTargets(input: NotifyInput): Promise<NotifyTarget[]> {
   await connectDb();
-  const filter: Record<string, unknown> = {
-    organizationId: input.organizationId,
-    status: { $in: ACTIVE_INSTALLATION }
-  };
+  const filter: Record<string, unknown> = { status: { $in: ACTIVE_INSTALLATION } };
   const storeIds = [...(input.storeIds ?? []), ...(input.storeId ? [input.storeId] : [])];
   const installationIds = input.workerInstallationIds ?? [];
   const scopes: Record<string, unknown>[] = [];
   if (storeIds.length) scopes.push({ storeId: { $in: storeIds } });
   if (installationIds.length) scopes.push({ workerInstallationId: { $in: installationIds } });
-  if (scopes.length) filter.$or = scopes;
+  // Nothing named means nothing to tell: a notify has to aim at a store (D-22).
+  if (!scopes.length) return [];
+  filter.$or = scopes;
   if (input.exceptInstallationId) filter.workerInstallationId = { $ne: input.exceptInstallationId };
 
   const installations = (await WorkerInstallationModel.find(filter).lean()) as Array<
@@ -128,7 +128,6 @@ export async function loadNotifyTargets(input: NotifyInput): Promise<NotifyTarge
       .select("+relayKey")
       .lean(),
     TenantStoreModel.find({
-      organizationId: input.organizationId,
       storeId: { $in: [...new Set(installations.map((i) => String(i.storeId)))] }
     }).lean()
   ])) as [Array<Record<string, unknown>>, Array<Record<string, unknown>>];

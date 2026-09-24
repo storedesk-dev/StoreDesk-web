@@ -1,4 +1,10 @@
-import { AppUserModel, LicenseModel, TenantStoreModel, UserAssignmentModel } from "@/models/ControlPlane";
+import {
+  AppUserModel,
+  LicenseModel,
+  OrganizationModel,
+  TenantStoreModel,
+  UserAssignmentModel
+} from "@/models/ControlPlane";
 import { publicId } from "@/lib/control-plane-security";
 import { coverageKeyFor, newLicenseNumber } from "@/lib/licenses";
 
@@ -70,6 +76,45 @@ export async function migrateEmailIdentity(): Promise<EmailIdentityReport> {
     { $count: "duplicates" }
   ]);
   return { verified: verified.modifiedCount ?? 0, duplicates: Number(duplicates[0]?.duplicates ?? 0) };
+}
+
+export type StoreRolesReport = { copied: number; seeded: number; alreadyHadRoles: number };
+
+/**
+ * D-22: roles hang off the store. Every store that has none of its own takes its organization's,
+ * so a role somebody edited — a page turned on for Cashier, a role added — survives the move.
+ *
+ * A store whose organization has no roles either is left alone: `storedRoles` falls back to the
+ * four templates on read, so it is never without them, and writing them here would only freeze a
+ * copy that cannot then follow the registry.
+ *
+ * Idempotent: a store with roles is skipped and counted.
+ */
+export async function migrateStoreScopedRoles(): Promise<StoreRolesReport> {
+  const stores = (await TenantStoreModel.find({}).select("storeId organizationId roles").lean()) as Array<
+    Record<string, unknown>
+  >;
+  const needing = stores.filter((store) => !Array.isArray(store.roles) || store.roles.length === 0);
+  if (!needing.length) return { copied: 0, seeded: 0, alreadyHadRoles: stores.length };
+
+  const organizationIds = [...new Set(needing.map((store) => String(store.organizationId)))];
+  const organizations = (await OrganizationModel.find({ organizationId: { $in: organizationIds } })
+    .select("organizationId roles")
+    .lean()) as Array<Record<string, unknown>>;
+  const rolesOf = new Map(organizations.map((org) => [String(org.organizationId), org.roles]));
+
+  let copied = 0;
+  let seeded = 0;
+  for (const store of needing) {
+    const roles = rolesOf.get(String(store.organizationId));
+    if (!Array.isArray(roles) || roles.length === 0) {
+      seeded += 1;
+      continue;
+    }
+    await TenantStoreModel.updateOne({ storeId: String(store.storeId) }, { $set: { roles } });
+    copied += 1;
+  }
+  return { copied, seeded, alreadyHadRoles: stores.length - needing.length };
 }
 
 export type StoreLicenseReport = { issued: number; masters: number; alreadyCovered: number };
@@ -206,6 +251,11 @@ export async function runMigrations(): Promise<void> {
   const identity = await migrateEmailIdentity();
   if (identity.verified > 0 || identity.duplicates > 0) {
     console.info(`[migrate] email identity: ${JSON.stringify(identity)}`);
+  }
+
+  const roles = await migrateStoreScopedRoles();
+  if (roles.copied > 0) {
+    console.info(`[migrate] store-scoped roles: ${JSON.stringify(roles)}`);
   }
 
   const licenses = await migrateStoreScopedLicenses();

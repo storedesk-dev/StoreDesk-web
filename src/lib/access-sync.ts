@@ -292,7 +292,7 @@ export async function loadAccessSync(worker: {
     store,
     subscription,
     // The Organization Admin role, when behind the registry, is stored at its new version first.
-    roles: await rolesPersistingOrgAdmin(organizationId, organization),
+    roles: await rolesPersistingOrgAdmin(storeId, store),
     users,
     generatedAt: new Date()
   });

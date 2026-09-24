@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { connectDb } from "@/lib/db";
-import { OrganizationModel } from "@/models/ControlPlane";
+import { TenantStoreModel } from "@/models/ControlPlane";
+import { templateRoles } from "@/lib/role-templates";
 import { ControlPlaneError } from "@/lib/control-plane-security";
 import { ALL_PAGES, type App } from "@/config/pages";
 
@@ -267,24 +268,29 @@ export function orgAdminRoleOutdated(raw: unknown): boolean {
 
 const WRITE_ATTEMPTS = 4;
 
-export type OrganizationRecord = Record<string, unknown> & { roles?: unknown; updatedAt?: unknown };
+/** A store document, as far as its roles are concerned. */
+export type StoreRecord = Record<string, unknown> & { roles?: unknown; updatedAt?: unknown };
 
-async function loadOrganization(organizationId: string): Promise<OrganizationRecord | null> {
+async function loadStoreRecord(storeId: string): Promise<StoreRecord | null> {
   await connectDb();
-  return (await OrganizationModel.findOne({ organizationId }).lean()) as OrganizationRecord | null;
+  return (await TenantStoreModel.findOne({ storeId }).lean()) as StoreRecord | null;
 }
 
-function storedRoles(org: OrganizationRecord): OrgRole[] {
-  return normalizeRoles(org.roles, toIsoOr(org.createdAt, EPOCH));
+/**
+ * A store with no roles of its own gets the four templates.
+ *
+ * That is the answer, not a stopgap: every store is created with them, and a store that somehow
+ * has none would otherwise let nobody in at all. `normalizeRoles` keeps whatever is stored.
+ */
+function storedRoles(store: StoreRecord): OrgRole[] {
+  const stamp = toIsoOr(store.createdAt, EPOCH);
+  const stored = normalizeRoles(store.roles, stamp);
+  return stored.length ? stored : templateRoles(new Date(stamp));
 }
 
-async function compareAndSetRoles(
-  organizationId: string,
-  stamp: unknown,
-  roles: OrgRole[]
-): Promise<boolean> {
-  const written = await OrganizationModel.findOneAndUpdate(
-    { organizationId, updatedAt: stamp ?? null },
+async function compareAndSetRoles(storeId: string, stamp: unknown, roles: OrgRole[]): Promise<boolean> {
+  const written = await TenantStoreModel.findOneAndUpdate(
+    { storeId, updatedAt: stamp ?? null },
     { $set: { roles } },
     { returnDocument: "after" }
   ).lean();
@@ -296,23 +302,22 @@ function busy(): ControlPlaneError {
 }
 
 /**
- * The organization's roles as read, first storing the Organization Admin role
- * with the pages it reads with (at the version it reads at) when the stored
- * copy is behind the registry. Best effort: a lost compare-and-set leaves it
- * for the next read, and every read resolves it the same way meanwhile, so the
- * version a store sees never goes back.
+ * The store's roles as read, first storing the Organization Admin role with the pages it reads
+ * with (at the version it reads at) when the stored copy is behind the registry. Best effort: a
+ * lost compare-and-set leaves it for the next read, and every read resolves it the same way
+ * meanwhile, so the version a store sees never goes back.
  */
-export async function rolesPersistingOrgAdmin(organizationId: string, org: OrganizationRecord): Promise<OrgRole[]> {
-  const roles = storedRoles(org);
-  if (orgAdminRoleOutdated(org.roles)) {
-    await compareAndSetRoles(organizationId, org.updatedAt, roles).catch(() => false);
+export async function rolesPersistingOrgAdmin(storeId: string, store: StoreRecord): Promise<OrgRole[]> {
+  const roles = storedRoles(store);
+  if (orgAdminRoleOutdated(store.roles)) {
+    await compareAndSetRoles(storeId, store.updatedAt, roles).catch(() => false);
   }
   return roles;
 }
 
-export async function readOrganizationRoles(organizationId: string): Promise<OrgRole[] | null> {
-  const org = await loadOrganization(organizationId);
-  return org ? rolesPersistingOrgAdmin(organizationId, org) : null;
+export async function readStoreRoles(storeId: string): Promise<OrgRole[] | null> {
+  const store = await loadStoreRecord(storeId);
+  return store ? rolesPersistingOrgAdmin(storeId, store) : null;
 }
 
 export type EdgeRoleUpdateOutcome =
@@ -354,16 +359,16 @@ function accessKeysToStore(roleId: string, accessKeys: RoleAccessKeys): RoleAcce
 export type RoleCreateOutcome = { status: "ok"; role: OrgRole } | { status: "exists" } | { status: "not_found" };
 
 export async function createRole(
-  organizationId: string,
+  storeId: string,
   input: { roleId: string; roleName: string; accessKeys: RoleAccessKeys }
 ): Promise<RoleCreateOutcome> {
   for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
-    const org = await loadOrganization(organizationId);
-    if (!org) return { status: "not_found" };
-    const roles = storedRoles(org);
+    const store = await loadStoreRecord(storeId);
+    if (!store) return { status: "not_found" };
+    const roles = storedRoles(store);
     if (roles.some((role) => role.roleId === input.roleId)) return { status: "exists" };
     if (roles.length >= MAX_ROLES) {
-      throw new ControlPlaneError(409, "ROLE_LIMIT_REACHED", `An organization can have at most ${MAX_ROLES} roles`);
+      throw new ControlPlaneError(409, "ROLE_LIMIT_REACHED", `A store can have at most ${MAX_ROLES} roles`);
     }
     const role: OrgRole = {
       roleId: input.roleId,
@@ -372,7 +377,7 @@ export async function createRole(
       version: 1,
       updatedAt: new Date().toISOString()
     };
-    if (await compareAndSetRoles(organizationId, org.updatedAt, [...roles, role])) {
+    if (await compareAndSetRoles(storeId, store.updatedAt, [...roles, role])) {
       return { status: "ok", role };
     }
   }
@@ -381,14 +386,14 @@ export async function createRole(
 
 export type RoleDeleteOutcome = { status: "ok"; role: OrgRole } | { status: "not_found" };
 
-export async function deleteRole(organizationId: string, roleId: string): Promise<RoleDeleteOutcome> {
+export async function deleteRole(storeId: string, roleId: string): Promise<RoleDeleteOutcome> {
   for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
-    const org = await loadOrganization(organizationId);
-    if (!org) return { status: "not_found" };
-    const roles = storedRoles(org);
+    const store = await loadStoreRecord(storeId);
+    if (!store) return { status: "not_found" };
+    const roles = storedRoles(store);
     const role = roles.find((entry) => entry.roleId === roleId);
     if (!role) return { status: "not_found" };
-    if (await compareAndSetRoles(organizationId, org.updatedAt, roles.filter((entry) => entry.roleId !== roleId))) {
+    if (await compareAndSetRoles(storeId, store.updatedAt, roles.filter((entry) => entry.roleId !== roleId))) {
       return { status: "ok", role };
     }
   }
@@ -396,9 +401,9 @@ export async function deleteRole(organizationId: string, roleId: string): Promis
 }
 
 /** Store the given roles as they are (a new organization's templates). */
-export async function writeInitialRoles(organizationId: string, roles: OrgRole[]): Promise<void> {
+export async function writeInitialRoles(storeId: string, roles: OrgRole[]): Promise<void> {
   await connectDb();
-  await OrganizationModel.updateOne({ organizationId }, { $set: { roles } });
+  await TenantStoreModel.updateOne({ storeId }, { $set: { roles } });
 }
 
 /**
@@ -406,23 +411,23 @@ export async function writeInitialRoles(organizationId: string, roles: OrgRole[]
  * server (`PUT /api/v1/edge/roles/{roleId}`) and the admin UI alike.
  */
 export async function updateRole(
-  organizationId: string,
+  storeId: string,
   roleId: string,
   update: EdgeRoleUpdate
 ): Promise<EdgeRoleUpdateOutcome> {
-  return updateRoleFromEdge(organizationId, roleId, update);
+  return updateRoleFromEdge(storeId, roleId, update);
 }
 
 /** A store server's edit of one role, accepted only on top of the stored version. */
 export async function updateRoleFromEdge(
-  organizationId: string,
+  storeId: string,
   roleId: string,
   update: EdgeRoleUpdate
 ): Promise<EdgeRoleUpdateOutcome> {
   for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
-    const org = await loadOrganization(organizationId);
-    if (!org) return { status: "not_found" };
-    const roles = storedRoles(org);
+    const store = await loadStoreRecord(storeId);
+    if (!store) return { status: "not_found" };
+    const roles = storedRoles(store);
     const index = roles.findIndex((role) => role.roleId === roleId);
     if (index < 0) return { status: "not_found" };
     const current = roles[index];
@@ -437,7 +442,7 @@ export async function updateRoleFromEdge(
     };
     const next = roles.slice();
     next[index] = role;
-    if (await compareAndSetRoles(organizationId, org.updatedAt, next)) {
+    if (await compareAndSetRoles(storeId, store.updatedAt, next)) {
       return { status: "ok", role };
     }
   }

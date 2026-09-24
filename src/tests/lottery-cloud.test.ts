@@ -91,8 +91,12 @@ async function fixture(options: { lotteryPages?: boolean; userStatus?: string } 
     organizationId,
     name: "Patel Retail",
     slug: "patel-retail",
-    status: "active",
-    licensing: { mode: "master" },
+    status: "active"
+  });
+
+  await TenantStoreModel.create({
+    storeId,
+    organizationId,
     roles: [
       {
         roleId: "clerk",
@@ -102,12 +106,7 @@ async function fixture(options: { lotteryPages?: boolean; userStatus?: string } 
           electron: { pages: [{ key: "pos", enabled: true, featureFlags: {} }] }
         }
       }
-    ]
-  });
-
-  await TenantStoreModel.create({
-    storeId,
-    organizationId,
+    ],
     name: "Store 42",
     storeNumber: "42",
     status: "active",

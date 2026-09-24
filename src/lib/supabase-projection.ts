@@ -8,7 +8,7 @@ import {
   WorkerInstallationModel
 } from "@/models/ControlPlane";
 import { coveringFrom, isEntitled } from "@/lib/licenses";
-import { readOrganizationRoles } from "@/lib/roles";
+import { readStoreRoles } from "@/lib/roles";
 import { LOTTERY } from "@/lib/products";
 
 /**
@@ -84,7 +84,7 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
   if (!organization) return null;
 
   const covering = coveringFrom(store, licences);
-  const roles = (await readOrganizationRoles(organizationId)) ?? [];
+  const roles = (await readStoreRoles(storeId)) ?? [];
   const pagesOfRole = new Map(
     roles.map((role) => [
       role.roleId,

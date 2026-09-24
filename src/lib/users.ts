@@ -142,6 +142,7 @@ async function assertLoginOwnedHere(organizationId: string, user: Doc): Promise<
 
 const iso = (value: unknown): string | null => (value ? toIsoOr(value, "") || null : null);
 
+/** `roles` is keyed `<storeId>:<roleId>`: the same role id at two stores is two roles. */
 type Lookup = { stores: Map<string, string>; roles: Map<string, string> };
 
 function assignmentView(assignment: Doc, lookup?: Lookup) {
@@ -154,7 +155,7 @@ function assignmentView(assignment: Doc, lookup?: Lookup) {
     storeName: lookup?.stores.get(storeId) ?? null,
     workerInstallationId: assignment.workerInstallationId ? String(assignment.workerInstallationId) : null,
     role,
-    roleName: lookup?.roles.get(role) ?? null,
+    roleName: lookup?.roles.get(`${storeId}:${role}`) ?? null,
     status: String(assignment.status ?? "active"),
     createdAt: iso(assignment.createdAt)
   };
@@ -188,22 +189,22 @@ export function userView(
   };
 }
 
-async function lookupFor(organizationId: string, org?: Doc): Promise<Lookup> {
-  const organization = org ?? (await requireOrganization(organizationId));
-  const stores = (await TenantStoreModel.find({ organizationId }).select("storeId name").lean()) as Doc[];
-  return {
-    stores: new Map(stores.map((store) => [String(store.storeId), String(store.name)])),
-    roles: new Map(orgRoles(organization).map((role) => [role.roleId, role.roleName]))
-  };
+async function lookupFor(organizationId: string): Promise<Lookup> {
+  const stores = (await TenantStoreModel.find({ organizationId }).select("storeId name roles createdAt").lean()) as Doc[];
+  const roles = new Map<string, string>();
+  for (const store of stores) {
+    for (const role of storeRoles(store)) roles.set(`${String(store.storeId)}:${role.roleId}`, role.roleName);
+  }
+  return { stores: new Map(stores.map((store) => [String(store.storeId), String(store.name)])), roles };
 }
 
-function orgRoles(org: Doc): OrgRole[] {
-  return normalizeRoles(org.roles, toIsoOr(org.createdAt, EPOCH));
+function storeRoles(store: Doc): OrgRole[] {
+  return normalizeRoles(store.roles, toIsoOr(store.createdAt, EPOCH));
 }
 
-async function viewsFor(organizationId: string, users: Doc[], assignments: Doc[], org?: Doc) {
+async function viewsFor(organizationId: string, users: Doc[], assignments: Doc[]) {
   const ids = users.map((user) => String(user.appUserId));
-  const [lookup, owners] = await Promise.all([lookupFor(organizationId, org), ownership(ids, users, organizationId)]);
+  const [lookup, owners] = await Promise.all([lookupFor(organizationId), ownership(ids, users, organizationId)]);
   return users.map((user) => {
     const owner = owners.get(String(user.appUserId))!;
     return userView(
@@ -216,27 +217,26 @@ async function viewsFor(organizationId: string, users: Doc[], assignments: Doc[]
 }
 
 export async function listUsers(organizationId: string) {
-  const org = await requireOrganization(organizationId);
+  await requireOrganization(organizationId);
   const assignments = (await UserAssignmentModel.find({ organizationId, status: "active" })
     .sort({ createdAt: 1 })
     .lean()) as Doc[];
   const ids = [...new Set(assignments.map((row) => String(row.appUserId)))];
   const users = (await AppUserModel.find({ appUserId: { $in: ids } }).sort({ email: 1 }).lean()) as Doc[];
-  return viewsFor(organizationId, users, assignments, org);
+  return viewsFor(organizationId, users, assignments);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Every role must exist in the organization and every store belong to it (P9). */
-async function validateAssignments(organizationId: string, org: Doc, inputs: AssignmentInput[]) {
-  const roleIds = new Set(orgRoles(org).map((role) => role.roleId));
-  const storeIds = new Set(
-    ((await TenantStoreModel.find({ organizationId }).select("storeId").lean()) as Doc[]).map((row) => String(row.storeId))
-  );
+/** Every store belongs to the organization, and every role exists at the store it is granted at. */
+async function validateAssignments(organizationId: string, inputs: AssignmentInput[]) {
+  const stores = (await TenantStoreModel.find({ organizationId }).select("storeId roles createdAt").lean()) as Doc[];
+  const storeIds = new Set(stores.map((row) => String(row.storeId)));
+  const rolesOf = new Map(stores.map((store) => [String(store.storeId), new Set(storeRoles(store).map((r) => r.roleId))]));
   const scopes = new Set<string>();
   for (const input of inputs) {
-    if (!roleIds.has(input.role)) {
-      throw new ControlPlaneError(400, "ROLE_UNKNOWN", `role: "${input.role}" is not a role of this organization`);
+    if (!rolesOf.get(input.storeId)?.has(input.role)) {
+      throw new ControlPlaneError(400, "ROLE_UNKNOWN", `role: "${input.role}" is not a role of that store`);
     }
     if (!storeIds.has(input.storeId)) {
       throw new ControlPlaneError(400, "STORE_UNKNOWN", `storeId: "${input.storeId}" is not a store of this organization`);
@@ -355,7 +355,7 @@ export async function addUser(admin: InternalAdminActor, organizationId: string,
   const org = await requireOrganization(organizationId);
   const login = body.email ?? body.login;
   if (!login) throw new ControlPlaneError(400, "REQUEST_INVALID", "email: the login is required");
-  await validateAssignments(organizationId, org, body.assignments);
+  await validateAssignments(organizationId, body.assignments);
 
   const existing = (await AppUserModel.findOne({ email: login }).lean()) as Doc | null;
   if (existing) {
@@ -561,16 +561,16 @@ export async function addAssignment(
   appUserId: string,
   input: AssignmentInput
 ) {
-  const org = await requireOrganization(organizationId);
+  await requireOrganization(organizationId);
   const user = await AppUserModel.findOne({ appUserId }).lean();
   if (!user) throw notFound("User");
-  await validateAssignments(organizationId, org, [input]);
+  await validateAssignments(organizationId, [input]);
   const result = await upsertAssignment(admin, organizationId, appUserId, input);
   if (result.outcome === "exists") {
     throw new ControlPlaneError(409, "ASSIGNMENT_EXISTS", "The user already has access at that store");
   }
   notifyAssignmentScope(result.assignment, "assignment.create");
-  return assignmentView(result.assignment, await lookupFor(organizationId, org));
+  return assignmentView(result.assignment, await lookupFor(organizationId));
 }
 
 async function requireAssignment(organizationId: string, appUserId: string, assignmentId: string): Promise<Doc> {
@@ -588,13 +588,13 @@ export async function updateAssignment(
   assignmentId: string,
   body: z.output<typeof AssignmentPatchSchema>
 ) {
-  const org = await requireOrganization(organizationId);
+  await requireOrganization(organizationId);
   const before = await requireAssignment(organizationId, appUserId, assignmentId);
   const target: AssignmentInput = {
     storeId: body.storeId ?? String(before.storeId),
     role: body.role ?? String(before.role)
   };
-  await validateAssignments(organizationId, org, [target]);
+  await validateAssignments(organizationId, [target]);
   const set: Doc = { role: target.role };
   const unset: Doc = {};
   const beforeStore = String(before.storeId);
@@ -620,7 +620,7 @@ export async function updateAssignment(
   await auditAssignment(admin, "assignment.update", after, { previousStoreId: beforeStore, previousRole: before.role });
   notifyAssignmentScope(before, "assignment.change");
   if (target.storeId !== beforeStore) notifyAssignmentScope(after, "assignment.change");
-  return assignmentView(after, await lookupFor(organizationId, org));
+  return assignmentView(after, await lookupFor(organizationId));
 }
 
 export async function revokeAssignment(admin: InternalAdminActor, organizationId: string, appUserId: string, assignmentId: string) {

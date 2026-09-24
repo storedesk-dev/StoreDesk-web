@@ -10,6 +10,7 @@ import {
   WorkerInstallationModel
 } from "@/models/ControlPlane";
 import { ControlPlaneError, publicId } from "@/lib/control-plane-security";
+import { templateRoles } from "@/lib/role-templates";
 import { productFilter, STOREDESK } from "@/lib/products";
 import { auditAdmin } from "@/lib/audit";
 import { notFound, optionalEmail, optionalText } from "@/lib/http";
@@ -276,6 +277,8 @@ export async function createStore(
     status: "active",
     settings,
     settingsVersion: 1,
+    // The four templates, at version 1: an assignment always names a real role.
+    roles: templateRoles(new Date()),
     // The tunnel label is saved only once a tunnel exists under it.
     configJson: registerConfigJson({})
   });

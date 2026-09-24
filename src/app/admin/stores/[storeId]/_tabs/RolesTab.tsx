@@ -33,22 +33,22 @@ import {
   cx,
   useLoad
 } from "../../../_components/ui";
-import type { OrgTabProps } from "./types";
+import type { StoreTabProps } from "./shared";
 
 interface Draft {
   roleName: string;
   accessKeys: RoleAccessKeys;
 }
 
-export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
+export function RolesTab({ storeId, store, refreshStore }: StoreTabProps) {
   const { toast } = useToast();
   const { data, error, loading, reload } = useLoad(async () => {
     const [roles, users] = await Promise.all([
-      api.listRoles(orgId),
-      api.listUsers(orgId).catch(() => null)
+      api.listRoles(storeId),
+      api.listUsers(store.organizationId).catch(() => null)
     ]);
     return { roles: roles.roles, users: users?.users ?? null };
-  }, [orgId]);
+  }, [storeId, store.organizationId]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -101,7 +101,7 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
     }
     setSaving(true);
     try {
-      await api.saveRole(orgId, selected.roleId, {
+      await api.saveRole(storeId, selected.roleId, {
         baseVersion: selected.version,
         roleName: draft.roleName.trim(),
         accessKeys: draft.accessKeys
@@ -257,10 +257,10 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
         onClose={() => setCreating(false)}
         existingNames={roles.map((r) => r.roleName.toLowerCase())}
         onCreate={async (roleName, template) => {
-          const res = await api.createRole(orgId, { roleName, template, accessKeys: templateAccessKeys(template) });
+          const res = await api.createRole(storeId, { roleName, template, accessKeys: templateAccessKeys(template) });
           toast(`${roleName} created`, "success");
           await reload();
-          refreshOrg();
+          refreshStore();
           if (res.role?.roleId) setSelectedId(res.role.roleId);
         }}
       />
@@ -273,12 +273,12 @@ export function RolesTab({ orgId, refreshOrg }: OrgTabProps) {
           confirmLabel="Delete role"
           destructive
           onConfirm={async () => {
-            await api.deleteRole(orgId, selected.roleId);
+            await api.deleteRole(storeId, selected.roleId);
             discard(selected.roleId);
             setSelectedId(null);
             toast(`${selected.roleName} deleted`, "success");
             await reload();
-            refreshOrg();
+            refreshStore();
           }}
         >
           {selectedUsers ? (

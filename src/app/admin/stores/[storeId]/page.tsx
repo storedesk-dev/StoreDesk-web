@@ -15,9 +15,10 @@ import { RegisterTab } from "./_tabs/RegisterTab";
 import { PcPhonesTab } from "./_tabs/PcPhonesTab";
 import { AccessPreviewTab } from "./_tabs/AccessPreviewTab";
 import { LicenseTab } from "./_tabs/LicenseTab";
+import { RolesTab } from "./_tabs/RolesTab";
 
-type TabKey = "overview" | "license" | "features" | "register" | "pc" | "access";
-const TAB_KEYS: TabKey[] = ["overview", "license", "features", "register", "pc", "access"];
+type TabKey = "overview" | "license" | "features" | "register" | "pc" | "roles" | "access";
+const TAB_KEYS: TabKey[] = ["overview", "license", "features", "register", "pc", "roles", "access"];
 
 export default function StorePage() {
   return (
@@ -95,6 +96,7 @@ function StoreDetail() {
           { key: "features", label: "Features" },
           { key: "register", label: "Register" },
           { key: "pc", label: "PC & phones" },
+          { key: "roles", label: "Roles" },
           { key: "access", label: "Access preview" }
         ]}
       />
@@ -104,6 +106,7 @@ function StoreDetail() {
         {tab === "features" ? <FeaturesTab {...props} /> : null}
         {tab === "register" ? <RegisterTab {...props} /> : null}
         {tab === "pc" ? <PcPhonesTab {...props} /> : null}
+        {tab === "roles" ? <RolesTab {...props} /> : null}
         {tab === "access" ? <AccessPreviewTab {...props} /> : null}
       </TabPanel>
     </div>

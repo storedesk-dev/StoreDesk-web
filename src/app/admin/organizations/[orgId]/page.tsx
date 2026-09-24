@@ -25,15 +25,14 @@ import {
 import { OrgStatusChip } from "../../_components/status";
 import { OverviewTab } from "./_tabs/OverviewTab";
 import { StoresTab } from "./_tabs/StoresTab";
-import { RolesTab } from "./_tabs/RolesTab";
 import { UsersTab } from "./_tabs/UsersTab";
 import { ActivityTab } from "./_tabs/ActivityTab";
 
 import type { OrgTabProps } from "./_tabs/types";
 
 // Licences live on the store now (D-22), so there is no tab for them here.
-type TabKey = "overview" | "stores" | "roles" | "users" | "activity";
-const TAB_KEYS: TabKey[] = ["overview", "stores", "roles", "users", "activity"];
+type TabKey = "overview" | "stores" | "users" | "activity";
+const TAB_KEYS: TabKey[] = ["overview", "stores", "users", "activity"];
 
 export default function OrganizationPage() {
   return (
@@ -123,7 +122,6 @@ function OrganizationDetail() {
         tabs={[
           { key: "overview", label: "Overview" },
           { key: "stores", label: "Stores", count: counts?.stores },
-          { key: "roles", label: "Roles", count: counts?.roles },
           { key: "users", label: "Users", count: counts?.users },
           { key: "activity", label: "Activity" }
         ]}
@@ -131,7 +129,6 @@ function OrganizationDetail() {
       <TabPanel id={tab}>
         {tab === "overview" ? <OverviewTab {...tabProps} goTo={setTab} /> : null}
         {tab === "stores" ? <StoresTab {...tabProps} /> : null}
-        {tab === "roles" ? <RolesTab {...tabProps} /> : null}
         {tab === "users" ? <UsersTab {...tabProps} /> : null}
         {tab === "activity" ? <ActivityTab {...tabProps} /> : null}
       </TabPanel>
