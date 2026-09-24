@@ -156,12 +156,16 @@ function OrganizationDetail() {
         }}
       >
         {statusTarget === "suspended" ? (
-          <p>
-            Every store of this organization turns sign-in off at its next sync, and phones can no longer find it by its
-            org tag. Nothing is deleted; resume to turn it back on.
-          </p>
+          <>
+            <p>
+              Phones can no longer find this business by its org tag. Nothing is deleted; resume to turn it back on.
+            </p>
+            <p className="mt-2 font-semibold">
+              Its stores keep running. A store is suspended on its own, from that store&apos;s page.
+            </p>
+          </>
         ) : (
-          <p>Stores turn sign-in back on at their next sync and phones can find the organization again.</p>
+          <p>Phones can find this business by its org tag again. Its stores were never stopped.</p>
         )}
       </ConfirmDialog>
 

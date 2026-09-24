@@ -527,6 +527,35 @@ describe("the store PC reads its key", () => {
     expect(await AuditEventModel.countDocuments({ action: "setup_key.reveal", actorType: "worker" })).toBe(0);
   });
 
+  it("refuses a row with no store, which used to mean every store of the organization", async () => {
+    const { body } = await issue();
+    const pc = await redeemKey(body.setupKey);
+
+    // The shape D-22 abolished, written straight past the model the way an older release would
+    // have. The key lets its holder take the store over, so this must not be a way in.
+    const appUserId = publicId("appu");
+    await AppUserModel.create({
+      appUserId,
+      email: `${appUserId}@example.invalid`,
+      name: "Owner of everything",
+      status: "active",
+      createdByAdminId: admin.adminId
+    });
+    await UserAssignmentModel.collection.insertOne({
+      assignmentId: publicId("asg"),
+      appUserId,
+      organizationId: params.organizationId,
+      role: "org_admin",
+      scopes: ["relay:request"],
+      status: "active",
+      createdByAdminId: admin.adminId
+    });
+
+    const res = await edgeKey(pc.body.workerCredential, appUserId);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("NOT_ORG_ADMIN");
+  });
+
   it("refuses an organization admin of another organization, and one scoped to another store", async () => {
     const { body } = await issue();
     const pc = await redeemKey(body.setupKey);

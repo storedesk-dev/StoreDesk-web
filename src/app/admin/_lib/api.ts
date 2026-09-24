@@ -42,7 +42,7 @@ export interface Organization {
   updatedAt?: string;
 }
 
-/** The master license as the organizations list shows it. */
+/** An old organization-scoped license, kept readable; it covers no store (D-22). */
 export interface OrgLicenseSummary {
   licenseId: string;
   licenseNumber: string;
@@ -63,7 +63,7 @@ export interface OrganizationSummary extends Organization {
 export interface OrganizationDetail {
   organization: Organization;
   counts?: { stores: number; roles: number; users: number; licenses: number; unlicensedStores: number };
-  /** The master license (master mode), with every store it covers. */
+  /** An old organization-scoped license, or null. It covers no store (D-22). */
   license?: License | null;
 }
 
@@ -83,7 +83,7 @@ export interface License {
   offlineGraceDays: number;
   maxPcsPerStore: number;
   notes: string | null;
-  /** Master: every store. Store license: its store. Cancelled: none. */
+  /** Its store — or none at all, when the license is cancelled or superseded. */
   coveredStores: Array<{ storeId: string; name: string }>;
 }
 

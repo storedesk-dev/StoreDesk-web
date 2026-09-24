@@ -15,7 +15,7 @@ type Ctx = { params: Promise<{ storeId: string; roleId: string }> };
  * Save one role on top of the version the editor read (P3): `{baseVersion,
  * roleName, accessKeys}`. 200 `{role}` at version + 1; 409
  * ROLE_VERSION_CONFLICT with the current `role` when someone (a store server
- * too) saved in between. Every store of the organization is notified.
+ * too) saved in between. The store is notified.
  */
 export async function PUT(req: Request, ctx: Ctx) {
   const correlationId = publicId("corr");

@@ -35,9 +35,11 @@ export function LicenseStatusChip({ status }: { status: LicenseStatus | null | u
 }
 
 /**
- * How a store is licensed, in one chip: "Master license", "Own license · trial"
- * or "Unlicensed" — plus the status when the license is not in force. The
- * number and end date are in the tooltip.
+ * How a store is licensed, in one chip: "Licensed · trial" or "Unlicensed", plus the status when
+ * the license is not in force. The number and end date are in the tooltip.
+ *
+ * An `organization`-scoped row is an old master license (D-22). It covers no store, so it can only
+ * turn up here on historical data, and it says so rather than looking like cover.
  */
 export function StoreLicenseChip({ license }: { license: StoreLicenseSummary | null | undefined }) {
   if (!license) {
@@ -49,12 +51,21 @@ export function StoreLicenseChip({ license }: { license: StoreLicenseSummary | n
   }
   const inForce = license.status === "active" || license.status === "trialing";
   const days = daysUntil(license.entitlementExpiresAt);
-  const parts = [license.scope === "organization" ? "Master license" : "Own license"];
-  if (license.scope === "store" && license.plan === "trial") parts.push("trial");
+  const superseded = license.scope === "organization";
+  const parts = [superseded ? "Superseded license" : "Licensed"];
+  if (!superseded && license.plan === "trial") parts.push("trial");
   if (!inForce) parts.push((LICENSE_STATUS[license.status]?.label ?? license.status).toLowerCase());
-  const tone: Tone = !inForce ? "red" : days !== null && days <= 30 ? "amber" : license.scope === "organization" ? "blue" : "green";
+  const tone: Tone = !inForce || superseded ? "red" : days !== null && days <= 30 ? "amber" : "green";
   return (
-    <Chip tone={tone} dot title={`${license.licenseNumber} · ends ${formatDate(license.entitlementExpiresAt)}`}>
+    <Chip
+      tone={tone}
+      dot
+      title={
+        superseded
+          ? `${license.licenseNumber} covers no store: a license covers one store now`
+          : `${license.licenseNumber} · ends ${formatDate(license.entitlementExpiresAt)}`
+      }
+    >
       {parts.join(" · ")}
     </Chip>
   );

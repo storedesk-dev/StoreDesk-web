@@ -228,18 +228,21 @@ export const NOT_ORG_ADMIN = "NOT_ORG_ADMIN";
 export const APP_USER_HEADER = "x-storedesk-app-user";
 
 /**
- * Whether this app user is an organization admin of `organizationId` — the
- * owner-level check. An assignment with no `storeId` covers every store of the
- * organization; a store-scoped one must name this store.
+ * Whether this app user holds the owner-level role **at this store**.
+ *
+ * It used to also accept an assignment with no `storeId`, which meant every store of the
+ * organization. D-22 removed that shape — `storeId` is required and the migration expanded the
+ * rows that had none — so matching it now could only ever let somebody through on a row that
+ * should not exist. The key this guards lets its holder take the store over, so it asks the
+ * narrow question: are you an owner *here*.
  */
-export async function isOrganizationAdmin(appUserId: string, organizationId: string, storeId: string): Promise<boolean> {
+export async function isOrganizationAdmin(appUserId: string, storeId: string): Promise<boolean> {
   await connectDb();
   const assignment = await UserAssignmentModel.findOne({
     appUserId,
-    organizationId,
+    storeId,
     status: "active",
-    role: ORG_ADMIN_ROLE_ID,
-    $or: [{ storeId }, { storeId: null }, { storeId: { $exists: false } }]
+    role: ORG_ADMIN_ROLE_ID
   }).lean();
   return Boolean(assignment);
 }
@@ -261,7 +264,7 @@ export async function workerSetupKey(
 ) {
   enforceRateLimit(`setup-key-worker:${worker.workerInstallationId}`, { limit: 10, windowMs: 60_000, code: "RATE_LIMITED" });
   const actor = appUserId?.trim();
-  if (!actor || !(await isOrganizationAdmin(actor, worker.organizationId, worker.storeId))) {
+  if (!actor || !(await isOrganizationAdmin(actor, worker.storeId))) {
     throw new ControlPlaneError(403, NOT_ORG_ADMIN, "Only an organization admin can read this store's setup key.");
   }
   const key = await openReusableKey({
