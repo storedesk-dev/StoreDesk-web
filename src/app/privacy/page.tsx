@@ -12,7 +12,7 @@ import { DOCS, PLANS, SITE, contactMailto } from "@/lib/site";
  * and stopped, which left every one of those questions unanswered.
  */
 
-const UPDATED = "16 September 2026";
+const UPDATED = "28 September 2026";
 
 const SECTIONS = [
   { id: "summary", title: "The short version" },
@@ -115,10 +115,10 @@ export default function PrivacyPage() {
             <DataTable
               columns={["What", "Why", "Example"]}
               rows={[
-                ["Organisation and stores", "So a licence covers the right stores.", "Business name, store name and address"],
+                ["Business and stores", "So each store's licence covers the right store.", "Business name, store name and address"],
                 ["People", "So they can sign in and be given a role.", "Name, email address and role"],
                 ["Installations", "So each store PC has its own identity and can be replaced on its own.", "Which PCs are connected, and when"],
-                ["Licence", "So we know the plan and when it renews.", `${PLANS.trialDays}-day trial, then a ${PLANS.standardDays}-day plan`],
+                ["Licence", "So we know each store's plan and when it ends.", "One per store, with its term and end date"],
                 ["Audit log", "So account changes can be traced.", "Who added a store, who changed a role, and when"]
               ]}
             />

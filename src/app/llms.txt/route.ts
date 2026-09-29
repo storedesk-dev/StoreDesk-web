@@ -26,8 +26,8 @@ ${SITE.name} is back-office software for independent convenience stores and gas 
 - Register: Verifone Commander, read over the store network. Writing back is a separate setting (off by default); when it is on, changes are staged and sent by a person, never automatically.
 - Data location: the price book, supplier costs and sales reports stay on the store PC. The ${SITE.name} account holds only your stores, their licensing and which PCs are connected.
 - Offline: the register, the desktop app and staff sign-in all keep working with no internet, because passwords are checked on the store PC; a session lasts ${PLANS.offlineSessionHours} hours. Phones away from the store, the Google Sheet export and the ${SITE.name} account need the line.
-- Setup: a setup key is emailed when a store is created; it does not expire but is used once, and StoreDesk makes the next one as it is used. An organization admin reads the current key on the store PC to set up a replacement PC (which takes over); StoreDesk can also rotate it.
-- Plans: a ${PLANS.trialDays}-day trial, then a ${PLANS.standardDays}-day standard plan. A license covers one store with ${PLANS.defaultMaxWorkers} store PC; a business with several stores holds a license for each. Pricing is by enquiry.
+- Setup: a setup key is emailed when a store is created; it does not expire but is used once, and StoreDesk makes the next one as it is used. An admin reads the current key on the store PC to set up a replacement PC (which takes over); StoreDesk can also rotate it.
+- Licensing: a license covers one store with ${PLANS.defaultMaxWorkers} store PC, for a term agreed with ${SITE.name}; a business with several stores holds a license for each. Licenses are granted by ${SITE.name}, not bought online, so a new store is unlicensed until one is granted. Pricing is by enquiry.
 - Contact: ${SITE.email}
 - Documentation: ${DOCS_BASE}${release ? `
 - Current version: ${release.version}${release.channel === "beta" ? " (beta)" : ""}, published ${release.releaseDate.slice(0, 10)}. Release notes: ${release.notesUrl}

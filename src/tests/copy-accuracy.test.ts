@@ -25,7 +25,8 @@ const NOT_MARKETING = ["src/app/admin", "src/app/admin-gate", "src/app/api"];
 
 function walk(dir: string): string[] {
   return readdirSync(join(process.cwd(), dir)).flatMap((name) => {
-    const full = join(dir, name);
+    // Forward slashes on every OS, or the skip list never matches on Windows.
+    const full = join(dir, name).split("\\").join("/");
     if (NOT_MARKETING.some((skip) => full.startsWith(skip))) return [];
     if (statSync(join(process.cwd(), full)).isDirectory()) return walk(full);
     return /\.tsx?$/.test(name) ? [full] : [];
@@ -126,6 +127,21 @@ describe("what the site says about the setup key", () => {
     });
     expect(email).toMatch(/works until it is used/i);
     expect(email).toMatch(/makes a new one/i);
-    expect(email).toMatch(/organization admin/i);
+    // D-22: the store is the tenant, so the email names the role a store has, not an organization.
+    expect(email).toMatch(/an admin reads the current key/i);
+    expect(email).not.toMatch(/organi[sz]ation/i);
+  });
+});
+
+describe("what the site says a licence covers", () => {
+  // D-22 and D-23: one licence per store, granted by us for an agreed term. There is no
+  // organisation licence covering several stores, and no trial a new store starts on by itself.
+  it("never describes a licence for several stores or an automatic trial", () => {
+    for (const file of [...pages, "src/lib/faq.ts"]) {
+      const text = rendered(file);
+      expect(text, `${file} describes an organisation licence`).not.toMatch(/organi[sz]ation licen[cs]e/i);
+      expect(text, `${file} says a licence covers up to N stores`).not.toMatch(/covers up to/i);
+      expect(text, `${file} says a licence begins with a trial`).not.toMatch(/begins with a .*trial/i);
+    }
   });
 });

@@ -23,7 +23,7 @@ import {
   verifySecret,
   enforceRateLimit
 } from "@/lib/control-plane-security";
-import { LOTTERY, productFilter, STOREDESK } from "@/lib/products";
+import { LOTTERY, productFilter } from "@/lib/products";
 import { normalizeStoreSettings } from "@/lib/store-settings";
 import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
 import { DEFAULT_ORG_ROLES } from "@/lib/roles";
@@ -39,7 +39,7 @@ import {
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
 import { coverageFor, coveringLicense, coveringLicenses, licenseProblem } from "@/lib/licenses";
-import { remoteStatuses } from "@/lib/remote-status";
+import { storeReach } from "@/lib/store-reach";
 
 /**
  * The store-facing half of the control plane: activation (setup-key redeem),
@@ -676,12 +676,12 @@ export function normalizeOrganizationSlug(raw: string): string | null {
 
 async function activeOrganizationBySlug(rawSlug: string) {
   const slug = normalizeOrganizationSlug(rawSlug);
-  if (!slug) throw new ControlPlaneError(400, "REQUEST_INVALID", "Organization is invalid");
+  if (!slug) throw new ControlPlaneError(400, "REQUEST_INVALID", "That tag is not valid");
   await connectDb();
   // A suspended organization is not found (P12).
   const org = await OrganizationModel.findOne({ slug, status: "active" }).lean();
   if (!org) {
-    throw new ControlPlaneError(404, "ORGANIZATION_NOT_FOUND", "No organization matches that name");
+    throw new ControlPlaneError(404, "ORGANIZATION_NOT_FOUND", "Nothing matches that tag");
   }
   return org;
 }
@@ -703,19 +703,10 @@ export async function lookupOrganization(rawSlug: string) {
   })
     .sort({ name: 1 })
     .lean()) as Doc[];
-  const remote = await remoteStatuses(stores);
-  // Whether a store PC has been activated: the phone shows a store that is still waiting for its PC as
-  // disabled ("Not set up yet") instead of hiding it.
+  // Tunnel URL, whether the store PC has been activated, and whether phones can reach it now — shared
+  // with the email sign-in's store list (`lib/store-reach.ts`) so the two answers never drift.
+  const reach = await storeReach(stores);
   const storeIds = stores.map((s) => String(s.storeId));
-  const installations = (await WorkerInstallationModel.find({ storeId: { $in: storeIds }, ...productFilter(STOREDESK) })
-    .select({ storeId: 1, status: 1 })
-    .lean()) as Doc[];
-  const setupOf = (storeId: string): "active" | "awaiting_activation" | "none" => {
-    const mine = installations.filter((i) => String(i.storeId) === storeId).map((i) => String(i.status));
-    if (mine.includes("active")) return "active";
-    if (mine.includes("awaiting_activation")) return "awaiting_activation";
-    return "none";
-  };
 
   // The lottery app's first screen needs the same list, for its own product: whether the store sells
   // lottery, whether it is switched on for the app, whether a PC already holds its setup, and whether
@@ -757,11 +748,11 @@ export async function lookupOrganization(rawSlug: string) {
       storeId: String(store.storeId),
       name: String(store.name),
       storeNumber: store.storeNumber ? String(store.storeNumber) : null,
-      tunnelUrl: store.tunnelUrl ? String(store.tunnelUrl) : null,
-      setup: setupOf(String(store.storeId)),
+      tunnelUrl: reach.get(String(store.storeId))?.tunnelUrl ?? null,
+      setup: reach.get(String(store.storeId))?.setup ?? ("none" as const),
       lottery: lotteryOf(store),
       licence: licenceOf(store),
-      remote: remote.get(String(store.storeId)) ?? { status: "unknown" as const, since: null }
+      remote: reach.get(String(store.storeId))?.remote ?? { status: "unknown" as const, since: null }
     }))
   };
 }

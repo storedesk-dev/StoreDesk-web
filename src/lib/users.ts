@@ -123,7 +123,7 @@ function blockedReason(organizationId: string, owner: { sharedWith: OrgRef[]; cr
   }
   if (owner.sharedWith.length) {
     return {
-      message: `This login is also used by ${owner.sharedWith.map((org) => org.name).join(", ")}. Its password and status can't be changed while another organization has it.`,
+      message: `This login is also used by ${owner.sharedWith.map((org) => org.name).join(", ")}. Its password and status can't be changed while another business has it.`,
       organizations: owner.sharedWith
     };
   }
@@ -239,7 +239,7 @@ async function validateAssignments(organizationId: string, inputs: AssignmentInp
       throw new ControlPlaneError(400, "ROLE_UNKNOWN", `role: "${input.role}" is not a role of that store`);
     }
     if (!storeIds.has(input.storeId)) {
-      throw new ControlPlaneError(400, "STORE_UNKNOWN", `storeId: "${input.storeId}" is not a store of this organization`);
+      throw new ControlPlaneError(400, "STORE_UNKNOWN", `storeId: "${input.storeId}" is not a known store`);
     }
     if (scopes.has(input.storeId)) {
       throw new ControlPlaneError(400, "REQUEST_INVALID", "assignments: the same store is listed twice");
@@ -375,7 +375,7 @@ export async function addUser(admin: InternalAdminActor, organizationId: string,
       invitationCode: null,
       invitationExpiresAt: null,
       emailed: false,
-      message: "This login already exists. Its password and details were not changed; access to this organization was added."
+      message: "This login already exists. Its password and details were not changed; access to these stores was added."
     };
   }
 

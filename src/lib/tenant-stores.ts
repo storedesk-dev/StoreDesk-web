@@ -216,9 +216,8 @@ export const StoreCreateSchema = z.object({
   contactEmail: optionalEmail.optional(),
   timeZone: timeZoneSchema.nullish(),
   /**
-   * Store-wise organizations only: issue the store's license now (plan, end).
-   * Left out: the store starts Unlicensed. In master mode the master license
-   * covers the new store: each store has its own license or none (D-22).
+   * Issue the store's license now (plan, end). Left out: the store starts
+   * Unlicensed. Each store has its own license or none (D-22).
    */
   storeLicense: NewLicenseSchema.optional(),
   /** The tunnel hostname label; defaults to `<org tag>-<store name>`. `slug` is the older name. */

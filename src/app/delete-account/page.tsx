@@ -20,7 +20,7 @@ export const metadata = pageMetadata({
   path: "/delete-account"
 });
 
-const UPDATED = "17 September 2026";
+const UPDATED = "28 September 2026";
 
 const SECTIONS = [
   { id: "ask", title: "How to ask" },
@@ -37,7 +37,7 @@ const MAILTO = contactMailto({
     "",
     "Name on the account:",
     "Email on the account:",
-    "Organization tag (if you know it):",
+    "Store number (if you know it):",
     "Store name (if this is about one store):",
     ""
   ].join("\n")

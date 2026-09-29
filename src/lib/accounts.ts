@@ -19,6 +19,8 @@ import { isEntitled } from "@/lib/licenses";
 import { rolesPersistingOrgAdmin } from "@/lib/roles";
 import { writeAudit } from "@/lib/audit";
 import { scheduleAppUserNotify } from "@/lib/store-notify";
+import { storeReach, type StoreSetup } from "@/lib/store-reach";
+import type { RemoteStatus } from "@/lib/remote-status";
 import type { App } from "@/config/pages";
 
 /**
@@ -58,6 +60,14 @@ export interface ReachableStore {
   readonly pages: Partial<Readonly<Record<App, readonly string[]>>>;
   readonly lottery: { readonly sells: boolean };
   readonly licence: { readonly covered: boolean; readonly status: string | null; readonly expiresAt: string | null };
+  /**
+   * How a phone reaches the store and whether it can yet — the same answers the old org-tag lookup
+   * gives (`lib/store-reach.ts`): its public hostname or null, whether its PC has been activated,
+   * and whether phones can reach it now. A phone greys a store out on any of them.
+   */
+  readonly tunnelUrl: string | null;
+  readonly setup: StoreSetup;
+  readonly remote: RemoteStatus;
 }
 
 export interface Account {
@@ -121,6 +131,7 @@ export async function reachableFor(appUserId: string): Promise<ReachableStore[]>
   }
 
   const byId = new Map(licences.map((licence) => [text(licence.storeId), licence]));
+  const reach = await storeReach(stores);
   const reachable: ReachableStore[] = [];
   for (const store of stores) {
     const storeId = text(store.storeId);
@@ -144,7 +155,10 @@ export async function reachableFor(appUserId: string): Promise<ReachableStore[]>
         covered: covering !== null && isEntitled(covering),
         status: covering ? text(covering.status) : null,
         expiresAt: covering ? iso(covering.entitlementExpiresAt) : null
-      }
+      },
+      tunnelUrl: reach.get(storeId)?.tunnelUrl ?? null,
+      setup: reach.get(storeId)?.setup ?? "none",
+      remote: reach.get(storeId)?.remote ?? { status: "unknown", since: null }
     });
   }
   return reachable.sort((a, b) => a.name.localeCompare(b.name));

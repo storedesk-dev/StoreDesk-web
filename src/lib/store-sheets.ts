@@ -42,7 +42,7 @@ export async function assertSheetNotInOtherOrganization(organizationId: string, 
     throw new ControlPlaneError(
       409,
       "SHEET_IN_USE",
-      "This sheet is already connected to another organization's store. Each organization needs its own sheet."
+      "This sheet is already connected to another business's store. Use a sheet of your own."
     );
   }
 }

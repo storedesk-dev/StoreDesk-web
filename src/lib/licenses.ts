@@ -385,7 +385,7 @@ export async function issueStoreLicense(admin: InternalAdminActor, organizationI
 export async function createLicense(admin: InternalAdminActor, organizationId: string, body: LicenseCreate) {
   await requireOrg(organizationId);
   const store = (await TenantStoreModel.findOne({ organizationId, storeId: body.storeId }).select("storeId name").lean()) as Doc | null;
-  if (!store) throw new ControlPlaneError(400, "STORE_UNKNOWN", "storeId: not a store of this organization");
+  if (!store) throw new ControlPlaneError(400, "STORE_UNKNOWN", "storeId: not a known store");
   return issueStoreLicense(admin, organizationId, { storeId: String(store.storeId), name: String(store.name) }, body);
 }
 

@@ -55,7 +55,7 @@ export function setupKeyEmail(message: SetupKeyMessage): EmailSpec {
             // 0.0.9: a redeem consumes the key and mints the next one in the same transaction
             // (lib/store-setup-key.ts), so "keep the key and use it again" is no longer true.
             "The key works until it is used. StoreDesk then makes a new one, so there is nothing to keep.",
-            "To set up another PC later, an organization admin reads the current key on the store PC, in StoreDesk Service → Replace PC. The new PC takes over and the old one stops working for the store."
+            "To set up another PC later, an admin reads the current key on the store PC, in StoreDesk Service → Replace PC. The new PC takes over and the old one stops working for the store."
           ]),
       "Keep this email to yourself — anyone with the key can connect a computer to your store.",
       "If you were not expecting this, you can ignore it; nothing happens until the key is used."
@@ -168,7 +168,7 @@ export function passwordResetEmail(message: PasswordResetMessage): string {
 
 
 /**
- * The organization owner is told every time a store's PC is replaced, because
+ * The store's owner is told every time a store's PC is replaced, because
  * a replacement moves the whole store to another computer. Plain, short, and
  * carrying no key: it says what happened, where, when, and what to do if it
  * was not them.
@@ -178,11 +178,11 @@ export function installationReplacedEmail(message: InstallationReplacedMessage):
     preheader: `The StoreDesk PC for ${message.storeName} was replaced`,
     heading: `The StoreDesk PC for ${message.storeName} was replaced`,
     body: [
-      `Organization: ${message.organizationName}`,
+      `Business: ${message.organizationName}`,
       `Store: ${message.storeName}`,
       `When: ${formatExpiry(message.at)}`,
       message.by === "admin"
-        ? "Replaced by StoreDesk support, at your organization's request."
+        ? "Replaced by StoreDesk support, at your request."
         : "A setup key was used to set StoreDesk up on a computer, and that computer took the store over.",
       "The old PC no longer works for this store: it can no longer sign anyone in or reach the register."
     ],

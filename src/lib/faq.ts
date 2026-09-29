@@ -1,4 +1,4 @@
-import { DOCS_BASE, PLANS, PLAY_STORE_URL, SITE } from "@/lib/site";
+import { DOCS_BASE, PLAY_STORE_URL, SITE } from "@/lib/site";
 
 /**
  * The questions stores actually ask before they buy, with the answers the product can stand behind.
@@ -63,12 +63,12 @@ export const FAQ: FaqEntry[] = [
   },
   {
     question: "How long does setup take?",
-    answer: `About an afternoon. Install on the back-office PC and paste the setup key we email you (keep it: it also sets up a replacement PC), then point StoreDesk at your register and let the price book import.`,
+    answer: `About an afternoon. Install on the back-office PC and paste the setup key we email you, then point StoreDesk at your register and let the price book import.`,
     href: `${DOCS_BASE}/t/flow.install`
   },
   {
     question: "What does StoreDesk cost?",
-    answer: `There is a ${PLANS.trialDays}-day trial, then a ${PLANS.standardDays}-day plan. Pricing depends on how many stores you run, so ask us at ${SITE.email} and we will tell you plainly.`,
+    answer: `Each store has its own licence, for the term we agree with you. Ask us at ${SITE.email} and we will tell you the price plainly.`,
     href: "/contact"
   }
 ];

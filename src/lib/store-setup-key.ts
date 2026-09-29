@@ -265,7 +265,7 @@ export async function workerSetupKey(
   enforceRateLimit(`setup-key-worker:${worker.workerInstallationId}`, { limit: 10, windowMs: 60_000, code: "RATE_LIMITED" });
   const actor = appUserId?.trim();
   if (!actor || !(await isOrganizationAdmin(actor, worker.storeId))) {
-    throw new ControlPlaneError(403, NOT_ORG_ADMIN, "Only an organization admin can read this store's setup key.");
+    throw new ControlPlaneError(403, NOT_ORG_ADMIN, "Only an admin can read this store's setup key.");
   }
   const key = await openReusableKey({
     organizationId: worker.organizationId,
@@ -352,7 +352,7 @@ export async function clearReplacementApproval(storeId: string): Promise<void> {
 // ── Telling the organization owner ───────────────────────────────────────────
 
 /**
- * E-mail the organization owner that a store's PC was replaced, and audit the
+ * E-mail the store's owner that a store's PC was replaced, and audit the
  * notice either way (`installation.replaced_notice`) so there is a record even
  * where e-mail is not configured. Best effort: a replacement is never undone
  * because a message could not be sent.
@@ -373,13 +373,13 @@ export async function notifyOwnerOfReplacement(input: {
     TenantStoreModel.findOne({ storeId: input.storeId }).lean()
   ])) as [Doc | null, Doc | null];
   const to = String(org?.billingEmail ?? store?.contactEmail ?? "").trim();
-  const organizationName = String(org?.name ?? "your organization");
+  const organizationName = String(org?.name ?? "your business");
   const storeName = String(store?.name ?? input.storeId);
 
   let delivered = false;
   let error: string | null = null;
   if (!to) {
-    error = "the organization has no owner e-mail address";
+    error = "the store has no owner e-mail address";
   } else if (!isEmailConfigured()) {
     error = "e-mail is not configured on this deployment";
   } else {

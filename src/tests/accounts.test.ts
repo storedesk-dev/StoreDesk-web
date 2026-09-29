@@ -1,17 +1,19 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import {
   AppUserModel,
   LicenseModel,
   OrganizationModel,
   TenantStoreModel,
-  UserAssignmentModel
+  UserAssignmentModel,
+  WorkerInstallationModel
 } from "@/models/ControlPlane";
 import { hashSecret, publicId, resetRateLimitsForTests } from "@/lib/control-plane-security";
 import { migrateEmailIdentity, migrateStoreScopedAccess } from "@/lib/migrations";
 import { reachableFor, requestPasswordReset, resetPassword, signIn, verifyEmail, requestEmailVerification } from "@/lib/accounts";
 import { POST as signInRoute } from "@/app/api/v1/app-auth/sign-in/route";
 import { POST as resetRoute } from "@/app/api/v1/app-auth/password-reset/route";
+import { REMOTE_STUB_ENV, resetRemoteStatusCacheForTests } from "@/lib/remote-status";
 
 setupMemoryMongo();
 
@@ -146,6 +148,68 @@ describe("what one account can reach", () => {
 
     const reachable = await reachableFor(dana);
     expect(reachable[0]?.licence).toEqual({ covered: false, status: null, expiresAt: null });
+  });
+});
+
+describe("what a phone needs to reach and label each store", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetRemoteStatusCacheForTests();
+  });
+
+  async function storedeskPc(organizationId: string, storeId: string, status: string, product = "storedesk") {
+    await WorkerInstallationModel.create({
+      organizationId,
+      storeId,
+      workerInstallationId: publicId("winst"),
+      product,
+      workerName: "Back office",
+      contactEmail: "store@example.invalid",
+      status,
+      activatedAt: new Date()
+    });
+  }
+
+  it("answers tunnel, setup and remote per store, as the org-tag lookup did", async () => {
+    const org = await organization("Patel Retail", "patel-retail");
+    const live = await store(org, "A Live");
+    const waiting = await store(org, "B Waiting");
+    const bare = await store(org, "C Bare");
+    await TenantStoreModel.updateOne({ storeId: live }, { $set: { tunnelUrl: "https://live.example.net" } });
+    await storedeskPc(org, live, "active");
+    await storedeskPc(org, waiting, "awaiting_activation");
+    // A lottery PC is a different product: it does not make a store set up for StoreDesk.
+    await storedeskPc(org, bare, "active", "lottery");
+    const since = new Date(Date.now() - 30 * 60_000).toISOString();
+    vi.stubEnv(REMOTE_STUB_ENV, JSON.stringify({ [waiting]: { status: "offline", since }, "*": { status: "online" } }));
+
+    const dana = await person("dana@example.com");
+    await assign(dana, org, live);
+    await assign(dana, org, waiting);
+    await assign(dana, org, bare);
+
+    const byName = new Map((await reachableFor(dana)).map((entry) => [entry.name, entry]));
+    expect(byName.get("A Live")).toMatchObject({ tunnelUrl: "https://live.example.net", setup: "active", remote: { status: "online" } });
+    expect(byName.get("B Waiting")).toMatchObject({ tunnelUrl: null, setup: "awaiting_activation", remote: { status: "offline" } });
+    expect(byName.get("B Waiting")?.remote.since).not.toBeNull();
+    expect(byName.get("C Bare")).toMatchObject({ tunnelUrl: null, setup: "none" });
+  });
+
+  it("carries them through the sign-in route, and nothing about the PC beyond that", async () => {
+    const org = await organization("Patel Retail", "patel-retail");
+    const one = await store(org, "Store 42");
+    await TenantStoreModel.updateOne({ storeId: one }, { $set: { tunnelUrl: "https://s42.example.net" } });
+    await storedeskPc(org, one, "active");
+    const dana = await person("dana@example.com");
+    await assign(dana, org, one);
+
+    const body = await (await signInRoute(post({ email: "dana@example.com", password: PASSWORD }))).json();
+    expect(body.stores[0].tunnelUrl).toBe("https://s42.example.net");
+    expect(body.stores[0].setup).toBe("active");
+    expect(["online", "offline", "unknown"]).toContain(body.stores[0].remote.status);
+    const text = JSON.stringify(body);
+    expect(text).not.toContain("Back office");
+    expect(text).not.toContain("workerInstallationId");
   });
 });
 

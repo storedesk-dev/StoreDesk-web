@@ -12,7 +12,7 @@ import { DOCS, PLANS, SITE, contactMailto } from "@/lib/site";
  * a price is sent to a register, or about the unsigned installer.
  */
 
-const UPDATED = "16 September 2026";
+const UPDATED = "28 September 2026";
 
 const SECTIONS = [
   { id: "who", title: "Who this is between" },
@@ -65,11 +65,11 @@ export default function TermsPage() {
 
           <LegalSection id="licence" index={3} icon={<FileText className="h-4.5 w-4.5" />} title="Your licence">
             <p>
-              While your plan is current, you may install and use StoreDesk in the store your licence covers.
-              A licence begins with a {PLANS.trialDays}-day trial and then runs as a {PLANS.standardDays}-day
-              plan, and covers one store with {PLANS.defaultMaxWorkers} store PC. A business with several
-              stores holds a licence for each. Any different limits are whatever we have agreed with you in
-              writing.
+              While your licence is current, you may install and use StoreDesk in the store it covers. A
+              licence covers one store, with {PLANS.defaultMaxWorkers} store PC, for the term we agree with
+              you; a business with several stores holds a licence for each. We grant every licence ourselves,
+              so a new store has none until we do. Any different limits are whatever we have agreed with you
+              in writing.
             </p>
             <p>
               StoreDesk does not charge for the software today, so there is nothing to pay, cancel or refund. If
@@ -94,7 +94,7 @@ export default function TermsPage() {
               </li>
               <li>
                 Your setup key: it works until a PC is set up with it, and StoreDesk then makes the next one.
-                An organization admin can read the current key any time. Treat it like a password.
+                An admin can read the current key any time. Treat it like a password.
               </li>
               <li>The accuracy of what you type in, in particular supplier costs and sales tax settings.</li>
             </ul>
