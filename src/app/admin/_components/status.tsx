@@ -18,7 +18,8 @@ export const ONLINE_WINDOW_MS = 15 * 60 * 1000;
 
 const LICENSE_STATUS: Record<LicenseStatus, { label: string; tone: Tone }> = {
   active: { label: "Active", tone: "green" },
-  trialing: { label: "Trialing", tone: "blue" },
+  /** Only on a record from before D-23 (there is no trial): it is in force until its end date. */
+  trialing: { label: "Active", tone: "green" },
   suspended: { label: "Suspended", tone: "amber" },
   cancelled: { label: "Cancelled", tone: "gray" },
   expired: { label: "Expired", tone: "red" }
@@ -35,7 +36,7 @@ export function LicenseStatusChip({ status }: { status: LicenseStatus | null | u
 }
 
 /**
- * How a store is licensed, in one chip: "Licensed · trial" or "Unlicensed", plus the status when
+ * How a store is licensed, in one chip: "Licensed" or "Unlicensed", plus the status when
  * the license is not in force. The number and end date are in the tooltip.
  *
  * An `organization`-scoped row is an old master license (D-22). It covers no store, so it can only
@@ -53,7 +54,6 @@ export function StoreLicenseChip({ license }: { license: StoreLicenseSummary | n
   const days = daysUntil(license.entitlementExpiresAt);
   const superseded = license.scope === "organization";
   const parts = [superseded ? "Superseded license" : "Licensed"];
-  if (!superseded && license.plan === "trial") parts.push("trial");
   if (!inForce) parts.push((LICENSE_STATUS[license.status]?.label ?? license.status).toLowerCase());
   const tone: Tone = !inForce || superseded ? "red" : days !== null && days <= 30 ? "amber" : "green";
   return (

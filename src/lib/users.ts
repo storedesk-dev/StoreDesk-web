@@ -2,6 +2,7 @@ import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import { AppUserModel, OrganizationModel, TenantStoreModel, UserAssignmentModel } from "@/models/ControlPlane";
 import { ControlPlaneError, hashSecret, publicId, randomSecret } from "@/lib/control-plane-security";
+import { revokePersonLottery } from "@/lib/lottery-refresh";
 import { auditAdmin } from "@/lib/audit";
 import { loginSchema, notFound, optionalText } from "@/lib/http";
 import { getEmailProvider, isEmailConfigured } from "@/lib/email-provider";
@@ -482,6 +483,7 @@ export async function updateUser(
     targetId: appUserId,
     metadata: { changed: Object.keys(body), ...(statusChanged ? { status: set.status, previousStatus: user.status } : {}) }
   });
+  if (statusChanged && set.status === "disabled") await revokePersonLottery(appUserId, "account_disabled");
   if (statusChanged || body.name !== undefined) {
     scheduleAppUserNotify(appUserId, set.status === "disabled" ? "app_user.disable" : "app_user.update");
   }
@@ -517,6 +519,8 @@ export async function setUserPassword(admin: InternalAdminActor, organizationId:
     targetId: appUserId,
     metadata: { previousStatus: user.status }
   });
+  // A new password ends every lottery PC's credential for this person; each PC asks for it again.
+  await revokePersonLottery(appUserId, "password_changed");
   scheduleAppUserNotify(appUserId, "app_user.password_set");
   return { ok: true as const };
 }
@@ -619,7 +623,10 @@ export async function updateAssignment(
   ).lean()) as Doc;
   await auditAssignment(admin, "assignment.update", after, { previousStoreId: beforeStore, previousRole: before.role });
   notifyAssignmentScope(before, "assignment.change");
-  if (target.storeId !== beforeStore) notifyAssignmentScope(after, "assignment.change");
+  if (target.storeId !== beforeStore) {
+    await revokePersonLottery(appUserId, "assignment_removed", beforeStore);
+    notifyAssignmentScope(after, "assignment.change");
+  }
   return assignmentView(after, await lookupFor(organizationId));
 }
 
@@ -627,6 +634,7 @@ export async function revokeAssignment(admin: InternalAdminActor, organizationId
   const assignment = await requireAssignment(organizationId, appUserId, assignmentId);
   await UserAssignmentModel.updateOne({ assignmentId }, { $set: { status: "revoked", revokedAt: new Date() } });
   await auditAssignment(admin, "assignment.revoke", assignment);
+  await revokePersonLottery(appUserId, "assignment_removed", String(assignment.storeId));
   // By the assignment's scope: the user no longer has it, so notifying by user would miss it.
   notifyAssignmentScope(assignment, "assignment.revoke");
   return { ok: true as const };

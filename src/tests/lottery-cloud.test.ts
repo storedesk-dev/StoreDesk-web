@@ -5,11 +5,12 @@ import {
   LicenseModel,
   OrganizationModel,
   TenantStoreModel,
+  LotteryPcModel,
   UserAssignmentModel,
   WorkerInstallationModel
 } from "@/models/ControlPlane";
 import { publicId } from "@/lib/control-plane-security";
-import { DEVICE_TTL_SECONDS, mintSupabaseToken, readSupabaseToken } from "@/lib/supabase-token";
+import { lotteryWords, MOBILE_TO_LOTTERY, mintSupabaseToken, readSupabaseToken, USER_TTL_SECONDS } from "@/lib/supabase-token";
 import { buildStoreProjection, forbiddenInProjection, projectionFields } from "@/lib/supabase-projection";
 
 setupMemoryMongo();
@@ -25,41 +26,82 @@ afterEach(() => {
   delete process.env.SUPABASE_URL;
 });
 
+const person = (over: Partial<Parameters<typeof mintSupabaseToken>[0]> = {}) => ({
+  app: "lottery" as const,
+  appUserId: "user-1",
+  email: "Dana@Example.com",
+  storeId: "store-1",
+  pcId: "0b6c1d52-4a9e-4c55-9d7c-6f5a2d7e9b10",
+  pages: ["lottery", "lotteryClose"],
+  ...over
+});
+
 describe("the token the control plane mints", () => {
   it("can only ever be an ordinary authenticated token", () => {
-    const { token } = mintSupabaseToken({ kind: "device", org: "org-1", store: "store-1", sub: "dev-1" });
+    const { token } = mintSupabaseToken(person());
     const body = JSON.parse(Buffer.from(token.split(".")[1]!, "base64url").toString("utf8"));
     expect(body.role).toBe("authenticated");
     expect(JSON.stringify(body)).not.toContain("service_role");
   });
 
-  it("carries the store a PC is bound to, and the stores a person may reach", () => {
-    const device = readSupabaseToken(mintSupabaseToken({ kind: "device", org: "org-1", store: "store-1", sub: "dev-1" }).token);
-    expect(device.claims).toMatchObject({ kind: "device", store: "store-1" });
-
-    const person = readSupabaseToken(
-      mintSupabaseToken({
-        kind: "user",
-        org: "org-1",
-        user: "user-1",
-        email: "dana@example.com",
-        stores: ["store-1", "store-2"],
-        pages: ["lottery"]
-      }).token
-    );
-    expect(person.claims).toMatchObject({ kind: "user", stores: ["store-1", "store-2"], pages: ["lottery"] });
+  it("is always a person's, for exactly one store, with the PC it was minted for", () => {
+    const { claims } = readSupabaseToken(mintSupabaseToken(person()).token);
+    expect(claims).toEqual({
+      kind: "user",
+      app: "lottery",
+      user: "user-1",
+      email: "dana@example.com",
+      store: "store-1",
+      stores: ["store-1"],
+      pc: "0b6c1d52-4a9e-4c55-9d7c-6f5a2d7e9b10",
+      pages: ["lottery", "lotteryClose"]
+    });
   });
 
-  it("gives a PC an hour and a person a quarter of one", () => {
-    const device = mintSupabaseToken({ kind: "device", org: "org-1", store: "store-1", sub: "dev-1" });
-    const person = mintSupabaseToken({ kind: "user", org: "org-1", user: "u", email: "e@x.com", stores: [], pages: [] });
-    const seconds = (at: Date) => Math.round((at.getTime() - Date.now()) / 1000);
-    expect(seconds(device.expiresAt)).toBeGreaterThan(DEVICE_TTL_SECONDS - 5);
-    expect(seconds(person.expiresAt)).toBeLessThan(16 * 60);
+  it("cannot be minted for a device any more (D-26)", () => {
+    // The input has no kind: a caller cannot ask for anything but a person.
+    const { token } = mintSupabaseToken({ ...person(), kind: "device" } as never);
+    const body = JSON.parse(Buffer.from(token.split(".")[1]!, "base64url").toString("utf8"));
+    expect(body.sd.kind).toBe("user");
+    expect(body.sub).toBe("user-1");
+  });
+
+  it("drops anything that is not a lottery page, so the database checks one vocabulary", () => {
+    const { claims } = readSupabaseToken(mintSupabaseToken(person({ pages: ["lotterySettings", "pos", "lottery", "lottery"] })).token);
+    expect(claims.pages).toEqual(["lottery", "lotterySettings"]);
+  });
+
+  it("maps a phone's mobile keys to lottery words, never to correct or settings, and carries no PC", () => {
+    const { claims } = readSupabaseToken(
+      mintSupabaseToken(
+        person({
+          app: "mobile",
+          pages: [
+            "mobileLotteryRack",
+            "mobileLotteryInventory",
+            "mobileLotteryClose",
+            "mobileLotteryReports",
+            "mobileLotteryAnalytics",
+            "lotterySettings",
+            "lotteryCorrect"
+          ]
+        })
+      ).token
+    );
+    expect(claims.app).toBe("mobile");
+    expect(claims.pages).toEqual(["lottery", "lotteryClose", "lotteryReports"]);
+    expect(claims.pc).toBeUndefined();
+  });
+
+  it("gives a person a quarter of an hour", () => {
+    const { expiresAt } = mintSupabaseToken(person());
+    const seconds = Math.round((expiresAt.getTime() - Date.now()) / 1000);
+    expect(seconds).toBeGreaterThan(USER_TTL_SECONDS - 5);
+    expect(seconds).toBeLessThanOrEqual(USER_TTL_SECONDS);
   });
 
   it("refuses a token somebody edited", () => {
-    const { token } = mintSupabaseToken({ kind: "device", org: "org-1", store: "store-1", sub: "dev-1" });
+    const { token } = mintSupabaseToken(person());
     const [header, payload, signature] = token.split(".");
     const tampered = JSON.parse(Buffer.from(payload!, "base64url").toString("utf8"));
     tampered.sd.store = "another-store";
@@ -68,13 +110,17 @@ describe("the token the control plane mints", () => {
   });
 
   it("refuses a token that has run out", () => {
-    const { token } = mintSupabaseToken({ kind: "device", org: "org-1", store: "store-1", sub: "dev-1" }, -10);
+    const { token } = mintSupabaseToken(person(), -10);
     expect(() => readSupabaseToken(token)).toThrow(/expired/);
   });
 
   it("will not mint anything at all when the cloud is not set up", () => {
     delete process.env.SUPABASE_JWT_SECRET;
-    expect(() => mintSupabaseToken({ kind: "device", org: "o", store: "s", sub: "d" })).toThrow(/not configured/);
+    expect(() => mintSupabaseToken(person())).toThrow(/not configured/);
+  });
+
+  it("maps pages the same way everywhere", () => {
+    expect(lotteryWords("mobile", Object.keys(MOBILE_TO_LOTTERY))).toEqual(["lottery", "lotteryClose", "lotteryReports"]);
   });
 });
 
@@ -82,7 +128,9 @@ describe("the token the control plane mints", () => {
 
 const PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$abcdefgh$ijklmnop";
 
-async function fixture(options: { lotteryPages?: boolean; userStatus?: string } = {}) {
+const PC = "5f0e8a4c-1b2d-4e3f-9a8b-7c6d5e4f3a2b";
+
+async function fixture(options: { lotteryPages?: boolean; userStatus?: string; mobileOnly?: boolean } = {}) {
   const organizationId = publicId("org");
   const storeId = publicId("str");
   const appUserId = publicId("appu");
@@ -102,8 +150,18 @@ async function fixture(options: { lotteryPages?: boolean; userStatus?: string } 
         roleId: "clerk",
         roleName: "Clerk",
         accessKeys: {
-          lottery: { pages: options.lotteryPages === false ? [] : [{ key: "lottery", enabled: true, featureFlags: {} }] },
-          electron: { pages: [{ key: "pos", enabled: true, featureFlags: {} }] }
+          lottery: {
+            pages: options.lotteryPages === false || options.mobileOnly ? [] : [{ key: "lottery", enabled: true, featureFlags: {} }]
+          },
+          electron: { pages: [{ key: "pos", enabled: true, featureFlags: {} }] },
+          mobile: {
+            pages: options.mobileOnly
+              ? [
+                  { key: "mobileLotteryClose", enabled: true, featureFlags: {} },
+                  { key: "mobileLotteryRack", enabled: true, featureFlags: {} }
+                ]
+              : []
+          }
         }
       }
     ],
@@ -150,14 +208,14 @@ async function fixture(options: { lotteryPages?: boolean; userStatus?: string } 
     createdByAdminId: publicId("adm")
   });
 
-  await WorkerInstallationModel.create({
-    workerInstallationId: publicId("winst"),
-    organizationId,
+  await LotteryPcModel.create({
+    pcId: PC,
     storeId,
-    product: "lottery",
-    workerName: "StoreDesk Lottery",
+    organizationId,
+    pcName: "FRONT-PC",
     status: "active",
-    contactEmail: "dana@example.com"
+    boundAt: new Date(),
+    boundBy: appUserId
   });
 
   return { organizationId, storeId, appUserId };
@@ -170,11 +228,10 @@ describe("what the control plane tells the lottery cloud", () => {
 
     expect(projection.store).toMatchObject({ id: storeId, name: "Store 42", time_zone: "America/New_York", cloud_mode: "cloud" });
     expect(projection.licence).toMatchObject({ status: "active", number: "SD-STR-7K3Q92", scope: "store", offline_grace_days: 7 });
-    expect(projection.users).toEqual([
-      { id: appUserId, email: "dana@example.com", name: "Dana Patel", status: "active", password_hash: PASSWORD_HASH }
-    ]);
+    expect(projection.users).toEqual([{ id: appUserId, email: "dana@example.com", name: "Dana Patel", status: "active" }]);
     expect(projection.access).toEqual([{ user_id: appUserId, role: "clerk", pages: ["lottery"] }]);
-    expect(projection.device).toMatchObject({ status: "active", device_name: "StoreDesk Lottery" });
+    expect(projection.pcs).toEqual([{ id: PC, store_id: storeId, name: "FRONT-PC", status: "active" }]);
+    expect(projection).not.toHaveProperty("device");
   });
 
   it("never carries a tunnel token, a relay key or a register password", async () => {
@@ -197,13 +254,60 @@ describe("what the control plane tells the lottery cloud", () => {
     expect(Object.keys(projection.licence).sort()).toEqual([...projectionFields.licence].sort());
     expect(Object.keys(projection.users[0]!).sort()).toEqual([...projectionFields.users].sort());
     expect(Object.keys(projection.access[0]!).sort()).toEqual([...projectionFields.access].sort());
-    expect(Object.keys(projection.device!).sort()).toEqual([...projectionFields.device].sort());
+    expect(Object.keys(projection.pcs[0]!).sort()).toEqual([...projectionFields.pcs].sort());
   });
 
-  it("carries the password hash, because that is what lets a PC sign somebody in with the line down", async () => {
+  it("never carries a password hash (D-26): a lottery PC keeps its own verifier", async () => {
     const { storeId } = await fixture();
+    const text = JSON.stringify(await buildStoreProjection(storeId));
+    expect(text).not.toContain(PASSWORD_HASH);
+    expect(text).not.toContain("argon2");
+    expect(text).not.toContain("password");
+  });
+
+  it("gives a phone-only lottery role its pages in lottery words", async () => {
+    const { storeId, appUserId } = await fixture({ mobileOnly: true });
     const projection = (await buildStoreProjection(storeId))!;
-    expect(projection.users[0]?.password_hash).toBe(PASSWORD_HASH);
+    expect(projection.access).toEqual([{ user_id: appUserId, role: "clerk", pages: ["lottery", "lotteryClose"] }]);
+  });
+
+  it("revokes a replaced PC at once, but not one that is live again somewhere", async () => {
+    const { storeId, organizationId, appUserId } = await fixture();
+    const other = "11111111-2222-4333-8444-555555555555";
+    await LotteryPcModel.updateOne({ pcId: PC }, { status: "replaced", replacedBy: other });
+    await LotteryPcModel.create({ pcId: other, storeId, organizationId, pcName: "BACK-PC", status: "active", boundAt: new Date(), boundBy: appUserId });
+    let projection = (await buildStoreProjection(storeId))!;
+    expect(projection.revoked).toContain(PC);
+    expect(projection.revoked).not.toContain(other);
+    expect(projection.pcs.map((pc) => pc.status).sort()).toEqual(["active", "replaced"]);
+
+    // The same PC bound again at another store: its id must not stay on a revocation list.
+    await LotteryPcModel.create({
+      pcId: PC,
+      storeId: publicId("str"),
+      organizationId,
+      pcName: "FRONT-PC",
+      status: "active",
+      boundAt: new Date(),
+      boundBy: appUserId
+    });
+    projection = (await buildStoreProjection(storeId))!;
+    expect(projection.revoked).not.toContain(PC);
+  });
+
+  it("names the lottery installations D-26 retired, so a device token still alive dies", async () => {
+    const { storeId, organizationId } = await fixture();
+    await WorkerInstallationModel.create({
+      workerInstallationId: "winst_retired",
+      organizationId,
+      storeId,
+      product: "lottery",
+      workerName: "StoreDesk Lottery",
+      status: "revoked",
+      contactEmail: "dana@example.com"
+    });
+    const projection = (await buildStoreProjection(storeId))!;
+    expect(projection.revoked).toContain("winst_retired");
   });
 
   it("revokes somebody whose role carries no lottery page rather than sending them over", async () => {

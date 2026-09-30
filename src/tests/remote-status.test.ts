@@ -201,8 +201,6 @@ describe("where it shows", () => {
         storeNumber: "42",
         tunnelUrl: "https://cf-lookup-down.tunnels.example",
         setup: expect.stringMatching(/^(active|awaiting_activation|none)$/),
-        // For the lottery app's store picker: states and a date, never a PC name or a licence number.
-        lottery: { hasLottery: false, appEnabled: false, pc: null },
         licence: { covered: true, status: "active" },
         remote: { status: "offline", since: "2026-09-12T20:14:00.000Z" }
       },
@@ -213,7 +211,6 @@ describe("where it shows", () => {
         storeNumber: null,
         tunnelUrl: null,
         setup: "none",
-        lottery: { hasLottery: false, appEnabled: false, pc: null },
         licence: { covered: false, status: null },
         remote: { status: "unknown", since: null }
       }

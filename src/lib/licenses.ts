@@ -30,8 +30,22 @@ import type { InternalAdminActor } from "@/lib/admin-auth";
 
 type Doc = Record<string, unknown>;
 
+/**
+ * `trialing` is still read as entitled (until its end date) because a record written before D-23
+ * may hold it until the startup migration converts it. Nothing writes it any more: a licence is
+ * granted by us for the agreed term, and there is no automatic trial nobody granted.
+ */
 export const ENTITLED_STATUSES = ["trialing", "active"];
+/** Every status a stored licence can hold, the legacy `trialing` included. */
 export const LICENSE_STATUSES = ["trialing", "active", "suspended", "cancelled", "expired"] as const;
+/** The statuses staff can set (D-23: no trialing). */
+export const SETTABLE_LICENSE_STATUSES = ["active", "suspended", "cancelled", "expired"] as const;
+/** Every plan a stored licence can hold, the legacy `trial` included. */
+export const LICENSE_PLANS = ["trial", "standard", "custom"] as const;
+/** The plans staff can issue or switch to (D-23: no trial). */
+export const ISSUABLE_PLANS = ["standard", "custom"] as const;
+/** A new licence's term when staff give no end: the standard year. */
+export const DEFAULT_TERM_DAYS = 365;
 const DAY_MS = 86_400_000;
 const DEFAULT_PCS = 1;
 const DEFAULT_GRACE = 7;
@@ -194,7 +208,7 @@ export type LicenseView = ReturnType<typeof licenseView>;
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
-const planSchema = z.enum(["trial", "standard", "custom"]);
+const planSchema = z.enum(ISSUABLE_PLANS);
 const dateInput = z
   .string()
   .trim()
@@ -207,7 +221,7 @@ const daysSchema = z.number().int().min(1).max(3650);
 
 const newLicenseShape = {
   plan: planSchema,
-  status: z.enum(["trialing", "active"]).optional(),
+  status: z.enum(["active"]).optional(),
   entitlementDays: daysSchema.optional(),
   entitlementExpiresAt: dateInput.optional(),
   offlineGraceDays: graceSchema.optional(),
@@ -218,7 +232,7 @@ const oneEndDate = (body: { entitlementDays?: number; entitlementExpiresAt?: Dat
   !(body.entitlementDays && body.entitlementExpiresAt);
 const ONE_END_DATE = { message: "Give entitlementDays or entitlementExpiresAt, not both" };
 
-/** A new license's terms: plan, status, end (days or date), grace, PCs per store, notes. */
+/** A new license's terms: plan (Standard or Custom), end (days or date), grace, PCs per store, notes. It starts active. */
 export const NewLicenseSchema = z.object(newLicenseShape).strict().refine(oneEndDate, ONE_END_DATE);
 export type NewLicense = z.output<typeof NewLicenseSchema>;
 
@@ -230,7 +244,7 @@ export type LicenseCreate = z.output<typeof LicenseCreateSchema>;
 
 const patchShape = {
   plan: planSchema.optional(),
-  status: z.enum(LICENSE_STATUSES).optional(),
+  status: z.enum(SETTABLE_LICENSE_STATUSES).optional(),
   entitlementExpiresAt: dateInput.optional(),
   renewDays: daysSchema.optional(),
   offlineGraceDays: graceSchema.optional(),
@@ -275,7 +289,7 @@ function storeLicenseExists(existing: Doc | null): ControlPlaneError {
 
 /** Start and end of a new license; 400 for an end date that is not in the future. */
 function licenseTerms(input: NewLicense, now = new Date()) {
-  const days = input.entitlementDays ?? (input.plan === "trial" ? 30 : 365);
+  const days = input.entitlementDays ?? DEFAULT_TERM_DAYS;
   const ends = input.entitlementExpiresAt ?? new Date(now.getTime() + days * DAY_MS);
   if (ends <= now) throw new ControlPlaneError(400, "REQUEST_INVALID", "entitlementExpiresAt: must be in the future");
   return { startsAt: now, entitlementExpiresAt: ends };
@@ -293,7 +307,7 @@ function licenseDoc(organizationId: string, storeId: string, input: NewLicense):
     scope: "store",
     storeId,
     plan: input.plan,
-    status: input.status ?? (input.plan === "trial" ? "trialing" : "active"),
+    status: "active",
     ...licenseTerms(input),
     offlineGraceDays: input.offlineGraceDays ?? DEFAULT_GRACE,
     maxPcsPerStore: input.maxPcsPerStore ?? DEFAULT_PCS,
@@ -440,12 +454,13 @@ export async function updateLicense(admin: InternalAdminActor, organizationId: s
     const base = currentEnd && currentEnd > now ? currentEnd : now;
     set.entitlementExpiresAt = new Date(base.getTime() + body.renewDays * DAY_MS);
     // Renewing a lapsed license brings it back; a suspended one stays suspended.
-    if (!body.status && current.status === "expired") {
-      set.status = (body.plan ?? current.plan) === "trial" ? "trialing" : "active";
-    }
+    if (!body.status && current.status === "expired") set.status = "active";
   }
   if (body.entitlementExpiresAt) set.entitlementExpiresAt = body.entitlementExpiresAt;
   if (body.status) set.status = body.status;
+  // An old record (before D-23) is brought forward by any edit: trialing becomes active, trial Standard.
+  if (!set.status && current.status === "trialing") set.status = "active";
+  if (!set.plan && current.plan === "trial") set.plan = "standard";
   if (body.status === "cancelled") unset.coverageKey = 1;
 
   if (body.maxPcsPerStore !== undefined) {
@@ -531,7 +546,7 @@ export async function upsertStoreLicense(admin: InternalAdminActor, storeId: str
       { storeId, name: String(store.name) },
       {
         plan: body.plan,
-        status: body.status as "trialing" | "active" | undefined,
+        status: body.status as "active" | undefined,
         entitlementDays: body.entitlementDays,
         entitlementExpiresAt: body.entitlementExpiresAt,
         offlineGraceDays: body.offlineGraceDays,

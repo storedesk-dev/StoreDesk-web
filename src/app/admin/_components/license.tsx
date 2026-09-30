@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useToast } from "@/components/ToastContext";
-import { api, errorMessage, type License, type LicensePlan, type NewLicenseInput } from "../_lib/api";
+import { api, errorMessage, type IssuablePlan, type License, type LicensePlan, type NewLicenseInput } from "../_lib/api";
 import { daysLeftLabel, daysUntil, formatDate, plural } from "../_lib/format";
 import { Button, Card, ConfirmDialog, DefinitionList, Dialog, Field, Input, Notice, Select, Textarea } from "./ui";
 import { RowMenu } from "./Menu";
@@ -16,10 +16,28 @@ import { LicenseStatusChip } from "./status";
  * resume, cancel — on a store's License tab.
  */
 
-export const PLAN_LABEL: Record<LicensePlan, string> = { trial: "Trial", standard: "Standard", custom: "Custom" };
-export const PLAN_DEFAULT_DAYS: Record<LicensePlan, number> = { trial: 30, standard: 365, custom: 365 };
+/**
+ * There is no trial (D-23): staff issue Standard or Custom for the term agreed. `trial` is kept
+ * only so a record written before the migration still reads, as "Trial (old)".
+ */
+export const PLAN_LABEL: Record<LicensePlan, string> = { trial: "Trial (old)", standard: "Standard", custom: "Custom" };
+export const ISSUABLE_PLANS: readonly IssuablePlan[] = ["standard", "custom"];
+export const PLAN_DEFAULT_DAYS: Record<IssuablePlan, number> = { standard: 365, custom: 365 };
+/** An old `trialing` licence counts as active until its end date, like the server's entitlement check. */
 export const inForce = (license: { status: string } | null | undefined) =>
   license?.status === "active" || license?.status === "trialing";
+
+function PlanOptions() {
+  return (
+    <>
+      {ISSUABLE_PLANS.map((plan) => (
+        <option key={plan} value={plan}>
+          {PLAN_LABEL[plan]}
+        </option>
+      ))}
+    </>
+  );
+}
 
 const storeHref = (orgId: string, storeId: string, tab?: string) =>
   `/admin/organizations/${encodeURIComponent(orgId)}/stores/${encodeURIComponent(storeId)}${tab ? `?tab=${tab}` : ""}`;
@@ -39,7 +57,7 @@ export function LicenseEnds({ license }: { license: { entitlementExpiresAt: stri
 // ── Create / edit ────────────────────────────────────────────────────────────
 
 export interface LicenseFormValues {
-  plan: LicensePlan;
+  plan: IssuablePlan;
   entitlementDays: number;
   maxPcsPerStore: number;
   offlineGraceDays: number;
@@ -57,13 +75,11 @@ export function NewLicenseFields({ value, onChange }: { value: NewLicenseInput; 
             {...p}
             value={value.plan}
             onChange={(e) => {
-              const plan = e.target.value as LicensePlan;
+              const plan = e.target.value as IssuablePlan;
               onChange({ ...value, plan, entitlementDays: PLAN_DEFAULT_DAYS[plan] });
             }}
           >
-            <option value="trial">Trial</option>
-            <option value="standard">Standard</option>
-            <option value="custom">Custom</option>
+            <PlanOptions />
           </Select>
         )}
       </Field>
@@ -106,7 +122,7 @@ export function LicenseFormDialog({
   onClose: () => void;
   onSubmit: (values: LicenseFormValues) => Promise<void>;
 }) {
-  const [plan, setPlan] = useState<LicensePlan>("standard");
+  const [plan, setPlan] = useState<IssuablePlan>("standard");
   const [days, setDays] = useState("365");
   const [pcs, setPcs] = useState("1");
   const [grace, setGrace] = useState("7");
@@ -117,7 +133,8 @@ export function LicenseFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setPlan(license?.plan ?? "standard");
+    // An old trial record is offered as Standard: saving never writes the trial plan back.
+    setPlan(license?.plan === "custom" ? "custom" : "standard");
     setDays("365");
     setPcs(String(license?.maxPcsPerStore ?? 1));
     setGrace(String(license?.offlineGraceDays ?? 7));
@@ -208,14 +225,12 @@ export function LicenseFormDialog({
               {...p}
               value={plan}
               onChange={(e) => {
-                const next = e.target.value as LicensePlan;
+                const next = e.target.value as IssuablePlan;
                 setPlan(next);
                 if (mode !== "edit") setDays(String(PLAN_DEFAULT_DAYS[next]));
               }}
             >
-              <option value="trial">Trial</option>
-              <option value="standard">Standard</option>
-              <option value="custom">Custom</option>
+              <PlanOptions />
             </Select>
           )}
         </Field>
@@ -347,7 +362,7 @@ export function useLicenseActions(orgId: string, license: License, onChanged: ()
   async function resume() {
     setResuming(true);
     try {
-      await api.updateLicense(orgId, license.licenseId, { status: license.plan === "trial" ? "trialing" : "active" });
+      await api.updateLicense(orgId, license.licenseId, { status: "active" });
       toast(`${license.licenseNumber} resumed`, "success");
       onChanged();
     } catch (e) {

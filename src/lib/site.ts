@@ -57,8 +57,6 @@ export const CAPABILITIES = {
 
 /** Real limits from the control plane, not aspirational ones. */
 export const PLANS = {
-  trialDays: 30,
-  standardDays: 365,
   /** A license's default PCs per store. */
   defaultMaxWorkers: 1,
   /** CLIENT_SESSION_TTL_SECONDS — one retail shift. */

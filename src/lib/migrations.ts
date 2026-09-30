@@ -2,11 +2,16 @@ import {
   AppUserModel,
   LicenseModel,
   OrganizationModel,
+  SetupKeyModel,
   TenantStoreModel,
-  UserAssignmentModel
+  UserAssignmentModel,
+  WorkerCredentialModel,
+  WorkerInstallationModel
 } from "@/models/ControlPlane";
 import { publicId } from "@/lib/control-plane-security";
 import { coverageKeyFor, newLicenseNumber } from "@/lib/licenses";
+import { writeAudit } from "@/lib/audit";
+import { LOTTERY } from "@/lib/products";
 
 /**
  * Data migrations, run once per server process right after the database
@@ -254,6 +259,111 @@ export async function migrateStoreScopedAccess(): Promise<StoreAccessReport> {
   return { expanded, orphans };
 }
 
+export type LotterySignInReport = { keys: number; credentials: number; installations: number; activeBefore: number };
+
+export const D26_REASON = "d26_lottery_sign_in";
+
+/**
+ * `2026-09-29-lottery-sign-in` (D-26, docs/design/lottery-sign-in.md §6). StoreDesk Lottery signs in
+ * with email and password now, so everything the old chain issued is revoked:
+ *
+ *   1. Count the live lottery installations first, for the audit line (expected zero: the access
+ *      sync refused every lottery credential, so no PC could finish the old setup).
+ *   2. Every lottery setup key — issued for lottery, or for a lottery installation — is revoked.
+ *   3. Every worker credential of a lottery installation is revoked.
+ *   4. Every lottery installation is revoked, and its store's projection version goes up, so the
+ *      hourly reconcile pushes a projection whose revocation list names it.
+ *   5. (In `redeemSetupKey`, not here: a non-StoreDesk installation's key is refused WRONG_PRODUCT.)
+ *   6. One audit line with the counts, only when something changed.
+ *
+ * Idempotent: every step filters on what is not revoked yet, so a second run changes nothing.
+ */
+export async function migrateLotterySignIn(): Promise<LotterySignInReport> {
+  const now = new Date();
+  const installations = (await WorkerInstallationModel.find({ product: LOTTERY })
+    .select("workerInstallationId storeId status")
+    .lean()) as Doc[];
+  const ids = installations.map((row) => String(row.workerInstallationId));
+  const activeBefore = installations.filter((row) => row.status === "active").length;
+
+  const keys = await SetupKeyModel.updateMany(
+    {
+      status: { $ne: "revoked" },
+      $or: [{ deliveryReason: "lottery_setup" }, ...(ids.length ? [{ workerInstallationId: { $in: ids } }] : [])]
+    },
+    { $set: { status: "revoked", revokedAt: now, revokedReason: D26_REASON } }
+  );
+  const credentials = ids.length
+    ? await WorkerCredentialModel.updateMany(
+        { workerInstallationId: { $in: ids }, status: { $ne: "revoked" } },
+        { $set: { status: "revoked", revokedAt: now, revokedReason: D26_REASON } }
+      )
+    : { modifiedCount: 0 };
+  const live = installations.filter((row) => row.status !== "revoked");
+  const retired = live.length
+    ? await WorkerInstallationModel.updateMany(
+        { product: LOTTERY, status: { $ne: "revoked" } },
+        { $set: { status: "revoked", revokedAt: now }, $unset: { workerCredentialId: 1 } }
+      )
+    : { modifiedCount: 0 };
+  const storeIds = [...new Set(live.map((row) => String(row.storeId ?? "")).filter(Boolean))];
+  if (storeIds.length) await TenantStoreModel.updateMany({ storeId: { $in: storeIds } }, { $inc: { projectionVersion: 1 } });
+
+  const report: LotterySignInReport = {
+    keys: Number(keys.modifiedCount ?? 0),
+    credentials: Number(credentials.modifiedCount ?? 0),
+    installations: Number(retired.modifiedCount ?? 0),
+    activeBefore
+  };
+  if (report.keys || report.credentials || report.installations) {
+    await writeAudit({
+      actorType: "system",
+      actorId: "migration",
+      action: "lottery.d26_migrated",
+      targetType: "migration",
+      targetId: "2026-09-29-lottery-sign-in",
+      metadata: report
+    });
+  }
+  return report;
+}
+
+export type NoTrialReport = { trialing: number; trialPlans: number };
+
+/**
+ * D-23: a licence is granted by us for the agreed term, and a new store is Unlicensed — there is no
+ * automatic trial nobody granted. Records written before that may still say status `trialing` or
+ * plan `trial`; they read as active until their end date already, and this makes the record say so:
+ *
+ *   · status `trialing` → `active`
+ *   · plan `trial` → `standard`
+ *
+ * Dates are left exactly as they are, so nobody gains or loses a day: a trialing licence past its
+ * end becomes active here and `expireLapsedLicenses` marks it expired on the next read, as it would
+ * have been. The store PCs accept both statuses, so nothing is pushed to them.
+ *
+ * Idempotent: each update filters on the old value, so a second run changes nothing.
+ */
+export async function migrateNoTrial(): Promise<NoTrialReport> {
+  const trialing = await LicenseModel.updateMany({ status: "trialing" }, { $set: { status: "active" } });
+  const trialPlans = await LicenseModel.updateMany({ plan: "trial" }, { $set: { plan: "standard" } });
+  const report: NoTrialReport = {
+    trialing: Number(trialing.modifiedCount ?? 0),
+    trialPlans: Number(trialPlans.modifiedCount ?? 0)
+  };
+  if (report.trialing || report.trialPlans) {
+    await writeAudit({
+      actorType: "system",
+      actorId: "migration",
+      action: "license.d23_no_trial",
+      targetType: "migration",
+      targetId: "2026-09-30-no-trial",
+      metadata: report
+    });
+  }
+  return report;
+}
+
 export async function runMigrations(): Promise<void> {
   const identity = await migrateEmailIdentity();
   if (identity.verified > 0 || identity.duplicates > 0) {
@@ -270,9 +380,20 @@ export async function runMigrations(): Promise<void> {
     console.info(`[migrate] store-scoped licenses: ${JSON.stringify(licenses)}`);
   }
 
+  // After the master copy above, which carries a master's plan and status across.
+  const noTrial = await migrateNoTrial();
+  if (noTrial.trialing || noTrial.trialPlans) {
+    console.info(`[migrate] 2026-09-30-no-trial: ${JSON.stringify(noTrial)}`);
+  }
+
   const access = await migrateStoreScopedAccess();
   if (access.expanded > 0 || access.orphans > 0) {
     console.info(`[migrate] store-scoped access: ${JSON.stringify(access)}`);
+  }
+
+  const lottery = await migrateLotterySignIn();
+  if (lottery.keys || lottery.credentials || lottery.installations) {
+    console.info(`[migrate] 2026-09-29-lottery-sign-in: ${JSON.stringify(lottery)}`);
   }
 
   const capabilities = await reportCapabilityDefaults();

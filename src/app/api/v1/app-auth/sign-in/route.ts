@@ -10,8 +10,9 @@ import { jsonError, parseBody } from "@/lib/http";
  * Answers who the person is and every store they can reach, as a flat list:
  * one store goes straight in, several show a picker (D-18). It
  * mints nothing — a StoreDesk app still signs in at its own store server, and
- * the lottery token comes from a separate route in P2 — so what this returns
- * is a directory answer, not a session.
+ * StoreDesk Lottery signs in at `/api/v1/lottery/sign-in` (D-26), which runs
+ * the same password check and mints the person's cloud token — so what this
+ * returns is a directory answer, not a session.
  *
  * Public, therefore rate-limited twice: in front of the database by caller, and
  * inside `signIn` per address and per email, counted before the password is

@@ -12,8 +12,17 @@ import type { StoreCapability } from "@/config/pages";
 // ── Shared shapes ────────────────────────────────────────────────────────────
 
 export type OrgStatus = "active" | "suspended" | "pending";
+/**
+ * A licence's status and plan as read. `trialing` and plan `trial` only turn up on a record written
+ * before D-23 (the startup migration converts them); staff can no longer set either — a licence is
+ * granted for the agreed term, and there is no trial.
+ */
 export type LicenseStatus = "trialing" | "active" | "suspended" | "cancelled" | "expired";
 export type LicensePlan = "trial" | "standard" | "custom";
+/** The plans staff can issue or switch a licence to (D-23: no trial). */
+export type IssuablePlan = "standard" | "custom";
+/** The statuses staff can set: `trialing` is read only. */
+export type SettableLicenseStatus = Exclude<LicenseStatus, "trialing">;
 /** Always "store" on anything issued since D-22; older rows may still say "organization". */
 export type LicenseScope = "organization" | "store";
 export type StoreStatus = "pending" | "active" | "suspended" | "closed";
@@ -100,8 +109,7 @@ export interface StoreLicenseSummary {
 }
 
 export interface NewLicenseInput {
-  plan: LicensePlan;
-  status?: "trialing" | "active";
+  plan: IssuablePlan;
   entitlementDays?: number;
   entitlementExpiresAt?: string;
   maxPcsPerStore?: number;
@@ -115,8 +123,8 @@ export interface LicenseCreateInput extends NewLicenseInput {
 }
 
 export type LicensePatch = Partial<{
-  plan: LicensePlan;
-  status: LicenseStatus;
+  plan: IssuablePlan;
+  status: SettableLicenseStatus;
   renewDays: number;
   entitlementExpiresAt: string;
   maxPcsPerStore: number;
@@ -242,12 +250,15 @@ export interface StoreSetup {
   keyBlockedCode?: string | null;
 }
 
+/** The store's StoreDesk Lottery PC (D-26): bound by a person signing in, never by a key. */
 export interface LotteryPc {
-  workerInstallationId: string;
+  pcName: string;
   status: string;
-  deviceName: string | null;
-  activatedAt: string | null;
-  hasOpenKey: boolean;
+  boundAt: string | null;
+  /** The email of the person who bound it. */
+  boundBy: string;
+  lastSeenAt: string | null;
+  appVersion: string | null;
 }
 
 export interface IssuedSetupKey {
@@ -608,12 +619,12 @@ export const api = {
     request<StoreSetup>("GET", `${store(storeId)}/setup`),
   issueSetupKey: (storeId: string, deliver: "show" | "email") =>
     request<IssuedSetupKey>("POST", `${store(storeId)}/setup-keys`, { deliver }),
-  /** The store's StoreDesk Lottery PC, if one is set up. */
+  /** The store's StoreDesk Lottery PC, if one is bound, and the cloud's view of it. */
   getLotteryPc: (storeId: string) =>
-    request<{ installation: LotteryPc | null }>("GET", `${store(storeId)}/lottery/setup-keys`),
-  /** Audited `lottery.setup_key.issue`. The key is in this answer only. */
-  issueLotterySetupKey: (storeId: string) =>
-    request<{ setupKey: string; keyId: string; storeName: string }>("POST", `${store(storeId)}/lottery/setup-keys`, {}),
+    request<{ pc: LotteryPc | null; health: Record<string, unknown> | null }>("GET", `${store(storeId)}/lottery`),
+  /** Audited `lottery_pc.released`. The next person to sign in on any PC can pick the store. */
+  releaseLotteryPc: (storeId: string) =>
+    request<{ ok: true }>("POST", `${store(storeId)}/lottery/pc/release`),
   /** Audited `setup_key.reveal`; call only on an explicit click. */
   revealSetupKey: (storeId: string) =>
     request<{ keyId: string; setupKey: string; workerInstallationId: string }>("GET", `${store(storeId)}/setup-keys/current`),

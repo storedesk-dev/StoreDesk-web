@@ -92,6 +92,11 @@ const LicenseSchema = new Schema(
     scope: { type: String, enum: ["organization", "store"], required: true },
     /** Required when scope is "store". */
     storeId: { type: String, index: true },
+    /**
+     * `trial` (and status `trialing`) stay in the enums only so a record written before D-23 still
+     * loads and validates; nothing writes them now — there is no trial, and the startup migration
+     * (`migrateNoTrial`) turns them into standard / active. Staff input is checked in lib/licenses.ts.
+     */
     plan: { type: String, enum: ["trial", "standard", "custom"], required: true },
     /** `expired` is written by a check on read once `entitlementExpiresAt` has passed. */
     status: {
@@ -263,10 +268,13 @@ const WorkerInstallationSchema = new Schema(
         "degraded",
         "suspended",
         "updating",
-        "rollback"
+        "rollback",
+        // Only lottery installations, retired by D-26: a lottery PC signs in with a person now.
+        "revoked"
       ],
       default: "awaiting_activation"
     },
+    revokedAt: Date,
     platform: { type: String, enum: ["windows", "macos", "linux"] },
     workerVersion: String,
     electronVersion: String,
@@ -332,6 +340,8 @@ const SetupKeySchema = new Schema(
     lastRedeemedAt: Date,
     redeemCount: { type: Number, default: 0 },
     revokedAt: Date,
+    /** Why an admin or a migration revoked it, e.g. `d26_lottery_sign_in`. */
+    revokedReason: { type: String },
     attempts: { type: Number, default: 0 },
     maxAttempts: { type: Number, default: 8 },
     deliveryProvider: String,
@@ -388,7 +398,8 @@ const WorkerCredentialSchema = new Schema(
     issuedAt: { type: Date, required: true },
     expiresAt: Date,
     overlapEndsAt: Date,
-    revokedAt: Date
+    revokedAt: Date,
+    revokedReason: { type: String }
   },
   timestamps
 );
@@ -545,6 +556,91 @@ const SupportCodeSchema = new Schema(
   timestamps
 );
 
+/**
+ * The PC that runs StoreDesk Lottery for a store (D-26). A person binds it by signing in with email
+ * and password; there is no setup key, claim or device credential. One `active` row per store and
+ * one per PC. The rest are history: `replaced` when another PC took over, `unbound` when someone
+ * switched store or an admin released it.
+ */
+const LotteryPcSchema = new Schema(
+  {
+    /** The id the PC made for itself (uuid). An identifier, never a secret. */
+    pcId: { type: String, required: true, index: true },
+    storeId: id,
+    organizationId: { type: String, index: true },
+    pcName: { type: String, required: true, trim: true },
+    status: { type: String, enum: ["active", "replaced", "unbound"], default: "active" },
+    boundAt: { type: Date, required: true },
+    /** The person who bound it (appUserId), and their email for the admin card. */
+    boundBy: { type: String, required: true },
+    boundByEmail: { type: String, lowercase: true, trim: true },
+    /** How it was bound: the picker, or the first online sign-in of a PC set up before D-26. */
+    boundVia: { type: String, enum: ["picker", "legacy"], default: "picker" },
+    replacedBy: { type: String },
+    endedAt: Date,
+    endedBy: { type: String },
+    lastSeenAt: Date,
+    appVersion: { type: String, trim: true }
+  },
+  timestamps
+);
+LotteryPcSchema.index({ storeId: 1 }, { unique: true, partialFilterExpression: { status: "active" }, name: "one_active_per_store" });
+LotteryPcSchema.index({ pcId: 1, status: 1 }, { unique: true, partialFilterExpression: { status: "active" }, name: "one_active_per_pc" });
+
+/**
+ * A person's refresh credential on one lottery PC: `lrt_<familyId>.<secret>`. One document per
+ * family; every use rotates it, and only the SHA-256 of the current secret and of the last few
+ * generations is kept. Presenting an older generation revokes the family (it was copied).
+ */
+const LotteryRefreshCredentialSchema = new Schema(
+  {
+    familyId: { ...id, unique: true },
+    generation: { type: Number, required: true, default: 1 },
+    hash: { type: String, required: true, select: false },
+    /** Hashes of the generations before this one, newest last, to tell reuse from a bad guess. */
+    previousHashes: { type: [String], default: [], select: false },
+    appUserId: id,
+    storeId: id,
+    /** Set for a lottery PC. A phone family (lottery-cloud P5) has a deviceId instead. */
+    pcId: { type: String, index: true, default: null },
+    deviceId: { type: String, default: null },
+    app: { type: String, enum: ["lottery", "mobile"], default: "lottery" },
+    status: { type: String, enum: ["active", "revoked"], default: "active" },
+    lastUsedAt: Date,
+    idleExpiresAt: { type: Date, required: true },
+    absoluteExpiresAt: { type: Date, required: true },
+    revokedAt: Date,
+    revokedReason: { type: String },
+    /** absoluteExpiresAt + 30 days: the TTL index drops the row then. */
+    purgeAt: { type: Date, required: true }
+  },
+  timestamps
+);
+LotteryRefreshCredentialSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0 });
+LotteryRefreshCredentialSchema.index({ appUserId: 1, status: 1 });
+
+/**
+ * Proof that a person's password was checked a moment ago, for the store picker's bind. Five
+ * minutes, once, tied to the person and the PC. Only its SHA-256 is stored; the TTL drops it.
+ */
+const LotterySignInTicketSchema = new Schema(
+  {
+    hash: { type: String, required: true, unique: true },
+    appUserId: { type: String, required: true },
+    pcId: { type: String, required: true },
+    storeIds: { type: [String], default: [] },
+    expiresAt: { type: Date, required: true },
+    usedAt: Date
+  },
+  { timestamps: true, versionKey: false }
+);
+LotterySignInTicketSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 60 * 60 });
+
+export const LotteryPcModel = models.LotteryPc || model("LotteryPc", LotteryPcSchema);
+export const LotteryRefreshCredentialModel =
+  models.LotteryRefreshCredential || model("LotteryRefreshCredential", LotteryRefreshCredentialSchema);
+export const LotterySignInTicketModel =
+  models.LotterySignInTicket || model("LotterySignInTicket", LotterySignInTicketSchema);
 export const SupportCodeModel = models.SupportCode || model("SupportCode", SupportCodeSchema);
 export const LoginThrottleModel = models.LoginThrottle || model("LoginThrottle", LoginThrottleSchema);
 export const InternalAdminModel =

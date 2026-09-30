@@ -23,8 +23,7 @@ import {
   verifySecret,
   enforceRateLimit
 } from "@/lib/control-plane-security";
-import { LOTTERY, productFilter } from "@/lib/products";
-import { normalizeStoreSettings } from "@/lib/store-settings";
+import { STOREDESK, productOf } from "@/lib/products";
 import { abortTransaction, commitTransaction, startTransaction, withSession } from "@/lib/db";
 import { DEFAULT_ORG_ROLES } from "@/lib/roles";
 import { loadNotifyTargets, notifyInstallations, runAfterResponse, scheduleAppUserNotify, type NotifyTarget } from "@/lib/store-notify";
@@ -156,6 +155,17 @@ export async function redeemSetupKey(body: RedeemBody) {
     .lean();
   if (!key || !(await verifySecret(String(key.secretHash), parsed.secret))) {
     throw invalidKey();
+  }
+  // StoreDesk keys only, checked before anything is consumed. The mirror of the guard the other way
+  // (a lottery credential on a StoreDesk route is WRONG_PRODUCT in authenticateWorker): a key whose
+  // installation is not a StoreDesk one must never activate a PC and be handed the store's tunnel
+  // token, relay key and register configuration. No lottery key has been issued since D-26, and the
+  // migration revoked the ones out there; this stays so that can never come back (audit F-03).
+  const keyInstallation = await WorkerInstallationModel.findOne({ workerInstallationId: key.workerInstallationId })
+    .select("product")
+    .lean();
+  if (keyInstallation && productOf(keyInstallation as { product?: unknown }) !== STOREDESK) {
+    throw new ControlPlaneError(409, "WRONG_PRODUCT", "That setup key is not for StoreDesk");
   }
   // A reusable key (lib/store-setup-key.ts) never expires and is never used
   // up: it activates the installation again, on this PC or another, until an
@@ -706,36 +716,9 @@ export async function lookupOrganization(rawSlug: string) {
   // Tunnel URL, whether the store PC has been activated, and whether phones can reach it now — shared
   // with the email sign-in's store list (`lib/store-reach.ts`) so the two answers never drift.
   const reach = await storeReach(stores);
-  const storeIds = stores.map((s) => String(s.storeId));
-
-  // The lottery app's first screen needs the same list, for its own product: whether the store sells
-  // lottery, whether it is switched on for the app, whether a PC already holds its setup, and whether
-  // a licence covers it. This route is public, so it answers with states and dates and never with a
-  // store's PC name, its licence number or anything a caller could not already learn from the tag.
-  const [lotteryPcs, licenses] = (await Promise.all([
-    WorkerInstallationModel.find({ storeId: { $in: storeIds }, ...productFilter(LOTTERY) })
-      .select({ storeId: 1, status: 1, activatedAt: 1, createdAt: 1 })
-      .sort({ createdAt: -1 })
-      .lean(),
-    coveringLicenses(stores)
-  ])) as [Doc[], Map<string, Doc>];
-
-  const isoDate = (value: unknown): string | null => {
-    const date = value instanceof Date ? value : value ? new Date(String(value)) : null;
-    return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
-  };
-
-  const lotteryOf = (store: Doc) => {
-    const settings = normalizeStoreSettings(store.settings);
-    const pc = lotteryPcs.find(
-      (row) => String(row.storeId) === String(store.storeId) && LIVE_INSTALLATION.includes(String(row.status))
-    );
-    return {
-      hasLottery: settings.capabilities.lottery === true,
-      appEnabled: settings.capabilities.lottery === true,
-      pc: pc ? { claimedAt: isoDate(pc.activatedAt ?? pc.createdAt) } : null
-    };
-  };
+  // Whether a licence covers each store: a state, never the licence number. (The lottery block that
+  // used to sit here went with the org tag in StoreDesk Lottery, D-26: that app signs in by email.)
+  const licenses = await coveringLicenses(stores);
 
   const licenceOf = (store: Doc) => {
     const license = licenses.get(String(store.storeId)) ?? null;
@@ -750,7 +733,6 @@ export async function lookupOrganization(rawSlug: string) {
       storeNumber: store.storeNumber ? String(store.storeNumber) : null,
       tunnelUrl: reach.get(String(store.storeId))?.tunnelUrl ?? null,
       setup: reach.get(String(store.storeId))?.setup ?? ("none" as const),
-      lottery: lotteryOf(store),
       licence: licenceOf(store),
       remote: reach.get(String(store.storeId))?.remote ?? { status: "unknown" as const, since: null }
     }))

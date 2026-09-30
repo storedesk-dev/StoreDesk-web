@@ -163,7 +163,7 @@ describe("POST …/stores", () => {
     const { organizationId } = await orgWithLicense();
     const ids = new Set<string>();
     for (const name of ["One", "Two", "Three"]) {
-      const created = await createStoreCall(organizationId, { name, storeLicense: { plan: "trial" } });
+      const created = await createStoreCall(organizationId, { name, storeLicense: { plan: "standard" } });
       expect(created.status).toBe(201);
       expect(created.body.store.license).toMatchObject({ scope: "store" });
       ids.add(created.body.store.license.licenseId);
@@ -180,9 +180,13 @@ describe("POST …/stores", () => {
     const unlicensed = await createStoreCall(organization.organizationId, { name: "S" });
     expect(unlicensed.status).toBe(201);
     expect(unlicensed.body.store).toMatchObject({ licenseId: null, license: null });
-    const licensed = await createStoreCall(organization.organizationId, { name: "T", storeLicense: { plan: "trial", entitlementDays: 30 } });
-    expect(licensed.body.store.license).toMatchObject({ scope: "store", plan: "trial", status: "trialing" });
-    const past = await createStoreCall(organization.organizationId, { name: "U", storeLicense: { plan: "trial", entitlementExpiresAt: "2020-01-01T00:00:00Z" } });
+    const licensed = await createStoreCall(organization.organizationId, { name: "T", storeLicense: { plan: "standard", entitlementDays: 30 } });
+    expect(licensed.body.store.license).toMatchObject({ scope: "store", plan: "standard", status: "active" });
+    // D-23: there is no trial to start a store on.
+    const trial = await createStoreCall(organization.organizationId, { name: "V", storeLicense: { plan: "trial", entitlementDays: 30 } });
+    expect(trial.status).toBe(400);
+    expect(await TenantStoreModel.countDocuments({ name: "V" })).toBe(0);
+    const past = await createStoreCall(organization.organizationId, { name: "U", storeLicense: { plan: "standard", entitlementExpiresAt: "2020-01-01T00:00:00Z" } });
     expect(past.status).toBe(400);
     expect(await TenantStoreModel.countDocuments({ name: "U" })).toBe(0);
 

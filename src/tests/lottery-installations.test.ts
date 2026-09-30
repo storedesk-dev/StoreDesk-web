@@ -111,48 +111,50 @@ describe("installations written before the lottery app existed", () => {
   });
 });
 
-describe("the org-tag lookup tells the lottery app what it needs", () => {
-  it("says a store sells lottery, is switched on for the app, and is licensed", async () => {
+describe("the org-tag lookup is for phones only (D-26)", () => {
+  it("says nothing about lottery: StoreDesk Lottery signs in by email and never types a tag", async () => {
     await updateStoreSettings(
       admin,
       storeId,
       { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null } },
       1
     );
-    const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]?.lottery).toEqual({ hasLottery: true, appEnabled: true, pc: null });
-    expect(lookup.stores[0]?.licence).toEqual({ covered: true, status: "active" });
-  });
-
-  it("answers that the app is on the moment the store sells lottery — one switch, not two", async () => {
-    await updateStoreSettings(
-      admin,
-      storeId,
-      { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null } },
-      1
-    );
-    const lookup = await lookupOrganization("example-retail");
-    // D-24: there is no second opt-in. Selling lottery is running StoreDesk Lottery.
-    expect(lookup.stores[0]?.lottery).toMatchObject({ hasLottery: true, appEnabled: true });
-  });
-
-  it("reports the PC that already holds the store, by date and never by name", async () => {
     await addLotteryPc();
     const lookup = await lookupOrganization("example-retail");
-    const pc = lookup.stores[0]?.lottery.pc;
-    expect(pc?.claimedAt).toEqual(expect.any(String));
+    expect(lookup.stores[0]).not.toHaveProperty("lottery");
     expect(JSON.stringify(lookup)).not.toContain("Counter PC");
-  });
-
-  it("ignores a lottery PC that is no longer live", async () => {
-    await addLotteryPc("awaiting_activation");
-    const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]?.lottery.pc).toBeNull();
   });
 
   it("never leaks a licence number, only whether one covers the store and its status", async () => {
     const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]?.licence.covered).toBe(true);
+    expect(lookup.stores[0]?.licence).toEqual({ covered: true, status: "active" });
     expect(JSON.stringify(lookup)).not.toMatch(/SD-(ORG|STR)-/);
+  });
+});
+
+describe("a credential proves a store and a product", () => {
+  /**
+   * `authenticateWorker` checks the product, so a lottery installation's credential (any issued
+   * before D-26 retired them) can never open a StoreDesk edge route such as
+   * `GET /api/v1/edge/sync/config`, which hands back the store's tunnel token.
+   */
+  it("refuses a lottery credential on a StoreDesk route", async () => {
+    const pc = await activatePc(organizationId, storeId);
+    await WorkerInstallationModel.updateOne({ workerInstallationId: pc.workerInstallationId }, { product: "lottery" });
+    const { GET: syncConfig } = await import("@/app/api/v1/edge/sync/config/route");
+    const res = await call(syncConfig, request("GET", "/", { token: pc.token }), {});
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(res.body)).toContain("WRONG_PRODUCT");
+    expect(JSON.stringify(res.body)).not.toContain("posPassword");
+  });
+
+  it("still lets the StoreDesk PC use its own routes, including one with no product field", async () => {
+    // A document written before the field existed has no such key at all, and Mongo does not
+    // backfill one. So take it away and test THAT.
+    const pc = await activatePc(organizationId, storeId);
+    await WorkerInstallationModel.updateOne({ workerInstallationId: pc.workerInstallationId }, { $unset: { product: 1 } });
+    const { GET: syncConfig } = await import("@/app/api/v1/edge/sync/config/route");
+    const res = await call(syncConfig, request("GET", "/", { token: pc.token }), {});
+    expect(res.status).toBe(200);
   });
 });

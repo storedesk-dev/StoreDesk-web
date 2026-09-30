@@ -18,6 +18,7 @@ import {
 import { isEntitled } from "@/lib/licenses";
 import { rolesPersistingOrgAdmin } from "@/lib/roles";
 import { writeAudit } from "@/lib/audit";
+import { revokePersonLottery } from "@/lib/lottery-refresh";
 import { scheduleAppUserNotify } from "@/lib/store-notify";
 import { storeReach, type StoreSetup } from "@/lib/store-reach";
 import type { RemoteStatus } from "@/lib/remote-status";
@@ -34,8 +35,9 @@ import type { App } from "@/config/pages";
  *
  * What this is not: a session. The control plane says who someone is and what
  * they may reach; a StoreDesk app still signs in at its own store server
- * (`lib/legacy-sign-in.ts` keeps the old routes 410), and the lottery product
- * takes a token from here in P2. Nothing in this file mints one yet.
+ * (`lib/legacy-sign-in.ts` keeps the old routes 410). StoreDesk Lottery signs
+ * in through `signIn` too (`lib/lottery-pc.ts`, D-26), which is where its
+ * cloud token is minted; nothing in this file mints one.
  */
 
 type Doc = Record<string, unknown>;
@@ -338,6 +340,8 @@ export async function resetPassword(rawCredential: string, password: string): Pr
     targetType: "app_user",
     targetId: appUserId
   });
+  // The old password stops working on lottery PCs too: their refresh credentials end here.
+  await revokePersonLottery(appUserId, "password_changed");
   // The new password reaches this person's stores with their next access pull.
   scheduleAppUserNotify(appUserId, "app_user.enroll");
   return account(user as unknown as Doc);

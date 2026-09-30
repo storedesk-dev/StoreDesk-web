@@ -21,8 +21,8 @@ import { GET as accessSync } from "@/app/api/v1/edge/sync/access/route";
 import { POST as redeem } from "@/app/api/v1/setup-keys/redeem/route";
 import { GET as dashboardRoute } from "@/app/api/v1/admin/dashboard/route";
 import { createOrganization } from "@/lib/organizations";
-import { LICENSE_NUMBER, coveringLicense } from "@/lib/licenses";
-import { migrateStoreScopedLicenses } from "@/lib/migrations";
+import { LICENSE_NUMBER, coveringLicense, newLicenseNumber } from "@/lib/licenses";
+import { migrateNoTrial, migrateStoreScopedLicenses } from "@/lib/migrations";
 import { scheduleNotify } from "@/lib/store-notify";
 import { LicenseModel } from "@/models/ControlPlane";
 
@@ -81,17 +81,17 @@ describe("a store and its licence", () => {
     const six = await newStore(organizationId, "Store 6");
     expect(six.body.store).toMatchObject({ licenseId: null, license: null });
 
-    const issued = await storeLicense(organizationId, six.body.store.storeId, { plan: "trial", entitlementDays: 30 });
+    const issued = await storeLicense(organizationId, six.body.store.storeId, { plan: "custom", entitlementDays: 30 });
     expect(issued.status).toBe(200);
-    expect(issued.body).toMatchObject({ created: true, license: { scope: "store", status: "trialing" } });
+    expect(issued.body).toMatchObject({ created: true, license: { scope: "store", plan: "custom", status: "active" } });
     const edited = await storeLicense(organizationId, six.body.store.storeId, { renewDays: 30, maxPcsPerStore: 2 });
     expect(edited.body).toMatchObject({ created: false, license: { maxPcsPerStore: 2 } });
     expect(await lastAudit("license.renew")).toBeTruthy();
 
-    const again = await call(createLicenseRoute, as("POST", { storeId: six.body.store.storeId, plan: "trial" }), { organizationId });
+    const again = await call(createLicenseRoute, as("POST", { storeId: six.body.store.storeId, plan: "standard" }), { organizationId });
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe("LICENSE_EXISTS");
-    const noMaster = await call(createLicenseRoute, as("POST", { scope: "organization", plan: "trial" }), { organizationId });
+    const noMaster = await call(createLicenseRoute, as("POST", { scope: "organization", plan: "standard" }), { organizationId });
     expect(noMaster.status).toBe(400);
     expect(noMaster.body.error.code).toBe("REQUEST_INVALID");
   });
@@ -214,7 +214,7 @@ describe("a store and its licence", () => {
 
   it("leaves a store that already has its own license, and a cancelled master, alone", async () => {
     const organizationId = await newOrg();
-    const own = (await newStore(organizationId, "Has its own", { storeLicense: { plan: "trial", entitlementDays: 30 } })).body.store;
+    const own = (await newStore(organizationId, "Has its own", { storeLicense: { plan: "standard", entitlementDays: 30 } })).body.store;
     await LicenseModel.create({
       licenseId: "lic_dead",
       licenseNumber: "SD-ORG-CANCEL",
@@ -250,13 +250,107 @@ describe("a store and its licence", () => {
   });
 
   it.each([
-    ["a license without its store", { plan: "trial" }],
-    ["a scope, which no longer exists", { scope: "organization", storeId: "store_x", plan: "trial" }],
-    ["31 days of grace", { storeId: "store_x", plan: "trial", offlineGraceDays: 31 }],
-    ["seats", { storeId: "store_x", plan: "trial", maxStores: 2 }]
+    ["a license without its store", { plan: "standard" }],
+    ["a scope, which no longer exists", { scope: "organization", storeId: "store_x", plan: "standard" }],
+    ["31 days of grace", { storeId: "store_x", plan: "standard", offlineGraceDays: 31 }],
+    ["seats", { storeId: "store_x", plan: "standard", maxStores: 2 }],
+    ["a trial plan (D-23: there is none)", { storeId: "store_x", plan: "trial" }],
+    ["a trialing status (D-23)", { storeId: "store_x", plan: "standard", status: "trialing" }]
   ])("answers 400 for %s", async (_label, body) => {
     const organizationId = await newOrg();
     expect((await call(createLicenseRoute, as("POST", body), { organizationId })).status).toBe(400);
   });
 });
 
+
+describe("no trial (D-23)", () => {
+  /** A record as it was written before D-23: plan trial, status trialing. */
+  async function oldTrial(organizationId: string, storeId: string, ends: Date) {
+    await LicenseModel.create({
+      licenseId: `lic_old_${storeId}`,
+      licenseNumber: newLicenseNumber(),
+      organizationId,
+      scope: "store",
+      storeId,
+      plan: "trial",
+      status: "trialing",
+      startsAt: new Date(Date.now() - DAY),
+      entitlementExpiresAt: ends,
+      offlineGraceDays: 7,
+      maxPcsPerStore: 1,
+      coverageKey: `store:${storeId}`
+    });
+    return `lic_old_${storeId}`;
+  }
+
+  it("staff can issue Standard or Custom only, and a new licence starts active for the term given", async () => {
+    const organizationId = await newOrg();
+    const store = (await newStore(organizationId, "Store 7")).body.store;
+    const params = (body: unknown) => call(createLicenseRoute, as("POST", { storeId: store.storeId, ...(body as object) }), { organizationId });
+
+    const trial = await params({ plan: "trial", entitlementDays: 30 });
+    expect(trial.status).toBe(400);
+    expect(trial.body.error.code).toBe("REQUEST_INVALID");
+    expect((await params({ plan: "standard", status: "trialing" })).status).toBe(400);
+    expect(await LicenseModel.countDocuments({ organizationId })).toBe(0);
+
+    const before = Date.now();
+    const issued = await params({ plan: "standard", entitlementDays: 90 });
+    expect(issued.status).toBe(201);
+    expect(issued.body.license).toMatchObject({ plan: "standard", status: "active" });
+    const ends = new Date(issued.body.license.entitlementExpiresAt).getTime();
+    expect(ends).toBeGreaterThanOrEqual(before + 90 * DAY - 1000);
+    expect(ends).toBeLessThanOrEqual(Date.now() + 90 * DAY + 1000);
+  });
+
+  it("staff can't switch a licence to the trial plan or the trialing status", async () => {
+    const organizationId = await newOrg();
+    const store = (await newStore(organizationId, "Store 8", { storeLicense: { plan: "standard" } })).body.store;
+    expect((await patch(organizationId, store.license.licenseId, { plan: "trial" })).status).toBe(400);
+    expect((await patch(organizationId, store.license.licenseId, { status: "trialing" })).status).toBe(400);
+    expect((await storeLicense(organizationId, store.storeId, { plan: "trial" })).status).toBe(400);
+    expect(await LicenseModel.findOne({ licenseId: store.license.licenseId }).lean()).toMatchObject({ plan: "standard", status: "active" });
+  });
+
+  it("an old trialing record is still entitled until its end, and an edit brings it forward", async () => {
+    const organizationId = await newOrg();
+    const store = (await newStore(organizationId, "Old trial")).body.store;
+    const ends = new Date(Math.floor((Date.now() + 10 * DAY) / 1000) * 1000);
+    const licenseId = await oldTrial(organizationId, store.storeId, ends);
+
+    const listed = (await list(organizationId)).body.licenses[0];
+    expect(listed).toMatchObject({ licenseId, plan: "trial", status: "trialing" });
+    const pc = await activatePc(organizationId, store.storeId);
+    expect((await pull(pc.token)).status).toBe(200);
+
+    const edited = await patch(organizationId, licenseId, { notes: "checked" });
+    expect(edited.status).toBe(200);
+    expect(edited.body.license).toMatchObject({ plan: "standard", status: "active" });
+    expect(edited.body.license.entitlementExpiresAt).toBe(ends.toISOString());
+  });
+
+  it("the migration turns trialing into active and trial into standard, keeps the dates, and runs once", async () => {
+    const organizationId = await newOrg();
+    const live = (await newStore(organizationId, "Live trial")).body.store;
+    const lapsed = (await newStore(organizationId, "Lapsed trial")).body.store;
+    const liveEnds = new Date(Math.floor((Date.now() + 10 * DAY) / 1000) * 1000);
+    const lapsedEnds = new Date(Math.floor((Date.now() - DAY) / 1000) * 1000);
+    const liveId = await oldTrial(organizationId, live.storeId, liveEnds);
+    const lapsedId = await oldTrial(organizationId, lapsed.storeId, lapsedEnds);
+
+    expect(await migrateNoTrial()).toEqual({ trialing: 2, trialPlans: 2 });
+    expect(await lastAudit("license.d23_no_trial")).toBeTruthy();
+    const after = (await LicenseModel.find({ licenseId: { $in: [liveId, lapsedId] } }).lean()) as Array<Record<string, unknown>>;
+    for (const row of after) expect(row).toMatchObject({ plan: "standard", status: "active" });
+    const endOf = (id: string) => new Date(String(after.find((row) => row.licenseId === id)!.entitlementExpiresAt)).toISOString();
+    expect(endOf(liveId)).toBe(liveEnds.toISOString());
+    expect(endOf(lapsedId)).toBe(lapsedEnds.toISOString());
+
+    // The lapsed one is still lapsed: the check on read marks it expired, as it would have been.
+    const listed = (await list(organizationId)).body.licenses as Array<{ licenseId: string; status: string }>;
+    expect(listed.find((row) => row.licenseId === lapsedId)?.status).toBe("expired");
+    expect(listed.find((row) => row.licenseId === liveId)?.status).toBe("active");
+
+    expect(await migrateNoTrial()).toEqual({ trialing: 0, trialPlans: 0 });
+  });
+});

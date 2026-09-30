@@ -141,7 +141,7 @@ export const ALL_PAGES: PageDefinition[] = [
   {
     key: "manageWorker",
     label: "StoreDesk Service",
-    description: "StoreDesk service status, service controls, logs, and remote access (tunnel) status.",
+    description: "StoreDesk Service status, service controls, logs, and remote access (tunnel) status.",
     app: "electron",
     filePath: "src/pages/ManageWorkerPage.tsx",
     defaultEnabled: true,

@@ -57,7 +57,7 @@ async function rpc<T>(name: string, body: unknown): Promise<T> {
     signal: AbortSignal.timeout(TIMEOUT_MS)
   });
   if (!response.ok) {
-    // The body can quote the payload back, and the payload holds password hashes.
+    // The body can quote the payload back, and the payload names people and their email addresses.
     throw new Error(`the lottery cloud answered ${response.status}`);
   }
   return (await response.json()) as T;

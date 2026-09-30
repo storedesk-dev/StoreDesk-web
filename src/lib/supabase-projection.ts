@@ -4,12 +4,14 @@ import {
   LicenseModel,
   OrganizationModel,
   TenantStoreModel,
+  LotteryPcModel,
   UserAssignmentModel,
   WorkerInstallationModel
 } from "@/models/ControlPlane";
 import { coveringFrom, isEntitled } from "@/lib/licenses";
 import { readStoreRoles } from "@/lib/roles";
 import { LOTTERY } from "@/lib/products";
+import { lotteryWords } from "@/lib/supabase-token";
 
 /**
  * What the control plane tells Supabase about a store, and nothing else.
@@ -44,10 +46,14 @@ export interface StoreProjection {
   };
   readonly licence: { status: string; expires_at: string | null; number: string | null; scope: string | null; offline_grace_days: number };
   readonly config: ReadonlyArray<{ key: string; value: unknown }>;
-  readonly users: ReadonlyArray<{ id: string; email: string; name: string | null; status: string; password_hash: string | null }>;
+  readonly users: ReadonlyArray<{ id: string; email: string; name: string | null; status: string }>;
   readonly access: ReadonlyArray<{ user_id: string; role: string; pages: string[] }>;
-  readonly device: { id: string; credential_hash: string | null; status: string; device_name: string | null } | null;
-  /** People whose access was taken away: their tokens stop at once. */
+  /** The store's lottery PCs (D-26): the live one, and the ones it replaced or let go. */
+  readonly pcs: ReadonlyArray<{ id: string; store_id: string; name: string; status: string }>;
+  /**
+   * Principals whose tokens stop at once: people whose access was taken away, lottery PCs that were
+   * replaced or let go and are not live anywhere, and the lottery installations D-26 retired.
+   */
   readonly revoked: ReadonlyArray<string>;
 }
 
@@ -56,18 +62,21 @@ export const projectionFields = {
   organization: ["id", "name", "slug", "status"],
   store: ["id", "organization_id", "name", "store_number", "time_zone", "state_code", "status", "cloud_mode"],
   licence: ["status", "expires_at", "number", "scope", "offline_grace_days"],
-  users: ["id", "email", "name", "status", "password_hash"],
+  users: ["id", "email", "name", "status"],
   access: ["user_id", "role", "pages"],
-  device: ["id", "credential_hash", "status", "device_name"]
+  pcs: ["id", "store_id", "name", "status"]
 } as const;
 
 /** The five lottery page keys. A role's other pages are StoreDesk's business, not the lottery's. */
 const LOTTERY_PAGES = new Set(["lottery", "lotteryClose", "lotteryCorrect", "lotteryReports", "lotterySettings"]);
 
+/** How many of a store's past lottery PCs travel with the live one. History, not a list to grow. */
+const PC_HISTORY = 20;
+
 /**
- * Build one store's projection. The password hash is in it on purpose and only here: it is what
- * lets a lottery PC sign somebody in with the internet down, and `app.app_user_secret` keeps it
- * where only a device can read it.
+ * Build one store's projection. No password hash travels any more (D-26): a lottery PC keeps its
+ * own verifier for each person who signed in on it, made from the password they typed, and the
+ * cloud has no use for one.
  */
 export async function buildStoreProjection(storeId: string): Promise<StoreProjection | null> {
   await connectDb();
@@ -75,12 +84,13 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
   if (!store) return null;
 
   const organizationId = text(store.organizationId);
-  const [organization, licences, assignments, installation] = (await Promise.all([
+  const [organization, licences, assignments, pcRows, retired] = (await Promise.all([
     OrganizationModel.findOne({ organizationId }).lean(),
     LicenseModel.find({ organizationId, status: { $ne: "cancelled" } }).lean(),
     UserAssignmentModel.find({ organizationId }).lean(),
-    WorkerInstallationModel.findOne({ storeId, product: LOTTERY }).lean()
-  ])) as [Doc | null, Doc[], Doc[], Doc | null];
+    LotteryPcModel.find({ storeId }).sort({ createdAt: -1 }).limit(PC_HISTORY).lean(),
+    WorkerInstallationModel.find({ storeId, product: LOTTERY, status: "revoked" }).select("workerInstallationId").lean()
+  ])) as [Doc | null, Doc[], Doc[], Doc[], Doc[]];
   if (!organization) return null;
 
   const covering = coveringFrom(store, licences);
@@ -88,9 +98,21 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
   const pagesOfRole = new Map(
     roles.map((role) => [
       role.roleId,
-      [...(role.accessKeys?.lottery?.pages ?? []), ...(role.accessKeys?.electron?.pages ?? [])]
-        .filter((page) => page.enabled && LOTTERY_PAGES.has(page.key))
-        .map((page) => page.key)
+      // In the lottery app's words, whichever app the role grants them in: the lottery app's own
+      // keys (older roles kept some under electron), and a phone's mobileLottery* keys mapped the
+      // way the token minter maps them.
+      lotteryWords("lottery", [
+        ...lotteryWords(
+          "lottery",
+          [...(role.accessKeys?.lottery?.pages ?? []), ...(role.accessKeys?.electron?.pages ?? [])]
+            .filter((page) => page.enabled && LOTTERY_PAGES.has(page.key))
+            .map((page) => page.key)
+        ),
+        ...lotteryWords(
+          "mobile",
+          (role.accessKeys?.mobile?.pages ?? []).filter((page) => page.enabled).map((page) => page.key)
+        )
+      ])
     ])
   );
 
@@ -105,11 +127,9 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
     if (!current || (target && !text(current.storeId))) forStore.set(appUserId, assignment);
   }
 
-  const people = (await AppUserModel.find({ appUserId: { $in: [...forStore.keys()] } })
-    .select("+passwordHash")
-    .lean()) as Doc[];
+  const people = (await AppUserModel.find({ appUserId: { $in: [...forStore.keys()] } }).lean()) as Doc[];
 
-  const users: Array<{ id: string; email: string; name: string | null; status: string; password_hash: string | null }> = [];
+  const users: Array<{ id: string; email: string; name: string | null; status: string }> = [];
   const access: Array<{ user_id: string; role: string; pages: string[] }> = [];
   const revoked: string[] = [];
 
@@ -129,11 +149,23 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
       id: appUserId,
       email: text(person.email).toLowerCase(),
       name: person.name ? text(person.name) : null,
-      status: text(person.status),
-      password_hash: typeof person.passwordHash === "string" && person.passwordHash ? person.passwordHash : null
+      status: text(person.status)
     });
     access.push({ user_id: appUserId, role: text(assignment?.role), pages });
   }
+
+  // A PC that was replaced or let go stops reading at once, unless it is live again somewhere (a PC
+  // that switched store keeps its id), because a revocation is never lifted for a PC.
+  const pcs = pcRows.map((row) => ({ id: text(row.pcId), store_id: storeId, name: text(row.pcName), status: text(row.status) }));
+  const endedIds = [...new Set(pcs.filter((pc) => pc.status !== "active").map((pc) => pc.id))];
+  const liveElsewhere = endedIds.length
+    ? new Set(
+        ((await LotteryPcModel.find({ pcId: { $in: endedIds }, status: "active" }).select("pcId").lean()) as Doc[]).map((row) =>
+          text(row.pcId)
+        )
+      )
+    : new Set<string>();
+  const deadPcs = endedIds.filter((id) => !liveElsewhere.has(id));
 
   const settings = (store.settings as Doc | undefined) ?? {};
   const lottery = (settings.lottery as Doc | undefined) ?? {};
@@ -172,15 +204,8 @@ export async function buildStoreProjection(storeId: string): Promise<StoreProjec
     ],
     users,
     access,
-    device: installation
-      ? {
-          id: text(installation.workerInstallationId),
-          credential_hash: null,
-          status: text(installation.status),
-          device_name: installation.workerName ? text(installation.workerName) : null
-        }
-      : null,
-    revoked
+    pcs,
+    revoked: [...revoked, ...deadPcs, ...retired.map((row) => text(row.workerInstallationId))]
   };
 }
 
@@ -198,5 +223,10 @@ export const forbiddenInProjection = [
   "secretHash",
   "sealedSecret",
   "serviceRole",
-  "SUPABASE_SERVICE_ROLE_KEY"
+  "SUPABASE_SERVICE_ROLE_KEY",
+  // D-26: no password hash reaches the cloud, and no lottery PC credential exists to send.
+  "password_hash",
+  "passwordHash",
+  "credential_hash",
+  "refreshCredential"
 ] as const;

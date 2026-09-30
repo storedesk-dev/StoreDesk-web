@@ -4,8 +4,8 @@ Parent: root `AGENTS.md` and `CLAUDE.md`. Remote: `https://github.com/storedesk-
 
 ## Purpose
 
-StoreDesk Web — the Next.js marketing site and the **control plane**: organizations, licenses
-(one mode per organization: a master license for every store, or a license per store), stores (feature and integration switches, register,
+StoreDesk Web — the Next.js marketing site and the **control plane**: stores (the tenant, D-22), one licence per store granted by staff
+(D-23), store settings (feature and integration switches, register,
 PC and phones), roles, users and audit, plus the API store servers
 use to activate and to pull access. Contract: `docs/design/control-plane-admin.md` and
 `docs/design/store-sign-in-and-sync.md` in the parent repo.
@@ -52,7 +52,7 @@ implement → verify → commit.
 src
 ├── app
 │   ├── (marketing pages)        about, contact, download, how-it-works, product, privacy, terms, enroll
-│   ├── admin/                   admin console (organizations, stores, roles, users, activity)
+│   ├── admin/                   admin console (stores, roles, users, activity)
 │   ├── admin-gate/              staff sign-in
 │   └── api
 │       ├── admin/login          staff sign-in API (rate-limited, audited)
@@ -63,7 +63,8 @@ src
 │           │                    (the store's own sheet only, while its switch is on)
 │           ├── setup-keys/redeem   activation (setup key)
 │           ├── organizations/…/worker-installations/…/bootstrap   store-server bootstrap
-│           └── app-auth/        org-tag lookup and enrollment (public, rate-limited)
+│           ├── lottery/         StoreDesk Lottery sign-in, bind, token, roster, sign-out, unbind (D-26)
+│           └── app-auth/        e-mail sign-in, enrollment, legacy org-tag lookup (public, rate-limited)
 ├── config/pages.ts              GENERATED page registry
 ├── lib/                         one module per area (see README "What is where")
 ├── models/ControlPlane.ts       every Mongoose model

@@ -136,7 +136,7 @@ function NewStoreDialog({
   const [contactEmail, setContactEmail] = useState("");
   const [timeZone, setTimeZone] = useState("America/New_York");
   const [issue, setIssue] = useState(true);
-  const [newLicense, setNewLicense] = useState<NewLicenseInput>({ plan: "trial", entitlementDays: 30 });
+  const [newLicense, setNewLicense] = useState<NewLicenseInput>({ plan: "standard", entitlementDays: 365 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -148,7 +148,7 @@ function NewStoreDialog({
     setContactEmail("");
     setTimeZone("America/New_York");
     setIssue(true);
-    setNewLicense({ plan: "trial", entitlementDays: 30 });
+    setNewLicense({ plan: "standard", entitlementDays: 365 });
     setError(null);
   }, [open]);
 

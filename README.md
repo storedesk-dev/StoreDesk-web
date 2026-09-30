@@ -1,7 +1,7 @@
 # StoreDesk Web
 
 The public site (storedesk.net) and the **control plane**: the admin console where StoreDesk staff create
-organizations, licenses, stores, roles and users, and the API store servers call to activate and to
+stores (the tenant, D-22), grant each store its one licence (D-23), and manage roles and users, and the API store servers call to activate and to
 pull who may sign in. No store data lives here — catalog, price book and register history stay on the
 store PC.
 
@@ -20,11 +20,10 @@ npm install
 npm run dev:local     # throwaway database with sample data — no .env.local needed
 ```
 
-`dev:local` starts an in-memory MongoDB replica set, seeds one staff login, the organization
-**Example Retail** (org tag `example-retail`) on a master license covering Stores 42 (fuel, lottery,
-Google Sheets on), 17 and 88, with the four template roles, a managed login, an invited user and a waiting
-setup key; and **Corner Mart Group** (`corner-mart`), store-wise: Store 5 with its own license, Store 6
-Unlicensed. It prints the logins and each store's license, and runs `next dev`. Open `http://localhost:3000/admin`. Cloudflare and e-mail are
+`dev:local` starts an in-memory MongoDB replica set, seeds one staff login and five stores under two business
+names (internal records; nothing is scoped by them): **Example Retail**'s Stores 42 (fuel, lottery, Google
+Sheets on), 17 and 88, each with its own licence, the four template roles, a managed login, an invited user and
+a waiting setup key; and **Corner Mart Group**'s Store 5 with its own licence and Store 6 Unlicensed. It prints the logins and each store's license, and runs `next dev`. Open `http://localhost:3000/admin`. Cloudflare and e-mail are
 turned off for the run (stores show the tunnel as *not configured*); the data is gone when you stop it.
 Set `DEV_ADMIN_EMAIL`, `DEV_ADMIN_PASSWORD`, `DEV_USER_PASSWORD` or `PORT` to choose them. The first run
 downloads a MongoDB binary once (to `~/.cache/mongodb-binaries`).
@@ -64,10 +63,13 @@ See `.env.example` for the full list with notes.
   reaches a store notifies it.
 - `src/app/api/v1/edge/**`, `src/app/api/v1/setup-keys/redeem`, `…/worker-installations/*/bootstrap*` —
   store-server API (worker credential, or the setup key).
-- `src/app/api/v1/app-auth/organizations/{slug}` — the phone's public org-tag lookup.
-- `src/lib/` — one module per area: `organizations`, `licenses` (licensing modes — master or store-wise —
-  the one coverage rule, the mode switch), `migrations` (subscriptions → licenses → modes, run once per
-  process on connect),
+- `src/app/api/v1/app-auth/sign-in` — the phone's e-mail sign-in and store list (D-18).
+- `src/app/api/v1/app-auth/organizations/{slug}` — the legacy org-tag lookup, kept only until phones older than
+  0.0.9 are gone.
+- `src/app/api/v1/lottery/*` — StoreDesk Lottery's sign-in, bind, token, roster, sign-out and unbind (D-26).
+- `src/lib/` — one module per area: `organizations` (the internal business record a store still carries),
+  `licenses` (one licence per store, granted by staff; no trial), `migrations` (run once per process on connect),
+  `lottery-pc` and `lottery-refresh` (the lottery PC and its per-person credentials),
   `tenant-stores` (stores and settings), `setup` (setup keys, Replace PC), `store-setup-key` (the reusable
   key: reveal, rotate, the PC reading its key and releasing its installation), `users`, `roles`,
   `role-templates`, `admin-views` (dashboard, audit, access preview), `access-sync`, `store-notify`,

@@ -262,17 +262,15 @@ describe("passwordHash stays out of every other response", () => {
     // or set the hash and return neither — accounts.test.ts reads the sign-in
     // response and asserts the hash is not anywhere in it.
     //
-    // The lottery projection (lib/supabase-projection.ts) is the second place
-    // a hash is sent on purpose, and for the same reason as the access sync: a
-    // lottery PC checks passwords itself, so a store keeps working with the
-    // line down. It lands in app.app_user_secret, which supabase/tests/rls.sql
-    // proves only a device can read — never a person, not even their own.
+    // The lottery projection (lib/supabase-projection.ts) used to be a second
+    // place a hash was sent. Not any more (D-26): a lottery PC keeps its own
+    // verifier, made from the password a person typed on it, so no hash
+    // reaches the lottery cloud, and that file is not on this list.
     const allowed = new Set([
       "lib/access-sync.ts",
       "lib/control-plane.ts",
       "lib/admin-auth.ts",
-      "lib/accounts.ts",
-      "lib/supabase-projection.ts"
+      "lib/accounts.ts"
     ]);
     const root = path.resolve(__dirname, "..");
     const offenders: string[] = [];
