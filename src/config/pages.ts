@@ -157,9 +157,27 @@ export const ALL_PAGES: PageDefinition[] = [
     knownFeatureFlags: {}
   },
   {
+    key: "salesTax",
+    label: "Sales Tax",
+    description: "Sales tax filing — the monthly returns, the filing profile and setup, the bank accounts that pay them, and marking a month filed. Also needed to file from the phone.",
+    app: "electron",
+    filePath: "src/pages/SalesTaxPage.tsx",
+    defaultEnabled: false,
+    knownFeatureFlags: {}
+  },
+  {
+    key: "storeSettings",
+    label: "Store settings",
+    description: "Change how the store is set up — the register login, sending changes to the register, Google Sheets, data retention, the Lottery page and developer tools. Without it Settings shows only what is safe to look at.",
+    app: "electron",
+    filePath: "src/pages/SettingsPage.tsx",
+    defaultEnabled: false,
+    knownFeatureFlags: {}
+  },
+  {
     key: "settings",
     label: "Settings",
-    description: "Store settings — POS config, receipt template, tax rates, and preferences.",
+    description: "Settings — the store's status and access sync for everyone; changing the store's setup needs Store settings, sales tax needs Sales Tax.",
     app: "electron",
     filePath: "src/pages/SettingsPage.tsx",
     defaultEnabled: true,

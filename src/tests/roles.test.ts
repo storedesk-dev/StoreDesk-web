@@ -7,6 +7,8 @@ import {
   orgAdminAccessKeys,
   orgAdminRoleOutdated,
   resolveOrgAdminRole,
+  resolveSplitSettingsPages,
+  splitSettingsOutdated,
   unknownPageKeys
 } from "@/lib/roles";
 import { canonicalJson } from "@/lib/control-plane-security";
@@ -20,7 +22,14 @@ const cashier = {
   roleId: "cashier",
   roleName: "Cashier",
   accessKeys: {
-    electron: { pages: [{ key: "pos", enabled: true, featureFlags: { enableRefunds: false } }] },
+    // Saved after Sales Tax and Store settings left Settings, so it names both (off).
+    electron: {
+      pages: [
+        { key: "pos", enabled: true, featureFlags: { enableRefunds: false } },
+        { key: "salesTax", enabled: false, featureFlags: {} },
+        { key: "storeSettings", enabled: false, featureFlags: {} }
+      ]
+    },
     mobile: { pages: [{ key: "mobilePos", enabled: true, featureFlags: {} }] }
   }
 };
@@ -69,7 +78,14 @@ describe("normalizeRoles", () => {
     );
     expect(role.roleName).toBe("odd");
     expect(role.accessKeys).toEqual({
-      electron: { pages: [{ key: "pos", enabled: false, featureFlags: { a: true } }] },
+      // A role from before the split gains Sales Tax and Store settings, off (nothing trusts it).
+      electron: {
+        pages: [
+          { key: "pos", enabled: false, featureFlags: { a: true } },
+          { key: "salesTax", enabled: false, featureFlags: {} },
+          { key: "storeSettings", enabled: false, featureFlags: {} }
+        ]
+      },
       mobile: { pages: [] },
       // A role stored before StoreDesk Lottery existed reads with an empty block, never a granted one.
       lottery: { pages: [] }
@@ -249,16 +265,17 @@ describe("canonicalJson", () => {
 
 describe("newAccessItems (the console's New pages available)", () => {
   it("lists pages a stored role doesn't name and flags its enabled pages don't carry, and nothing for a full role", () => {
-    const viewer = templateAccessKeys("viewer");
-    expect(newAccessItems(viewer)).toEqual([]);
+    // Store Manager: it has the phone's Price Book on, so its flags are offered when missing.
+    const manager = templateAccessKeys("store_manager");
+    expect(newAccessItems(manager)).toEqual([]);
     const stale = {
-      electron: { pages: viewer.electron.pages.filter((page) => page.key !== "deals") },
+      electron: { pages: manager.electron.pages.filter((page) => page.key !== "deals") },
       mobile: {
-        pages: viewer.mobile.pages
+        pages: manager.mobile.pages
           .filter((page) => page.key !== "mobileDeals")
           .map((page) => (page.key === "mobilePriceBook" ? { ...page, featureFlags: {} } : page))
       },
-      lottery: viewer.lottery ?? { pages: [] }
+      lottery: manager.lottery ?? { pages: [] }
     };
     const items = newAccessItems(stale);
     expect(items.map(({ app, pageKey, flag }) => `${app}.${pageKey}${flag ? `.${flag}` : ""}`).sort()).toEqual(
@@ -303,5 +320,101 @@ describe("the Viewer template is read-only", () => {
     for (const app of ["electron", "mobile"] as const) {
       expect(enabledKeys(console[app].pages).sort()).toEqual(enabledKeys(viewer.accessKeys[app].pages).sort());
     }
+  });
+});
+
+/**
+ * Sales Tax (`salesTax`) and Store settings (`storeSettings`) used to ride on the always-on Settings
+ * page, so a Cashier or Viewer could add a bank account, mark a return filed or change the register
+ * login. Templates for those two never grant them; stored roles from before are resolved once.
+ */
+describe("Sales Tax and Store settings, split out of Settings", () => {
+  const enabledKeys = (pages: { key: string; enabled: boolean }[]) =>
+    pages.filter((page) => page.enabled).map((page) => page.key);
+  const template = (id: string) => ROLE_TEMPLATES.find((entry) => entry.templateId === id)!;
+
+  it("Cashier and Viewer templates have neither, nor the Price Book; Manager and Admin have both", () => {
+    for (const id of ["cashier", "viewer"]) {
+      const server = enabledKeys(template(id).accessKeys.electron.pages);
+      const console = enabledKeys(templateAccessKeys(id as "cashier" | "viewer").electron.pages);
+      for (const keys of [server, console]) {
+        expect(keys).toContain("settings");
+        expect(keys).not.toContain("salesTax");
+        expect(keys).not.toContain("storeSettings");
+      }
+    }
+    expect(enabledKeys(template("viewer").accessKeys.electron.pages)).not.toContain("priceBook");
+    expect(enabledKeys(template("viewer").accessKeys.mobile.pages)).not.toContain("mobilePriceBook");
+    for (const id of ["store_manager", "org_admin"]) {
+      expect(enabledKeys(template(id).accessKeys.electron.pages)).toEqual(expect.arrayContaining(["salesTax", "storeSettings"]));
+    }
+  });
+
+  const stored = (roleId: string, electron: { key: string; enabled: boolean; featureFlags?: Record<string, boolean> }[], mobile: string[] = []) => ({
+    roleId,
+    roleName: roleId,
+    version: 3,
+    updatedAt: CREATED,
+    accessKeys: {
+      electron: { pages: electron.map((page) => ({ featureFlags: {}, ...page })) },
+      mobile: { pages: mobile.map((key) => ({ key, enabled: true, featureFlags: {} })) },
+      lottery: { pages: [] }
+    }
+  });
+  const grantOf = (role: ReturnType<typeof stored>) => {
+    const { role: next, changed } = resolveSplitSettingsPages(role);
+    const on = (key: string) => next.accessKeys.electron.pages.find((page) => page.key === key)?.enabled;
+    return { changed, version: next.version, salesTax: on("salesTax"), storeSettings: on("storeSettings") };
+  };
+
+  it("a stored cashier or viewer gets both, switched off, one version up", () => {
+    const settings = { key: "settings", enabled: true };
+    expect(grantOf(stored("cashier", [{ key: "pos", enabled: true }, settings]))).toEqual({ changed: true, version: 4, salesTax: false, storeSettings: false });
+    expect(grantOf(stored("viewer", [{ key: "priceBook", enabled: true }, settings]))).toEqual({ changed: true, version: 4, salesTax: false, storeSettings: false });
+  });
+
+  it("an owner or manager keeps both: Store Manager, Users and Roles, the service page, or Report mapping", () => {
+    const settings = { key: "settings", enabled: true };
+    const both = { changed: true, version: 4, salesTax: true, storeSettings: true };
+    expect(grantOf(stored("store_manager", [settings]))).toEqual(both);
+    expect(grantOf(stored("owner", [settings, { key: "userManagement", enabled: true }]))).toEqual(both);
+    expect(grantOf(stored("it", [settings, { key: "manageWorker", enabled: true }]))).toEqual(both);
+    expect(grantOf(stored("books", [{ key: "settings", enabled: true, featureFlags: { reportMapping: true } }]))).toEqual(both);
+    // A switched-off page or flag is not trust.
+    expect(grantOf(stored("x", [{ key: "settings", enabled: true, featureFlags: { reportMapping: false } }, { key: "userManagement", enabled: false }])).salesTax).toBe(false);
+  });
+
+  it("a role given the phone's Sales Tax keeps filing from the phone (it now needs the desktop's salesTax)", () => {
+    expect(grantOf(stored("bookkeeper", [{ key: "settings", enabled: true }], ["mobileSalesTax"]))).toEqual({
+      changed: true,
+      version: 4,
+      salesTax: true,
+      storeSettings: false
+    });
+  });
+
+  it("happens once: a role naming either key keeps its choice, and the admin is left to its own rule", () => {
+    const decided = stored("cashier", [{ key: "salesTax", enabled: true }, { key: "storeSettings", enabled: false }]);
+    expect(resolveSplitSettingsPages(decided)).toEqual({ role: decided, changed: false });
+    expect(splitSettingsOutdated([decided])).toBe(false);
+    expect(splitSettingsOutdated([stored("cashier", [{ key: "pos", enabled: true }])])).toBe(true);
+    expect(splitSettingsOutdated([{ roleId: "org_admin", accessKeys: {} }])).toBe(false);
+    // Only the missing key is added; the one already named is untouched.
+    const half = stored("store_manager", [{ key: "salesTax", enabled: false }]);
+    const next = resolveSplitSettingsPages(half).role.accessKeys.electron.pages;
+    expect(next).toEqual([
+      { key: "salesTax", enabled: false, featureFlags: {} },
+      { key: "storeSettings", enabled: true, featureFlags: {} }
+    ]);
+  });
+
+  it("normalizeRoles reads stored roles with the split applied, and the Organization Admin with both on", () => {
+    const [admin, cashierRole] = normalizeRoles(
+      [stored("org_admin", [{ key: "settings", enabled: true }]), stored("cashier", [{ key: "settings", enabled: true }])],
+      CREATED
+    );
+    expect(enabledKeys(admin.accessKeys.electron.pages)).toEqual(expect.arrayContaining(["salesTax", "storeSettings"]));
+    expect(enabledKeys(cashierRole.accessKeys.electron.pages)).toEqual(["settings"]);
+    expect(cashierRole.version).toBe(4);
   });
 });

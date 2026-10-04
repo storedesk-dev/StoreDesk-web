@@ -45,7 +45,9 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       "deals",
       "registerChanges",
       "transactions",
-      "settings"
+      "settings",
+      "salesTax",
+      "storeSettings"
     ],
     mobile: [
       "mobileDashboard",
@@ -78,18 +80,17 @@ const DEFINITIONS: Record<string, TemplateDef> = {
       transactions: { enableExport: false, enableRefundView: false }
     }
   },
-  // Read-only means read-only: the Deals pages stage register changes, so a
+  // Read-only means read-only: the Price Book (New item, Set price) and Deals pages change the register, so a
   // Viewer does not get them. (A saved role that already has them is left
   // alone — templates only seed new roles.)
   viewer: {
     roleName: "Viewer",
-    description: "Looks, doesn't change: products, prices and transactions, read-only.",
-    electron: ["dashboard", "products", "priceBook", "transactions", "settings"],
+    description: "Looks, doesn't change: the dashboard, products and transactions, read-only. No sales tax, store settings or price changes.",
+    electron: ["dashboard", "products", "transactions", "settings"],
     mobile: [
       "mobileDashboard",
       "mobileScanner",
       "mobileProductSearch",
-      "mobilePriceBook",
       "mobileTransactions",
       "mobileSettings"
     ],
@@ -97,8 +98,6 @@ const DEFINITIONS: Record<string, TemplateDef> = {
     lottery: ["lottery"],
     flags: {
       products: { enableBulkImport: false, enableBarcodeGeneration: false },
-      priceBook: { priceGroups: false },
-      mobilePriceBook: { priceGroups: false },
       transactions: { enableExport: false },
       mobileTransactions: { enableExport: false }
     }

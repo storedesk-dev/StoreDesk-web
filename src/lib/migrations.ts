@@ -12,6 +12,7 @@ import { publicId } from "@/lib/control-plane-security";
 import { coverageKeyFor, newLicenseNumber } from "@/lib/licenses";
 import { writeAudit } from "@/lib/audit";
 import { LOTTERY } from "@/lib/products";
+import { rolesPersistingOrgAdmin, splitSettingsOutdated, type StoreRecord } from "@/lib/roles";
 
 /**
  * Data migrations, run once per server process right after the database
@@ -364,6 +365,29 @@ export async function migrateNoTrial(): Promise<NoTrialReport> {
   return report;
 }
 
+export type SplitSettingsReport = { stores: number; migrated: number };
+
+/**
+ * 2026-10-03: Sales Tax (`salesTax`) and Store settings (`storeSettings`) left the always-on Settings
+ * page, so Cashier and Viewer stop reaching sales tax, bank accounts and the register login. Every
+ * store whose stored roles predate them is written once with the roles as they now read
+ * (`resolveSplitSettingsPages` in lib/roles.ts: owners and managers keep both, the rest get them
+ * switched off), each changed role one version up so the store PC takes it at its next sync.
+ *
+ * Reads already resolve the same way, so this only saves the answer. Idempotent: a store whose roles
+ * all name both keys is skipped; a lost compare-and-set is left for the next read or run.
+ */
+export async function migrateSplitSettingsPages(): Promise<SplitSettingsReport> {
+  const stores = (await TenantStoreModel.find({}).select("storeId roles updatedAt createdAt").lean()) as Doc[];
+  let migrated = 0;
+  for (const store of stores) {
+    if (!splitSettingsOutdated(store.roles)) continue;
+    await rolesPersistingOrgAdmin(String(store.storeId), store as StoreRecord);
+    migrated += 1;
+  }
+  return { stores: stores.length, migrated };
+}
+
 export async function runMigrations(): Promise<void> {
   const identity = await migrateEmailIdentity();
   if (identity.verified > 0 || identity.duplicates > 0) {
@@ -373,6 +397,12 @@ export async function runMigrations(): Promise<void> {
   const roles = await migrateStoreScopedRoles();
   if (roles.copied > 0) {
     console.info(`[migrate] store-scoped roles: ${JSON.stringify(roles)}`);
+  }
+
+  // After the copy above, so a store that just took its organization's roles is split too.
+  const split = await migrateSplitSettingsPages();
+  if (split.migrated > 0) {
+    console.info(`[migrate] 2026-10-03-split-settings: ${JSON.stringify(split)}`);
   }
 
   const licenses = await migrateStoreScopedLicenses();

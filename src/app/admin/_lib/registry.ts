@@ -113,7 +113,9 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       "deals",
       "registerChanges",
       "transactions",
-      "settings"
+      "settings",
+      "salesTax",
+      "storeSettings"
     ],
     mobile: [
       "mobileDashboard",
@@ -146,17 +148,16 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
       transactions: { enableExport: false, enableRefundView: false }
     }
   },
-  // The Deals pages stage register changes, so read-only Viewer does not get
+  // The Price Book and Deals pages change the register, so read-only Viewer does not get
   // them (kept identical to lib/role-templates.ts).
   viewer: {
     label: "Viewer",
-    description: "Looks, doesn't change: products, prices and transactions, read-only.",
-    electron: ["dashboard", "products", "priceBook", "transactions", "settings"],
+    description: "Looks, doesn't change: the dashboard, products and transactions, read-only. No sales tax, store settings or price changes.",
+    electron: ["dashboard", "products", "transactions", "settings"],
     mobile: [
       "mobileDashboard",
       "mobileScanner",
       "mobileProductSearch",
-      "mobilePriceBook",
       "mobileTransactions",
       "mobileSettings"
     ],
@@ -164,8 +165,6 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
     lottery: ["lottery"],
     flags: {
       products: { enableBulkImport: false, enableBarcodeGeneration: false },
-      priceBook: { priceGroups: false },
-      mobilePriceBook: { priceGroups: false },
       transactions: { enableExport: false },
       mobileTransactions: { enableExport: false }
     }

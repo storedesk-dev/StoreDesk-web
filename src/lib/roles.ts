@@ -215,6 +215,78 @@ export function resolveOrgAdminRole(role: OrgRole): { role: OrgRole; changed: bo
   return { role: { ...role, version: role.version + 1, accessKeys }, changed: true };
 }
 
+// ── Sales Tax and Store settings, split out of Settings (2026-10-03) ─────────
+
+/**
+ * Desktop pages that used to ride on the always-on `settings` page. Everyone has `settings`, so
+ * until these existed every role — Cashier and Viewer included — could add a bank account, mark a
+ * return filed or change the register login.
+ */
+export const SPLIT_FROM_SETTINGS = ["salesTax", "storeSettings"] as const;
+
+/** Stored role ids of the template that runs the store and had both through Settings. */
+const MANAGER_ROLE_ID = "store_manager";
+
+function electronPageOn(role: OrgRole, key: string, flag?: string): boolean {
+  return role.accessKeys.electron.pages.some(
+    (page) => page.key === key && page.enabled && (!flag || page.featureFlags[flag] === true)
+  );
+}
+
+/**
+ * A stored role saved before `salesTax` and `storeSettings` existed, as it reads now: each missing
+ * key is added — enabled only when the role was trusted with the store's setup, else disabled — and
+ * the role reads one version higher so every store takes it at its next sync.
+ *
+ * `settings` says nothing (every role has it), so trust is read from what only an owner or manager
+ * is given: the Store Manager template, Users and Roles (whoever has it can grant themselves
+ * anything), the StoreDesk Service page, or Report mapping. Sales Tax also goes to a role given the
+ * phone's Sales Tax, because filing from the phone now needs the desktop's `salesTax` too. Anything
+ * else — Cashier, Viewer, a custom role with neither — gets both switched off; an admin can turn
+ * them on in the role editor. The Organization Admin is not handled here: it always has every page.
+ *
+ * A role that already names a key (on or off) keeps it, so this happens once.
+ */
+export function resolveSplitSettingsPages(role: OrgRole): { role: OrgRole; changed: boolean } {
+  if (role.roleId === ORG_ADMIN_ROLE_ID) return { role, changed: false };
+  const listed = new Set(role.accessKeys.electron.pages.map((page) => page.key));
+  const missing = SPLIT_FROM_SETTINGS.filter((key) => !listed.has(key));
+  if (!missing.length) return { role, changed: false };
+
+  const trusted =
+    role.roleId === MANAGER_ROLE_ID ||
+    electronPageOn(role, "userManagement") ||
+    electronPageOn(role, "manageWorker") ||
+    electronPageOn(role, "settings", "reportMapping");
+  const phoneSalesTax = role.accessKeys.mobile.pages.some((page) => page.key === "mobileSalesTax" && page.enabled);
+  const grant: Record<(typeof SPLIT_FROM_SETTINGS)[number], boolean> = {
+    salesTax: trusted || phoneSalesTax,
+    storeSettings: trusted
+  };
+
+  const added = missing.map((key) => ({ key, enabled: grant[key], featureFlags: {} }));
+  return {
+    role: {
+      ...role,
+      version: role.version + 1,
+      accessKeys: { ...role.accessKeys, electron: { pages: [...role.accessKeys.electron.pages, ...added] } }
+    },
+    changed: true
+  };
+}
+
+/** A stored role lacks `salesTax` or `storeSettings`: the stored copy is from before the split. */
+export function splitSettingsOutdated(raw: unknown): boolean {
+  if (!Array.isArray(raw)) return false;
+  return raw.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const role = entry as Record<string, unknown>;
+    if (role.roleId === ORG_ADMIN_ROLE_ID) return false;
+    const keys = new Set(normalizeAccessKeys(role.accessKeys).electron.pages.map((page) => page.key));
+    return SPLIT_FROM_SETTINGS.some((key) => !keys.has(key));
+  });
+}
+
 /**
  * Stored roles (Mixed, possibly written by an older build) to the versioned
  * shape. No stored roles means the defaults. Missing version reads as 1;
@@ -244,7 +316,7 @@ export function normalizeRoles(raw: unknown, fallbackUpdatedAt: string): OrgRole
       updatedAt: toIsoOr(role.updatedAt, fallbackUpdatedAt),
       accessKeys: normalizeAccessKeys(role.accessKeys)
     };
-    const resolved = resolveOrgAdminRole(normalized).role;
+    const resolved = resolveSplitSettingsPages(resolveOrgAdminRole(normalized).role).role;
     roles.push(stored ? resolved : { ...resolved, version: normalized.version });
   }
   return roles;
@@ -302,14 +374,15 @@ function busy(): ControlPlaneError {
 }
 
 /**
- * The store's roles as read, first storing the Organization Admin role with the pages it reads
- * with (at the version it reads at) when the stored copy is behind the registry. Best effort: a
+ * The store's roles as read, first storing them as they read (at the versions they read at) when
+ * the stored copy is behind: the Organization Admin role missing a registered page or flag, or a
+ * role from before Sales Tax and Store settings left Settings (resolveSplitSettingsPages). Best effort: a
  * lost compare-and-set leaves it for the next read, and every read resolves it the same way
  * meanwhile, so the version a store sees never goes back.
  */
 export async function rolesPersistingOrgAdmin(storeId: string, store: StoreRecord): Promise<OrgRole[]> {
   const roles = storedRoles(store);
-  if (orgAdminRoleOutdated(store.roles)) {
+  if (orgAdminRoleOutdated(store.roles) || splitSettingsOutdated(store.roles)) {
     await compareAndSetRoles(storeId, store.updatedAt, roles).catch(() => false);
   }
   return roles;
