@@ -12,7 +12,7 @@ import { publicId } from "@/lib/control-plane-security";
 import { coverageKeyFor, newLicenseNumber } from "@/lib/licenses";
 import { writeAudit } from "@/lib/audit";
 import { LOTTERY } from "@/lib/products";
-import { rolesPersistingOrgAdmin, splitSettingsOutdated, type StoreRecord } from "@/lib/roles";
+import { managedFlagsOutdated, rolesPersistingOrgAdmin, splitSettingsOutdated, type StoreRecord } from "@/lib/roles";
 
 /**
  * Data migrations, run once per server process right after the database
@@ -388,6 +388,29 @@ export async function migrateSplitSettingsPages(): Promise<SplitSettingsReport> 
   return { stores: stores.length, migrated };
 }
 
+export type ManagedFlagsReport = { stores: number; migrated: number };
+
+/**
+ * 2026-11-01: product and variant writes need `manageCatalog`, and importing, clearing and sending
+ * the daily sales need `manageData`, so a read page no longer lets a Cashier or Viewer change them.
+ * Every store whose stored roles predate the flags is written once with the roles as they now read
+ * (`resolveManagedFlags` in lib/roles.ts), which also takes the register pages off a stored Viewer.
+ * The service refuses a missing flag, so this must reach stores before the service that checks them.
+ *
+ * Idempotent: a store whose roles all name both flags is skipped; a lost compare-and-set is left for
+ * the next read or run.
+ */
+export async function migrateManagedFlags(): Promise<ManagedFlagsReport> {
+  const stores = (await TenantStoreModel.find({}).select("storeId roles updatedAt createdAt").lean()) as Doc[];
+  let migrated = 0;
+  for (const store of stores) {
+    if (!managedFlagsOutdated(store.roles)) continue;
+    await rolesPersistingOrgAdmin(String(store.storeId), store as StoreRecord);
+    migrated += 1;
+  }
+  return { stores: stores.length, migrated };
+}
+
 export async function runMigrations(): Promise<void> {
   const identity = await migrateEmailIdentity();
   if (identity.verified > 0 || identity.duplicates > 0) {
@@ -403,6 +426,12 @@ export async function runMigrations(): Promise<void> {
   const split = await migrateSplitSettingsPages();
   if (split.migrated > 0) {
     console.info(`[migrate] 2026-10-03-split-settings: ${JSON.stringify(split)}`);
+  }
+
+  // After the split, whose Store settings answer counts as trust here.
+  const managed = await migrateManagedFlags();
+  if (managed.migrated > 0) {
+    console.info(`[migrate] 2026-11-01-managed-flags: ${JSON.stringify(managed)}`);
   }
 
   const licenses = await migrateStoreScopedLicenses();

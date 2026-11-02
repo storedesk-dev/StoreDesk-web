@@ -44,7 +44,8 @@ export const ALL_PAGES: PageDefinition[] = [
       enableRefunds: { label: "Refunds", description: "Allow cashiers to process refunds.", default: true },
       enableDiscounts: { label: "Discounts", description: "Allow manual discount entry on line items.", default: true },
       enableVoidTransaction: { label: "Void Transaction", description: "Allow voiding an active transaction.", default: true },
-      enableCashDrawer: { label: "Cash Drawer", description: "Trigger cash drawer open on payment.", default: true }
+      enableCashDrawer: { label: "Cash Drawer", description: "Trigger cash drawer open on payment.", default: true },
+      manageData: { label: "Change sales data", description: "Import or clear the daily sales, and send them to Google Sheets.", default: false }
     }
   },
   {
@@ -66,7 +67,8 @@ export const ALL_PAGES: PageDefinition[] = [
     defaultEnabled: true,
     knownFeatureFlags: {
       enableBulkImport: { label: "Bulk Import", description: "Allow CSV bulk product import.", default: false },
-      enableBarcodeGeneration: { label: "Barcode Generation", description: "Generate internal barcodes for products.", default: true }
+      enableBarcodeGeneration: { label: "Barcode Generation", description: "Generate internal barcodes for products.", default: true },
+      manageCatalog: { label: "Change products", description: "Add, change and delete the store's own products and variants.", default: false }
     }
   },
   {
@@ -111,7 +113,7 @@ export const ALL_PAGES: PageDefinition[] = [
   {
     key: "deals",
     label: "Deals",
-    description: "Register combos and mix & match deals with their item lists and items (read-only).",
+    description: "Register combos and mix & match deals with their item lists and items; stage changes to them.",
     app: "electron",
     filePath: "src/pages/DealsPage.tsx",
     defaultEnabled: true,
@@ -233,7 +235,7 @@ export const ALL_PAGES: PageDefinition[] = [
   {
     key: "mobileVendorPrices",
     label: "Vendor Prices",
-    description: "View and compare vendor pricing for a product on mobile.",
+    description: "View, compare and record vendor pricing for a product on mobile.",
     app: "mobile",
     filePath: "lib/features/products/vendor_prices_screen.dart",
     defaultEnabled: true,
@@ -242,13 +244,13 @@ export const ALL_PAGES: PageDefinition[] = [
   {
     key: "mobilePriceBook",
     label: "Price Book",
-    description: "View the selling price book and suggested prices on mobile.",
+    description: "View the selling price book and suggested prices, and stage price changes, on mobile.",
     app: "mobile",
     filePath: "lib/features/price_book/price_book_screen.dart",
     defaultEnabled: true,
     knownFeatureFlags: {
       priceGroups: { label: "Price Groups", description: "View price groups and mass-update price through a group on mobile.", default: true },
-      sendToRegister: { label: "Send to register", description: "Preview and send staged price book and deal changes to the register from the phone (always previewed and confirmed).", default: false }
+      sendToRegister: { label: "Send to register", description: "Preview and send staged price book changes to the register from the phone (always previewed and confirmed).", default: false }
     }
   },
   {
@@ -264,11 +266,13 @@ export const ALL_PAGES: PageDefinition[] = [
   {
     key: "mobileDeals",
     label: "Deals",
-    description: "Register combos and mix & match deals with their items on mobile (read-only).",
+    description: "Register combos and mix & match deals with their items on mobile; stage changes to them.",
     app: "mobile",
     filePath: "lib/features/deals/deals_screen.dart",
     defaultEnabled: true,
-    knownFeatureFlags: {}
+    knownFeatureFlags: {
+      sendToRegister: { label: "Send to register", description: "Preview and send staged deal changes to the register from the phone (always previewed and confirmed). Also needs Send to register on the Price Book.", default: false }
+    }
   },
   {
     key: "mobileTransactions",

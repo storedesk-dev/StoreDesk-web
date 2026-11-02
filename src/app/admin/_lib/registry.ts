@@ -132,7 +132,7 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
     // Everything in the lottery app, including correcting a closed shift and its settings.
     lottery: ["lottery", "lotteryClose", "lotteryCorrect", "lotteryReports", "lotterySettings"],
     // Report mapping is a section inside Settings.
-    flags: { settings: { reportMapping: true } }
+    flags: { settings: { reportMapping: true }, products: { manageCatalog: true }, pos: { manageData: true } }
   },
   cashier: {
     label: "Cashier",

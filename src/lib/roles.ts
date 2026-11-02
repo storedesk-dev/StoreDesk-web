@@ -233,6 +233,16 @@ function electronPageOn(role: OrgRole, key: string, flag?: string): boolean {
   );
 }
 
+/** What only an owner or manager is given: `settings` says nothing, every role has it. */
+function trustedWithStore(role: OrgRole): boolean {
+  return (
+    role.roleId === MANAGER_ROLE_ID ||
+    electronPageOn(role, "userManagement") ||
+    electronPageOn(role, "manageWorker") ||
+    electronPageOn(role, "settings", "reportMapping")
+  );
+}
+
 /**
  * A stored role saved before `salesTax` and `storeSettings` existed, as it reads now: each missing
  * key is added — enabled only when the role was trusted with the store's setup, else disabled — and
@@ -253,11 +263,7 @@ export function resolveSplitSettingsPages(role: OrgRole): { role: OrgRole; chang
   const missing = SPLIT_FROM_SETTINGS.filter((key) => !listed.has(key));
   if (!missing.length) return { role, changed: false };
 
-  const trusted =
-    role.roleId === MANAGER_ROLE_ID ||
-    electronPageOn(role, "userManagement") ||
-    electronPageOn(role, "manageWorker") ||
-    electronPageOn(role, "settings", "reportMapping");
+  const trusted = trustedWithStore(role);
   const phoneSalesTax = role.accessKeys.mobile.pages.some((page) => page.key === "mobileSalesTax" && page.enabled);
   const grant: Record<(typeof SPLIT_FROM_SETTINGS)[number], boolean> = {
     salesTax: trusted || phoneSalesTax,
@@ -284,6 +290,76 @@ export function splitSettingsOutdated(raw: unknown): boolean {
     if (role.roleId === ORG_ADMIN_ROLE_ID) return false;
     const keys = new Set(normalizeAccessKeys(role.accessKeys).electron.pages.map((page) => page.key));
     return SPLIT_FROM_SETTINGS.some((key) => !keys.has(key));
+  });
+}
+
+/** Writes that used to come with a read page: the flag each one needs now. */
+export const MANAGED_FLAGS = [
+  { page: "products", flag: "manageCatalog" },
+  { page: "pos", flag: "manageData" }
+] as const;
+
+/** Pages that change the register, which a stored Viewer gives up with its first managed flag. */
+const VIEWER_DROPS: Record<"electron" | "mobile", string[]> = {
+  electron: ["priceBook", "deals"],
+  mobile: ["mobilePriceBook", "mobileDeals"]
+};
+
+const VIEWER_ROLE_ID = "viewer";
+
+function undecidedFlags(role: Pick<OrgRole, "accessKeys">) {
+  return MANAGED_FLAGS.filter(({ page, flag }) =>
+    role.accessKeys.electron.pages.some((entry) => entry.key === page && entry.featureFlags[flag] === undefined)
+  );
+}
+
+/**
+ * A stored role saved before the managed flags, as it reads now: each flag on a page it lists is set —
+ * on only when the role was trusted with the store (the same rule as the Settings split, or Store
+ * settings) — and the role reads one version higher so every store takes it at its next sync. A stored
+ * Viewer also loses the pages that change the register in the same step: templates stopped giving them
+ * in 0.1.1, but a role saved before that kept them.
+ *
+ * A role that already names a flag (on or off) keeps it, so this happens once, and an admin who gives a
+ * Viewer those pages back is not undone. The Organization Admin always has every flag.
+ */
+export function resolveManagedFlags(role: OrgRole): { role: OrgRole; changed: boolean } {
+  if (role.roleId === ORG_ADMIN_ROLE_ID) return { role, changed: false };
+  const undecided = undecidedFlags(role);
+  if (!undecided.length) return { role, changed: false };
+
+  const trusted = trustedWithStore(role) || electronPageOn(role, "storeSettings");
+  const viewer = role.roleId === VIEWER_ROLE_ID;
+  const electron = role.accessKeys.electron.pages.map((page) => ({
+    ...page,
+    enabled: page.enabled && !(viewer && VIEWER_DROPS.electron.includes(page.key)),
+    featureFlags: {
+      ...page.featureFlags,
+      ...Object.fromEntries(undecided.filter((entry) => entry.page === page.key).map((entry) => [entry.flag, trusted]))
+    }
+  }));
+  const mobile = role.accessKeys.mobile.pages.map((page) => ({
+    ...page,
+    enabled: page.enabled && !(viewer && VIEWER_DROPS.mobile.includes(page.key))
+  }));
+  return {
+    role: {
+      ...role,
+      version: role.version + 1,
+      accessKeys: { ...role.accessKeys, electron: { pages: electron }, mobile: { pages: mobile } }
+    },
+    changed: true
+  };
+}
+
+/** A stored role lists a managed page without its flag: the stored copy is from before the flags. */
+export function managedFlagsOutdated(raw: unknown): boolean {
+  if (!Array.isArray(raw)) return false;
+  return raw.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const role = entry as Record<string, unknown>;
+    if (role.roleId === ORG_ADMIN_ROLE_ID) return false;
+    return undecidedFlags({ accessKeys: normalizeAccessKeys(role.accessKeys) }).length > 0;
   });
 }
 
@@ -316,7 +392,7 @@ export function normalizeRoles(raw: unknown, fallbackUpdatedAt: string): OrgRole
       updatedAt: toIsoOr(role.updatedAt, fallbackUpdatedAt),
       accessKeys: normalizeAccessKeys(role.accessKeys)
     };
-    const resolved = resolveSplitSettingsPages(resolveOrgAdminRole(normalized).role).role;
+    const resolved = resolveManagedFlags(resolveSplitSettingsPages(resolveOrgAdminRole(normalized).role).role).role;
     roles.push(stored ? resolved : { ...resolved, version: normalized.version });
   }
   return roles;
@@ -382,7 +458,7 @@ function busy(): ControlPlaneError {
  */
 export async function rolesPersistingOrgAdmin(storeId: string, store: StoreRecord): Promise<OrgRole[]> {
   const roles = storedRoles(store);
-  if (orgAdminRoleOutdated(store.roles) || splitSettingsOutdated(store.roles)) {
+  if (orgAdminRoleOutdated(store.roles) || splitSettingsOutdated(store.roles) || managedFlagsOutdated(store.roles)) {
     await compareAndSetRoles(storeId, store.updatedAt, roles).catch(() => false);
   }
   return roles;

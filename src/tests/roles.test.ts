@@ -7,6 +7,8 @@ import {
   orgAdminAccessKeys,
   orgAdminRoleOutdated,
   resolveOrgAdminRole,
+  managedFlagsOutdated,
+  resolveManagedFlags,
   resolveSplitSettingsPages,
   splitSettingsOutdated,
   unknownPageKeys
@@ -25,7 +27,7 @@ const cashier = {
     // Saved after Sales Tax and Store settings left Settings, so it names both (off).
     electron: {
       pages: [
-        { key: "pos", enabled: true, featureFlags: { enableRefunds: false } },
+        { key: "pos", enabled: true, featureFlags: { enableRefunds: false, manageData: false } },
         { key: "salesTax", enabled: false, featureFlags: {} },
         { key: "storeSettings", enabled: false, featureFlags: {} }
       ]
@@ -81,7 +83,7 @@ describe("normalizeRoles", () => {
       // A role from before the split gains Sales Tax and Store settings, off (nothing trusts it).
       electron: {
         pages: [
-          { key: "pos", enabled: false, featureFlags: { a: true } },
+          { key: "pos", enabled: false, featureFlags: { a: true, manageData: false } },
           { key: "salesTax", enabled: false, featureFlags: {} },
           { key: "storeSettings", enabled: false, featureFlags: {} }
         ]
@@ -416,5 +418,70 @@ describe("Sales Tax and Store settings, split out of Settings", () => {
     expect(enabledKeys(admin.accessKeys.electron.pages)).toEqual(expect.arrayContaining(["salesTax", "storeSettings"]));
     expect(enabledKeys(cashierRole.accessKeys.electron.pages)).toEqual(["settings"]);
     expect(cashierRole.version).toBe(4);
+  });
+});
+
+describe("managed flags: a read page no longer lets a role change data", () => {
+  const stored = (roleId: string, electron: Array<Record<string, unknown>>, mobile: string[] = []) => ({
+    roleId,
+    roleName: roleId,
+    version: 3,
+    updatedAt: CREATED,
+    accessKeys: {
+      electron: { pages: electron.map((page) => ({ featureFlags: {}, ...page })) as never[] },
+      mobile: { pages: mobile.map((key) => ({ key, enabled: true, featureFlags: {} })) },
+      lottery: { pages: [] }
+    }
+  });
+  const products = { key: "products", enabled: true };
+  const pos = { key: "pos", enabled: true };
+  const flags = (role: ReturnType<typeof stored>) => {
+    const pages = resolveManagedFlags(role).role.accessKeys.electron.pages;
+    return [
+      pages.find((page) => page.key === "products")?.featureFlags.manageCatalog,
+      pages.find((page) => page.key === "pos")?.featureFlags.manageData
+    ];
+  };
+
+  it("a stored cashier or viewer gets both off, one version up", () => {
+    expect(flags(stored("cashier", [products, pos]))).toEqual([false, false]);
+    const { role, changed } = resolveManagedFlags(stored("viewer", [products]));
+    expect([changed, role.version]).toEqual([true, 4]);
+  });
+
+  it("an owner or manager keeps both", () => {
+    expect(flags(stored("store_manager", [products, pos]))).toEqual([true, true]);
+    expect(flags(stored("owner", [products, pos, { key: "userManagement", enabled: true }]))).toEqual([true, true]);
+    expect(flags(stored("office", [products, pos, { key: "storeSettings", enabled: true }]))).toEqual([true, true]);
+  });
+
+  it("a stored Viewer loses the pages that change the register, and only a Viewer", () => {
+    const pages = (roleId: string) => {
+      const next = resolveManagedFlags(
+        stored(roleId, [products, { key: "priceBook", enabled: true }, { key: "deals", enabled: true }], ["mobilePriceBook", "mobileDeals", "mobileDashboard"])
+      ).role.accessKeys;
+      return [...next.electron.pages, ...next.mobile.pages].filter((page) => page.enabled).map((page) => page.key);
+    };
+    expect(pages("viewer")).toEqual(["products", "mobileDashboard"]);
+    expect(pages("night_clerk")).toEqual(["products", "priceBook", "deals", "mobilePriceBook", "mobileDeals", "mobileDashboard"]);
+  });
+
+  it("happens once: an admin who gives a Viewer the pages back is not undone", () => {
+    const decided = stored(
+      "viewer",
+      [{ key: "products", enabled: true, featureFlags: { manageCatalog: true } }, { key: "priceBook", enabled: true }],
+      ["mobilePriceBook"]
+    );
+    expect(resolveManagedFlags(decided)).toEqual({ role: decided, changed: false });
+    expect(managedFlagsOutdated([decided])).toBe(false);
+    expect(managedFlagsOutdated([stored("cashier", [pos])])).toBe(true);
+    expect(managedFlagsOutdated([{ roleId: "org_admin", accessKeys: {} }])).toBe(false);
+    const once = resolveManagedFlags(stored("cashier", [products, pos])).role;
+    expect(resolveManagedFlags(once)).toEqual({ role: once, changed: false });
+  });
+
+  it("a page the role doesn't list gets no flag", () => {
+    const role = stored("cashier", [{ key: "settings", enabled: true }]);
+    expect(resolveManagedFlags(role)).toEqual({ role, changed: false });
   });
 });

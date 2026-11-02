@@ -64,7 +64,7 @@ const DEFINITIONS: Record<string, TemplateDef> = {
     // Everything in the lottery app, including correcting a closed shift and its settings.
     lottery: ["lottery", "lotteryClose", "lotteryCorrect", "lotteryReports", "lotterySettings"],
     // Report mapping is a section inside Settings.
-    flags: { settings: { reportMapping: true } }
+    flags: { settings: { reportMapping: true }, products: { manageCatalog: true }, pos: { manageData: true } }
   },
   cashier: {
     roleName: "Cashier",
@@ -81,8 +81,7 @@ const DEFINITIONS: Record<string, TemplateDef> = {
     }
   },
   // Read-only means read-only: the Price Book (New item, Set price) and Deals pages change the register, so a
-  // Viewer does not get them. (A saved role that already has them is left
-  // alone — templates only seed new roles.)
+  // Viewer does not get them. (A saved Viewer lost them once, in resolveManagedFlags.)
   viewer: {
     roleName: "Viewer",
     description: "Looks, doesn't change: the dashboard, products and transactions, read-only. No sales tax, store settings or price changes.",
