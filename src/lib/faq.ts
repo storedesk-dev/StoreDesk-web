@@ -29,7 +29,7 @@ export const FAQ: FaqEntry[] = [
   {
     question: "Does StoreDesk change prices on my register?",
     answer:
-      "Only if you turn that on, and only when a person sends them. Sending changes back is off by default; when it is on, changes are staged so you can check them, and someone has to press send. Nothing is ever pushed to a till automatically.",
+      "Only for the roles you allow, and only when a person saves. Changes go one item at a time: StoreDesk checks the item first, sends only what changed, and reads it back from the register. Deals and fuel prices are still changed on the register itself. Nothing is ever pushed to a till automatically.",
     href: `${DOCS_BASE}/t/settings.registerWrites`
   },
   {
@@ -55,6 +55,12 @@ export const FAQ: FaqEntry[] = [
     answer:
       "A Windows 10 or later PC in the back office that can reach your register over the store network, and an Android 5.0 or later phone for the shop floor. There is no iPhone app yet.",
     href: "/download"
+  },
+  {
+    question: "Does it handle lottery?",
+    answer:
+      "Yes, with StoreDesk Lottery, its own app on the lottery PC. It keeps the instant-ticket rack and packs, closes each shift by scanner, and gives you the day's figures. It works on its own, and with StoreDesk it sends the day's lottery cash to StoreDesk Service.",
+    href: "/product/lottery"
   },
   {
     question: "How do staff get the phone app?",

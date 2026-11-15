@@ -654,19 +654,19 @@ export const api = {
   accessPreview: (storeId: string) =>
     request<AccessPreview>("GET", `${store(storeId)}/access-preview`),
 
-  // Roles
-  listRoles: (orgId: string) => request<{ roles: Role[] }>("GET", `${org(orgId)}/roles`),
+  // Roles belong to a store (D-22): `/stores/{storeId}/roles`.
+  listRoles: (storeId: string) => request<{ roles: Role[] }>("GET", `${store(storeId)}/roles`),
   createRole: (
-    orgId: string,
+    storeId: string,
     input: { roleName: string; template: RoleTemplate; accessKeys: RoleAccessKeys }
-  ) => request<{ role: Role }>("POST", `${org(orgId)}/roles`, input),
+  ) => request<{ role: Role }>("POST", `${store(storeId)}/roles`, input),
   saveRole: (
-    orgId: string,
+    storeId: string,
     roleId: string,
     input: { baseVersion: number; roleName: string; accessKeys: RoleAccessKeys }
-  ) => request<{ role: Role }>("PUT", `${org(orgId)}/roles/${enc(roleId)}`, input),
-  deleteRole: (orgId: string, roleId: string) =>
-    request<{ deleted: string }>("DELETE", `${org(orgId)}/roles/${enc(roleId)}`),
+  ) => request<{ role: Role }>("PUT", `${store(storeId)}/roles/${enc(roleId)}`, input),
+  deleteRole: (storeId: string, roleId: string) =>
+    request<{ deleted: string }>("DELETE", `${store(storeId)}/roles/${enc(roleId)}`),
 
   // Users
   listUsers: (orgId: string) => request<{ users: AppUser[] }>("GET", `${org(orgId)}/users`),
@@ -703,53 +703,3 @@ export const api = {
     return request<AuditPage>("GET", `${org(orgId)}/audit?${q.toString()}`);
   }
 };
-
-/** Every route this module calls, for diffing against the route handlers. */
-export const ADMIN_ROUTES = [
-  "POST   /api/admin/login",
-  "DELETE /api/admin/login",
-  "GET    /api/v1/admin/dashboard",
-  "GET    /api/v1/admin/organizations",
-  "POST   /api/v1/admin/organizations",
-  "GET    /api/v1/admin/organizations/{org}",
-  "PATCH  /api/v1/admin/organizations/{org}",
-  "DELETE /api/v1/admin/organizations/{org}",
-  "GET    /api/v1/admin/organizations/{org}/licenses",
-  "POST   /api/v1/admin/organizations/{org}/licenses",
-  "PATCH  /api/v1/admin/organizations/{org}/licenses/{licenseId}",
-  "POST   /api/v1/admin/organizations/{org}/licensing/mode",
-  "GET    /api/v1/admin/organizations/{org}/stores",
-  "POST   /api/v1/admin/organizations/{org}/stores",
-  "GET    /api/v1/admin/organizations/{org}/stores/{store}",
-  "PATCH  /api/v1/admin/organizations/{org}/stores/{store}",
-  "DELETE /api/v1/admin/organizations/{org}/stores/{store}",
-  "PUT    /api/v1/admin/organizations/{org}/stores/{store}/license",
-  "GET    /api/v1/admin/organizations/{org}/stores/{store}/settings",
-  "PUT    /api/v1/admin/organizations/{org}/stores/{store}/settings",
-  "GET    /api/v1/admin/organizations/{org}/stores/{store}/pos-credentials",
-  "PUT    /api/v1/admin/organizations/{org}/stores/{store}/pos-credentials",
-  "GET    /api/v1/admin/organizations/{org}/stores/{store}/setup",
-  "POST   /api/v1/admin/organizations/{org}/stores/{store}/setup-keys",
-  "GET    /api/v1/admin/organizations/{org}/stores/{store}/setup-keys/current",
-  "POST   /api/v1/admin/organizations/{org}/stores/{store}/setup-keys/rotate",
-  "POST   /api/v1/admin/organizations/{org}/stores/{store}/replace-pc",
-  "POST   /api/v1/admin/organizations/{org}/stores/{store}/replacement-approval",
-  "POST   /api/v1/admin/organizations/{org}/stores/{store}/tunnel",
-  "GET    /api/v1/admin/organizations/{org}/stores/{store}/support-codes",
-  "POST   /api/v1/admin/organizations/{org}/stores/{store}/support-codes",
-  "DELETE /api/v1/admin/organizations/{org}/stores/{store}/support-codes/{supportCodeId}",
-  "GET    /api/v1/admin/organizations/{org}/stores/{store}/access-preview",
-  "GET    /api/v1/admin/organizations/{org}/roles",
-  "POST   /api/v1/admin/organizations/{org}/roles",
-  "PUT    /api/v1/admin/organizations/{org}/roles/{roleId}",
-  "DELETE /api/v1/admin/organizations/{org}/roles/{roleId}",
-  "GET    /api/v1/admin/organizations/{org}/users",
-  "POST   /api/v1/admin/organizations/{org}/users",
-  "PATCH  /api/v1/admin/organizations/{org}/users/{appUserId}",
-  "POST   /api/v1/admin/organizations/{org}/users/{appUserId}/password",
-  "POST   /api/v1/admin/organizations/{org}/users/{appUserId}/invite",
-  "POST   /api/v1/admin/organizations/{org}/users/{appUserId}/assignments",
-  "PATCH  /api/v1/admin/organizations/{org}/users/{appUserId}/assignments/{id}",
-  "DELETE /api/v1/admin/organizations/{org}/users/{appUserId}/assignments/{id}",
-  "GET    /api/v1/admin/organizations/{org}/audit?cursor&action&limit"
-] as const;

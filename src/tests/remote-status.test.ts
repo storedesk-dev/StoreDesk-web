@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, request, seedOrganization, type TestAdmin } from "./helpers/api";
-import { GET as lookup } from "@/app/api/v1/app-auth/organizations/[slug]/route";
+import { storeReach } from "@/lib/store-reach";
 import { GET as setupRoute } from "@/app/api/v1/admin/stores/[storeId]/setup/route";
 import { GET as dashboardRoute } from "@/app/api/v1/admin/dashboard/route";
 import { resetRateLimitsForTests } from "@/lib/control-plane-security";
@@ -25,7 +25,7 @@ vi.mock("@/lib/store-notify", async (importOriginal) => ({
 /**
  * Remote reachability per store: Cloudflare's tunnel status (mapped, cached,
  * timed out to unknown), the heartbeat fallback, `since`, the dev stub, and
- * where it shows — the phone's org-tag lookup, the setup view, the dashboard.
+ * where it shows — the phone's store list, the setup view, the dashboard.
  */
 
 setupMemoryMongo();
@@ -180,7 +180,7 @@ describe("without Cloudflare", () => {
 });
 
 describe("where it shows", () => {
-  it("the org-tag lookup: each store gains remote, offline stores stay listed, nothing else about the PC", async () => {
+  it("the phone's store list: each store gains remote, offline stores stay listed, nothing else about the PC", async () => {
     useCloudflare();
     await giveTunnel(seeded.store.storeId, "cf-lookup-down");
     tunnels["cf-lookup-down"] = { status: "inactive", conns_inactive_at: "2026-09-12T20:14:37Z" };
@@ -192,44 +192,28 @@ describe("where it shows", () => {
     const { store: noTunnel } = await createStore(admin, seeded.organization.organizationId, { name: "Store 90" });
     vi.stubEnv("CLOUDFLARE_API_TOKEN", "cf-token");
 
-    const res = await call(lookup, request("GET", "/", { headers: { "x-forwarded-for": "192.0.2.50" } }), { slug: "example-retail" });
-    expect(res.status).toBe(200);
-    expect(res.body.stores).toEqual([
-      {
-        storeId: seeded.store.storeId,
-        name: "Store 42",
-        storeNumber: "42",
-        tunnelUrl: "https://cf-lookup-down.tunnels.example",
-        setup: expect.stringMatching(/^(active|awaiting_activation|none)$/),
-        licence: { covered: true, status: "active" },
-        remote: { status: "offline", since: "2026-09-12T20:14:00.000Z" }
-      },
-      {
-        // Created with no license of its own, so it is not covered: Store 42's does not reach it.
-        storeId: noTunnel.storeId,
-        name: "Store 90",
-        storeNumber: null,
-        tunnelUrl: null,
-        setup: "none",
-        licence: { covered: false, status: null },
-        remote: { status: "unknown", since: null }
-      }
-    ]);
-    const text = JSON.stringify(res.body);
+    const stores = (await TenantStoreModel.find({ organizationId: seeded.organization.organizationId }).lean()) as Record<string, unknown>[];
+    const reach = await storeReach(stores);
+    expect(reach.get(seeded.store.storeId)).toEqual({
+      tunnelUrl: "https://cf-lookup-down.tunnels.example",
+      setup: expect.stringMatching(/^(active|awaiting_activation|none)$/),
+      remote: { status: "offline", since: "2026-09-12T20:14:00.000Z" }
+    });
+    expect(reach.get(noTunnel.storeId)).toEqual({ tunnelUrl: null, setup: "none", remote: { status: "unknown", since: null } });
+    const text = JSON.stringify([...reach.values()]);
     expect(text).not.toContain("192.168.");
     expect(text).not.toContain("cf-lookup-down\"");
     expect(text).not.toContain("lastSeenAt");
   });
 
-  it("the lookup stays fast and answers when Cloudflare hangs", async () => {
+  it("the store list stays fast and answers when Cloudflare hangs", async () => {
     useCloudflare();
-    await giveTunnel(seeded.store.storeId, "cf-hang");
+    const store = await giveTunnel(seeded.store.storeId, "cf-hang");
     tunnels["cf-hang"] = "hang";
     const started = Date.now();
-    const res = await call(lookup, request("GET", "/", { headers: { "x-forwarded-for": "192.0.2.51" } }), { slug: "example-retail" });
+    const reach = await storeReach([store]);
     expect(Date.now() - started).toBeLessThan(2_500);
-    expect(res.status).toBe(200);
-    expect(res.body.stores[0].remote).toEqual({ status: "unknown", since: null });
+    expect(reach.get(seeded.store.storeId)?.remote).toEqual({ status: "unknown", since: null });
   });
 
   it("the store's setup view and the dashboard (down for more than 15 minutes)", async () => {

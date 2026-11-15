@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { MotionConfig, motion, useReducedMotion } from "framer-motion";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
 /**
@@ -14,11 +14,16 @@ import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
  */
 export function PageFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen text-[var(--foreground)]">
-      <SiteHeader />
-      <main>{children}</main>
-      <SiteFooter />
-    </div>
+    // reducedMotion="user": every Framer animation below honours the OS "reduce motion" setting.
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen text-[var(--foreground)]">
+        <SiteHeader />
+        <main id="main" tabIndex={-1} className="outline-none">
+          {children}
+        </main>
+        <SiteFooter />
+      </div>
+    </MotionConfig>
   );
 }
 
@@ -106,7 +111,7 @@ export function SectionHead({
 }
 
 export const primaryButton =
-  "inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-5 py-3 text-[15.5px] font-semibold text-white shadow-[0_8px_22px_-8px_rgba(26,99,244,0.6)] transition-[filter,transform] hover:-translate-y-0.5 hover:brightness-110";
+  "inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00875F] px-5 py-3 text-[15.5px] font-semibold text-white shadow-[0_8px_22px_-8px_rgba(26,99,244,0.6)] transition-[filter,transform] hover:-translate-y-0.5 hover:brightness-110";
 
 export const secondaryButton =
   "inline-flex items-center gap-2 rounded-full border border-[#1A63F4]/20 bg-white/80 px-5 py-3 text-[15.5px] font-semibold text-[#17202A] backdrop-blur transition-colors hover:border-[#1A63F4]/45 hover:text-[#1A63F4]";

@@ -12,8 +12,7 @@ import { canonicalJson } from "@/lib/control-plane-security";
  * Integrations are switches in the admin; they are set up on the store PC.
  * For Google Sheets the admin owns `enabled` only. The sheet itself
  * (`spreadsheetId`, `spreadsheetUrl`, `sheetName`, `headerRow`) is connected
- * in the StoreDesk desktop app and reported by the store PC (next phase: an
- * edge route, see lib/store-sheets.ts).
+ * in the StoreDesk desktop app on the store PC.
  */
 
 /**

@@ -142,11 +142,7 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
     // A cashier closes the till, which is the whole job at the counter. Correcting a day already
     // closed is a manager's, and the reports are the owner's.
     lottery: ["lottery", "lotteryClose"],
-    flags: {
-      pos: { enableRefunds: false, enableDiscounts: false, enableVoidTransaction: false, enableCashDrawer: true },
-      products: { enableBulkImport: false, enableBarcodeGeneration: false },
-      transactions: { enableExport: false, enableRefundView: false }
-    }
+    flags: {}
   },
   // The Price Book and Deals pages change the register, so read-only Viewer does not get
   // them (kept identical to lib/role-templates.ts).
@@ -163,11 +159,7 @@ export const ROLE_TEMPLATES: Record<Exclude<RoleTemplate, "blank">, TemplateDef>
     ],
     // Looks, doesn't change: the rack as it stands, and nothing that closes or corrects a day.
     lottery: ["lottery"],
-    flags: {
-      products: { enableBulkImport: false, enableBarcodeGeneration: false },
-      transactions: { enableExport: false },
-      mobileTransactions: { enableExport: false }
-    }
+    flags: {}
   }
 };
 

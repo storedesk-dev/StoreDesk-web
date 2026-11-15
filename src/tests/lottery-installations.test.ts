@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, request, seedOrganization } from "./helpers/api";
-import { WorkerInstallationModel } from "@/models/ControlPlane";
+import { TenantStoreModel, WorkerInstallationModel } from "@/models/ControlPlane";
 import { publicId } from "@/lib/control-plane-security";
 import { getStoreSetup } from "@/lib/setup";
-import { lookupOrganization } from "@/lib/control-plane";
-import { listStores, updateStoreSettings } from "@/lib/tenant-stores";
+import { storeReach } from "@/lib/store-reach";
+import { listStores } from "@/lib/tenant-stores";
 import { POST as issueSetupKey } from "@/app/api/v1/admin/stores/[storeId]/setup-keys/route";
 
 vi.mock("@/lib/store-notify", async (importOriginal) => ({
@@ -40,6 +40,12 @@ async function addLotteryPc(status = "active") {
   return workerInstallationId;
 }
 
+/** What the phone's store list says about setup (lib/store-reach.ts, shared with the email sign-in). */
+async function phoneSetup() {
+  const store = (await TenantStoreModel.findOne({ storeId }).lean()) as Record<string, unknown>;
+  return (await storeReach([store])).get(storeId)?.setup;
+}
+
 beforeEach(async () => {
   admin = await createAdmin();
   const seeded = await seedOrganization(admin, { maxPcsPerStore: 1 });
@@ -55,10 +61,9 @@ describe("a lottery PC is not a StoreDesk PC", () => {
     expect(setup.installation).toBeNull();
   });
 
-  it("does not make the store look set up to the phone's org lookup", async () => {
+  it("does not make the store look set up in the phone's store list", async () => {
     await addLotteryPc();
-    const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]?.setup).toBe("none");
+    expect(await phoneSetup()).toBe("none");
   });
 
   it("does not become the store's current PC in the admin list", async () => {
@@ -83,8 +88,7 @@ describe("a lottery PC is not a StoreDesk PC", () => {
     await activatePc(organizationId, storeId);
     const setup = await getStoreSetup(storeId);
     expect(setup.installations).toHaveLength(1);
-    const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]?.setup).toBe("active");
+    expect(await phoneSetup()).toBe("active");
   });
 
   it("is unaffected by the StoreDesk PC in turn", async () => {
@@ -106,29 +110,7 @@ describe("installations written before the lottery app existed", () => {
     await WorkerInstallationModel.updateOne({ workerInstallationId }, { $unset: { product: 1 } });
     const setup = await getStoreSetup(storeId);
     expect(setup.installations).toHaveLength(1);
-    const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]?.setup).toBe("active");
-  });
-});
-
-describe("the org-tag lookup is for phones only (D-26)", () => {
-  it("says nothing about lottery: StoreDesk Lottery signs in by email and never types a tag", async () => {
-    await updateStoreSettings(
-      admin,
-      storeId,
-      { capabilities: { lottery: true, coam: null, fuel: null, ebt: null, moneyOrder: null, prepaidGift: null } },
-      1
-    );
-    await addLotteryPc();
-    const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]).not.toHaveProperty("lottery");
-    expect(JSON.stringify(lookup)).not.toContain("Counter PC");
-  });
-
-  it("never leaks a licence number, only whether one covers the store and its status", async () => {
-    const lookup = await lookupOrganization("example-retail");
-    expect(lookup.stores[0]?.licence).toEqual({ covered: true, status: "active" });
-    expect(JSON.stringify(lookup)).not.toMatch(/SD-(ORG|STR)-/);
+    expect(await phoneSetup()).toBe("active");
   });
 });
 

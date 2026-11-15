@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowDownToLine, ArrowUpRight, Check, ChevronRight, Copy, KeyRound, Monitor, ShieldAlert, Smartphone } from "lucide-react";
 import { GooglePlayIcon, WindowsIcon } from "@/components/BrandIcons";
 import { PageFrame, PageHero, SectionHead } from "@/components/PageHero";
@@ -23,15 +24,15 @@ type Platform = "windows" | "android";
 const INSTALLERS: Array<{ platform: Platform; name: string; requirement: string; body: string; cta: string; footnote: string }> = [
   {
     platform: "windows",
-    name: "StoreDesk for Windows",
+    name: "StoreDesk Desktop and Service",
     requirement: "Windows 10 or later",
-    body: "The back office. Holds your catalogue and sales history, and talks to the register.",
+    body: "One installer for the back-office PC. StoreDesk Service holds your data and talks to the register; StoreDesk Desktop is where you work.",
     cta: "Download for Windows",
-    footnote: "Windows asks once for permission to install the background service."
+    footnote: "Windows asks once for permission to install StoreDesk Service."
   },
   {
     platform: "android",
-    name: "StoreDesk for Android",
+    name: "StoreDesk Mobile",
     requirement: "Android 5.0 or later",
     body: "The shop floor. Scan a shelf tag to see the price, the cost and the margin.",
     cta: "Get it on Google Play",
@@ -69,8 +70,8 @@ function CopyHash({ value }: { value: string }) {
       }}
       className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#D0D5DD] bg-white px-2.5 py-1 text-[12px] font-semibold text-[#344054] hover:bg-[#F9FAFB]"
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-[#00875F]" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
-      {copied ? "Copied" : "Copy"}
+      {copied ? <Check className="h-3.5 w-3.5 text-[#006B4B]" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
+      <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
     </button>
   );
 }
@@ -127,7 +128,7 @@ function Installers({ release }: { release: LatestRelease | null }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-[19px] font-bold tracking-tight">{it.name}</h2>
                   {detected === it.platform ? (
-                    <span className="rounded-full bg-[#00A87B]/12 px-2.5 py-0.5 text-[12px] font-semibold text-[#00875F]">For this device</span>
+                    <span className="rounded-full bg-[#00A87B]/12 px-2.5 py-0.5 text-[12px] font-semibold text-[#006B4B]">For this device</span>
                   ) : null}
                 </div>
                 <p className="sd-num mt-0.5 text-[13px] text-[var(--muted)]">
@@ -243,7 +244,7 @@ const BEFORE = [
   {
     icon: <Smartphone className="h-5 w-5" />,
     title: "Phones last",
-    body: "Install the Android app once the store PC is connected, and sign staff in against your store.",
+    body: "Install StoreDesk Mobile once the store PC is connected. Each person signs in with their own account.",
     action: null
   }
 ];
@@ -308,10 +309,34 @@ export function DownloadClient() {
           ))}
         </div>
 
-        <p className="mt-8 text-[15px] text-[var(--muted)]">
-          There is no iPhone version yet. macOS and Linux can run the desktop app for development, but the background
-          service that keeps it running is Windows-only today.
-        </p>
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
+          <div className="rounded-[24px] border border-[var(--border)] bg-white p-6">
+            <h2 className="text-[18px] font-bold tracking-tight">StoreDesk Lottery</h2>
+            <p className="mt-2 text-[15.5px] leading-relaxed text-[var(--muted)]">
+              Its own installer, for the PC at the lottery counter. Ask us for it.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <a
+                href={contactMailto({ subject: "StoreDesk Lottery installer" })}
+                className="inline-flex min-h-11 items-center rounded-full bg-[#17202A] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#1A63F4]"
+              >
+                Ask for StoreDesk Lottery
+              </a>
+              <Link
+                href="/product/lottery"
+                className="inline-flex min-h-11 items-center text-[14.5px] font-semibold text-[#1A63F4] hover:underline"
+              >
+                What it does
+              </Link>
+            </div>
+          </div>
+          <div className="rounded-[24px] border border-[var(--border)] bg-white p-6">
+            <h2 className="text-[18px] font-bold tracking-tight">iPhone, Mac and Linux</h2>
+            <p className="mt-2 text-[15.5px] leading-relaxed text-[var(--muted)]">
+              The iPhone app is not released yet. StoreDesk Service runs on Windows only.
+            </p>
+          </div>
+        </div>
       </section>
     </PageFrame>
   );

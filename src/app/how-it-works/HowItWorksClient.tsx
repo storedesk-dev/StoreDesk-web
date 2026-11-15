@@ -14,6 +14,7 @@ import {
   Server,
   Smartphone,
   Tags,
+  Ticket,
   UserCheck
 } from "lucide-react";
 import { PageFrame, PageHero, SectionHead, primaryButton } from "@/components/PageHero";
@@ -104,7 +105,7 @@ function SetupStages() {
       {STEPS.map((step, index) => (
         <li key={step.key} className={index > 0 ? "border-t border-[var(--border)]" : ""}>
           <a href={step.href} className="group flex items-start gap-4 p-5 transition-colors hover:bg-[#F5F8FF]">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1A63F4] to-[#00875F] text-white">
               {step.icon}
             </span>
             <span className="min-w-0 flex-1">
@@ -145,7 +146,7 @@ const LINKS: Link_[] = [
   },
   {
     icon: <Monitor className="h-5 w-5" />,
-    name: "Desktop app",
+    name: "StoreDesk Desktop",
     where: "store",
     online: "Price book, costs, reports, sales tax",
     offline: "Works as normal. It runs on the same PC",
@@ -164,7 +165,7 @@ const LINKS: Link_[] = [
   },
   {
     icon: <Smartphone className="h-5 w-5" />,
-    name: "Phone app",
+    name: "StoreDesk Mobile",
     where: "outside",
     online: "Check prices and takings from anywhere",
     // Phones reach the store through the tunnel, so they need the line. An admin can turn on local
@@ -192,7 +193,7 @@ const LINKS: Link_[] = [
 ];
 
 const STATE_STYLE = {
-  up: { dot: "bg-[#00A87B]", pill: "bg-[#00A87B]/12 text-[#00875F]", label: "Working" },
+  up: { dot: "bg-[#00A87B]", pill: "bg-[#00A87B]/12 text-[#006B4B]", label: "Working" },
   limited: { dot: "bg-[#F79009]", pill: "bg-[#F79009]/12 text-[#B54708]", label: "Holding" },
   down: { dot: "bg-[#98A2B3]", pill: "bg-[#98A2B3]/15 text-[#475467]", label: "Paused" }
 } as const;
@@ -205,12 +206,13 @@ function OutageSimulator() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-[16px] font-semibold">
           Internet at the store:{" "}
-          <span className={offline ? "text-[#B42318]" : "text-[#00875F]"}>{offline ? "down" : "connected"}</span>
+          <span className={offline ? "text-[#B42318]" : "text-[#006B4B]"}>{offline ? "down" : "connected"}</span>
         </p>
         <button
           type="button"
           role="switch"
           aria-checked={offline}
+          aria-label="Internet line down"
           onClick={() => setOffline((v) => !v)}
           className={`relative inline-flex h-10 w-[184px] items-center rounded-full p-1 text-[14px] font-semibold transition-colors ${
             offline ? "bg-[#17202A]" : "bg-[#E8F0FF]"
@@ -277,23 +279,29 @@ function OutageSimulator() {
 const PIECES = [
   {
     icon: <Server className="h-5 w-5" />,
-    name: "The service on your PC",
-    role: "Holds the catalogue, prices and sales history, and does the talking to the register. Everything else is a window onto it."
+    name: "StoreDesk Service",
+    role: "Runs on the store PC. Holds the catalogue, prices and sales history, and talks to the register. Everything else is a window onto it."
   },
   {
     icon: <Monitor className="h-5 w-5" />,
-    name: "The desktop app",
-    role: "Where you run the store: price book, cost comparison, sales reports, sales tax. Fast, because it talks to the PC it is installed on."
+    name: "StoreDesk Desktop",
+    role: "Where you run the store: price book, supplier costs, sales reports, sales tax. Fast, because it talks to the PC it is installed on."
   },
   {
     icon: <Smartphone className="h-5 w-5" />,
-    name: "The phone app",
-    role: "For the shop floor. Scan, search, check a price, look at today’s takings. Connects back to your own PC over a secure link."
+    name: "StoreDesk Mobile",
+    role: "For the shop floor, on Android. Scan, search, check a price, see today’s sales. Connects back to your own PC over a secure link."
   },
   {
     icon: <Cloud className="h-5 w-5" />,
     name: "Your account",
-    role: "We look after licensing and which PCs are connected. That is all it holds. Your sales figures never leave the store."
+    role: "One licence per store, the store PC and your people. That is all it holds. Your sales figures never leave the store."
+  },
+  {
+    icon: <Ticket className="h-5 w-5" />,
+    name: "StoreDesk Lottery (optional)",
+    role: "Its own app on the lottery counter PC. Closes each shift by scanner and sends the day’s lottery cash to StoreDesk Service.",
+    href: "/product/lottery"
   }
 ];
 
@@ -305,7 +313,7 @@ export function HowItWorksClient() {
         title={
           <>
             An afternoon to set up.{" "}
-            <span className="bg-gradient-to-r from-[#1A63F4] to-[#00A87B] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#1A63F4] to-[#00875F] bg-clip-text text-transparent">
               Then it stays out of your way.
             </span>
           </>
@@ -332,22 +340,30 @@ export function HowItWorksClient() {
         <div className="mx-auto max-w-6xl px-6 py-20">
           <SectionHead
             eyebrow="The pieces"
-            title="Four parts, one of them doing the heavy lifting"
-            lede="You meet all four during setup. Only the first has to be running for the store to work."
+            title="The parts, one of them doing the heavy lifting"
+            lede="You meet the first four during setup. Only StoreDesk Service has to be running for the store to work."
           />
           <div className="mt-10 grid gap-4 sm:grid-cols-2">
             {PIECES.map((piece, i) => (
               <div
                 key={piece.name}
-                className={`rounded-3xl border p-7 ${
+                className={`rounded-3xl border p-6 sm:p-7 ${
                   i === 0 ? "border-[#1A63F4]/30 bg-gradient-to-br from-[#F5F8FF] to-[#F0FBF6]" : "border-[var(--border)] bg-white"
                 }`}
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#00A87B]/12 text-[#00875F]">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#00A87B]/12 text-[#006B4B]">
                   {piece.icon}
                 </span>
                 <h3 className="mt-4 text-[19px] font-bold tracking-tight">{piece.name}</h3>
                 <p className="mt-2 text-[16px] leading-relaxed text-[var(--muted)]">{piece.role}</p>
+                {"href" in piece && piece.href ? (
+                  <Link
+                    href={piece.href}
+                    className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-semibold text-[#1A63F4] hover:underline"
+                  >
+                    What it does <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : null}
               </div>
             ))}
           </div>

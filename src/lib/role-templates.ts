@@ -74,11 +74,7 @@ const DEFINITIONS: Record<string, TemplateDef> = {
     // A cashier closes the till, which is the whole job at the counter. Correcting a day already
     // closed is a manager's, and the reports are the owner's.
     lottery: ["lottery", "lotteryClose"],
-    flags: {
-      pos: { enableRefunds: false, enableDiscounts: false, enableVoidTransaction: false, enableCashDrawer: true },
-      products: { enableBulkImport: false, enableBarcodeGeneration: false },
-      transactions: { enableExport: false, enableRefundView: false }
-    }
+    flags: {}
   },
   // Read-only means read-only: the Price Book (New item, Set price) and Deals pages change the register, so a
   // Viewer does not get them. (A saved Viewer lost them once, in resolveManagedFlags.)
@@ -95,11 +91,7 @@ const DEFINITIONS: Record<string, TemplateDef> = {
     ],
     // Looks, doesn't change: the rack as it stands, and nothing that closes or corrects a day.
     lottery: ["lottery"],
-    flags: {
-      products: { enableBulkImport: false, enableBarcodeGeneration: false },
-      transactions: { enableExport: false },
-      mobileTransactions: { enableExport: false }
-    }
+    flags: {}
   }
 };
 

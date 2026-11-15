@@ -4,9 +4,9 @@ import { faqJsonLd } from "@/lib/faq";
 import { jsonLdScript } from "@/lib/json-ld";
 
 export const metadata = pageMetadata({
-  title: "What StoreDesk does",
+  title: "Product: Desktop, Mobile, Service and Lottery",
   description:
-    "Price book, supplier cost comparison, fuel, deals, floor scanning, sales reports from the register, Georgia ST-3 sales tax and Google Sheets export, on the PC in your back office.",
+    "What StoreDesk Desktop, Mobile, Service and Lottery each do, who uses them, what they need and what is coming.",
   path: "/product"
 });
 
@@ -25,7 +25,7 @@ const jsonLd = {
       "@type": "BreadcrumbList",
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "StoreDesk", item: SITE_URL },
-        { "@type": "ListItem", position: 2, name: "What it does", item: PAGE_URL }
+        { "@type": "ListItem", position: 2, name: "Product", item: PAGE_URL }
       ]
     }
   ]

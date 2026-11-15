@@ -12,8 +12,9 @@ import { sinceTime } from "./_components/status";
 
 const orgHref = (orgId: string, tab?: string) =>
   `/admin/organizations/${encodeURIComponent(orgId)}${tab ? `?tab=${tab}` : ""}`;
-const storeHref = (orgId: string, storeId: string, tab?: string) =>
-  `/admin/organizations/${encodeURIComponent(orgId)}/stores/${encodeURIComponent(storeId)}${tab ? `?tab=${tab}` : ""}`;
+// A store has its own page on its own id (D-22); the organization is not in the path.
+const storeHref = (storeId: string, tab?: string) =>
+  `/admin/stores/${encodeURIComponent(storeId)}${tab ? `?tab=${tab}` : ""}`;
 
 function attentionText(item: AttentionItem): string {
   // Shown in the viewer's own time.
@@ -119,14 +120,14 @@ export default function DashboardPage() {
                       </div>
                       {item.kind === "license_ending" ? (
                         <Link
-                          href={item.storeId ? storeHref(item.organizationId, item.storeId, "license") : orgHref(item.organizationId, "licenses")}
+                          href={item.storeId ? storeHref(item.storeId, "license") : orgHref(item.organizationId, "licenses")}
                           className="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
                         >
                           Renew
                         </Link>
                       ) : item.kind === "store_unlicensed" && item.storeId ? (
                         <Link
-                          href={storeHref(item.organizationId, item.storeId, "license")}
+                          href={storeHref(item.storeId, "license")}
                           className="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
                         >
                           License
@@ -137,7 +138,7 @@ export default function DashboardPage() {
                         </Button>
                       ) : item.storeId ? (
                         <Link
-                          href={storeHref(item.organizationId, item.storeId, "pc")}
+                          href={storeHref(item.storeId, "pc")}
                           className="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold hover:bg-slate-50"
                         >
                           Open

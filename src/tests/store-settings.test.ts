@@ -3,7 +3,6 @@ import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, lastAudit, request, seedOrganization, type TestAdmin } from "./helpers/api";
 import { GET as getSettings, PUT as putSettings } from "@/app/api/v1/admin/stores/[storeId]/settings/route";
 import { GET as accessSync } from "@/app/api/v1/edge/sync/access/route";
-import { GET as lookup } from "@/app/api/v1/app-auth/organizations/[slug]/route";
 import { updateOrganization } from "@/lib/organizations";
 import { updateStore } from "@/lib/tenant-stores";
 import { scheduleNotify } from "@/lib/store-notify";
@@ -248,8 +247,6 @@ describe("what the store receives, and suspension (P12)", () => {
     const store = await pull(pc.token);
     expect(store.status).toBe(403);
     expect(store.body.error).toMatchObject({ code: "STORE_SUSPENDED", message: "This store is suspended in StoreDesk." });
-    const hidden = await call(lookup, request("GET", "/"), { slug: "example-retail" });
-    expect(hidden.body.stores).toEqual([]);
 
     await updateStore(admin, params.storeId, { status: "active" });
     expect((await pull(pc.token)).status).toBe(200);

@@ -120,11 +120,8 @@ describe("dev:local", () => {
 });
 
 describe("CORS (next.config.ts)", () => {
-  it("sends no CORS headers on the admin API or sign-in, never with credentials, and only a GET-only wildcard on the org-tag lookup", async () => {
+  it("sends no CORS headers on any route", async () => {
     const rules = (await nextConfig.headers?.()) ?? [];
-    expect(rules.map((rule) => rule.source)).toEqual(["/api/v1/app-auth/organizations/:slug"]);
-    const headers = rules.flatMap((rule) => rule.headers);
-    expect(headers.find((header) => header.key === "Access-Control-Allow-Credentials")).toBeUndefined();
-    expect(headers).toContainEqual({ key: "Access-Control-Allow-Methods", value: "GET" });
+    expect(rules.flatMap((rule) => rule.headers).filter((header) => header.key.startsWith("Access-Control-"))).toEqual([]);
   });
 });

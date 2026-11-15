@@ -59,8 +59,13 @@ type Action =
 export function UsersTab({ orgId, org, refreshOrg }: OrgTabProps) {
   const { toast } = useToast();
   const { data, error, loading, reload } = useLoad(async () => {
-    const [users, stores, roles] = await Promise.all([api.listUsers(orgId), api.listStores(orgId), api.listRoles(orgId)]);
-    return { users: users.users, stores: stores.stores, roles: roles.roles };
+    const [users, stores] = await Promise.all([api.listUsers(orgId), api.listStores(orgId)]);
+    // Roles belong to each store (D-22); every store starts from the same defaults, so the
+    // pickers here offer the union by role id (first store's name wins).
+    const perStore = await Promise.all(stores.stores.map((s) => api.listRoles(s.storeId)));
+    const roles = new Map<string, Role>();
+    for (const list of perStore) for (const r of list.roles) if (!roles.has(r.roleId)) roles.set(r.roleId, r);
+    return { users: users.users, stores: stores.stores, roles: [...roles.values()] };
   }, [orgId]);
   const [adding, setAdding] = useState(false);
   const [action, setAction] = useState<Action | null>(null);
@@ -119,7 +124,11 @@ export function UsersTab({ orgId, org, refreshOrg }: OrgTabProps) {
           Add user
         </Button>
       </div>
-      {data.roles.length === 0 ? <Notice tone="amber">Create a role on the Roles tab before adding users.</Notice> : null}
+      {data.stores.length === 0 ? (
+        <Notice tone="amber">Add a store before adding users.</Notice>
+      ) : data.roles.length === 0 ? (
+        <Notice tone="amber">Create a role on a store&apos;s Roles tab before adding users.</Notice>
+      ) : null}
 
       {data.users.length === 0 ? (
         <EmptyState title="No users yet">Add the store owner or manager first, with a login and password or an invitation.</EmptyState>

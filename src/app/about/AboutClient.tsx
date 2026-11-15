@@ -16,7 +16,7 @@ import { contactMailto } from "@/lib/site";
 const BELIEFS = [
   {
     title: "Your data stays in your store",
-    body: "Sales figures, margins and supplier prices are the most sensitive numbers a small retailer has. The cloud side of StoreDesk knows your store exists and that your licence is paid. It does not know what you sold today."
+    body: "Sales figures, margins and supplier prices are the most sensitive numbers a small retailer has. The cloud side of StoreDesk knows your store exists and that it has a licence. It does not know what you sold today."
   },
   {
     title: "It has to work when the line is down",
@@ -24,11 +24,11 @@ const BELIEFS = [
   },
   {
     title: "The register is the source of truth",
-    body: "StoreDesk reads from your Commander, and only sends something back when you have turned that on and a person confirms it. Nothing is pushed to a till automatically. If StoreDesk vanished tomorrow, the store would keep trading."
+    body: "StoreDesk reads from your Commander. It sends an item change back only when a person sends it, and reads it back to check. Nothing is pushed to a till automatically. If StoreDesk vanished tomorrow, the store would keep trading."
   },
   {
     title: "No feature nobody asked for",
-    body: "Plenty of store software is sold on the length of its feature list. We would rather ship six things that work than thirty that mostly do."
+    body: "Plenty of store software is sold on the length of its feature list. We would rather ship a few things that work than thirty that mostly do."
   }
 ];
 
@@ -79,17 +79,21 @@ export function AboutClient() {
             </p>
           </div>
         </div>
-        <div className="self-start rounded-[28px] bg-gradient-to-br from-[#0E43D8] via-[#1A63F4] to-[#00A87B] p-8 text-white shadow-[0_30px_70px_-30px_rgba(14,67,216,0.7)]">
-          <Building2 className="h-7 w-7 text-white/85" />
+        <div className="self-start rounded-[28px] bg-gradient-to-br from-[#0E43D8] via-[#1A63F4] to-[#00875F] p-6 text-white shadow-[0_30px_70px_-30px_rgba(14,67,216,0.7)] sm:p-8">
+          <Building2 className="h-7 w-7 text-white" />
           <p className="mt-5 font-[family-name:var(--font-display)] text-[26px] font-bold leading-snug tracking-tight">
             Everything on this site describes software that exists and runs in a store today.
           </p>
-          <p className="mt-4 text-[16px] leading-relaxed text-white/80">
-            Two things are being built and are not here yet: EDI, so invoices from H.T. Hackney and
-            the other distributors that support it land as costs without anyone typing them, and a
-            lottery module for settling the daily ticket count. Until they ship we list them as
-            planned, not as features.
+          <p className="mt-4 text-[16px] leading-relaxed text-white">
+            Not here yet: EDI, so distributor invoices land as costs without typing; sending deals and fuel
+            prices to the register; and an iPhone app. We list them as planned, not as features.
           </p>
+          <Link
+            href="/product/lottery"
+            className="mt-5 inline-flex min-h-11 items-center gap-1.5 font-semibold text-white underline decoration-white/60 underline-offset-4 hover:decoration-white"
+          >
+            StoreDesk Lottery is here: the ticket rack and the shift close
+          </Link>
         </div>
       </section>
 

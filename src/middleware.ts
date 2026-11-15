@@ -56,7 +56,7 @@ export async function middleware(req: NextRequest) {
 
   const authed = isValidAdminCookie(req.cookies.get(adminCookieName())?.value);
 
-  if (pathname.startsWith("/api/stores") || pathname.startsWith("/api/v1/admin")) {
+  if (pathname.startsWith("/api/v1/admin")) {
     if (!authed) {
       // The standard error shape every route answers with.
       return refuse(401, "UNAUTHORIZED", "Sign in again.");
@@ -78,5 +78,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/stores/:path*", "/api/v1/admin/:path*", "/api/admin/:path*"]
+  matcher: ["/admin/:path*", "/api/v1/admin/:path*", "/api/admin/:path*"]
 };

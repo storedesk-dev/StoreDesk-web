@@ -38,11 +38,11 @@ export const CAPABILITIES = {
   /** fuelPrices — page key `fuelPrices`, "Fuel Center" */
   fuel: "Fuel grades and pump prices, on the desktop and on a phone at the island",
   /** deals — page key `deals` */
-  deals: "Multi-buy deals from the register, with what each one is really making",
+  deals: "Multi-buy deals from the register, with what each one is really making (changed on the register itself for now)",
   /** priceBook.priceGroups feature flag */
   priceGroups: "Group items and change price and information across the whole group at once",
   /** registerChanges + settings.registerWrites */
-  registerChanges: "Stage price changes, check them, and send them to the register when you choose",
+  registerChanges: "Change an item's price or details and save it to the register, one item at a time, checked and read back",
   /** transactions + POS reports — Features/PosReports */
   posReports: "Daily, shift and monthly sales pulled from the register, down to single transactions",
   /** Features/SalesTax — StateRules.Supported is ["GA"] */
@@ -52,7 +52,9 @@ export const CAPABILITIES = {
   /** mobileScanner + mobilePriceBook */
   scanner: "Scan a barcode on the shop floor and see cost, price and margin",
   /** userManagement — page key `userManagement`, "Users and Roles" */
-  roles: "Staff accounts you create, and per-screen control over what each person opens"
+  roles: "Staff accounts you create, and per-screen control over what each person opens",
+  /** store-desk-lottery — StoreDesk Lottery, its own app on the lottery PC */
+  lottery: "Instant-ticket rack, packs and shift close by scanner on the lottery PC, with the day's lottery cash sent to StoreDesk"
 } as const;
 
 /** Real limits from the control plane, not aspirational ones. */

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, BookOpen, Check, Copy, KeyRound, LifeBuoy, Mail, MessageSquare, Plug, Send, Smartphone, Store } from "lucide-react";
+import { ArrowUpRight, BookOpen, Check, Copy, KeyRound, LifeBuoy, Mail, MessageSquare, Plug, Send, Smartphone, Store, Ticket } from "lucide-react";
 import { PageFrame, PageHero } from "@/components/PageHero";
 import { DOCS, SITE, contactMailto } from "@/lib/site";
 
@@ -59,12 +59,21 @@ const TOPICS: Topic[] = [
   },
   {
     key: "phone",
-    hint: "Android app trouble",
+    hint: "StoreDesk Mobile trouble",
     icon: <Smartphone className="h-4 w-4" />,
     label: "Phone app",
     subject: "StoreDesk: phone app",
     guide: { href: DOCS.mobileSetup, label: "Setting up the phone app" },
     ask: ["Phone model and Android version", "What you were doing when it went wrong", "A screenshot, if you can"]
+  },
+  {
+    key: "lottery",
+    hint: "The ticket rack app",
+    icon: <Ticket className="h-4 w-4" />,
+    label: "StoreDesk Lottery",
+    subject: "StoreDesk Lottery",
+    guide: { href: DOCS.topic("product.lottery"), label: "The StoreDesk Lottery guide" },
+    ask: ["Store name", "Is StoreDesk already on a PC in the store?", "Which PC will run it at the lottery counter?"]
   },
   {
     key: "other",
@@ -100,16 +109,15 @@ function Composer() {
   return (
     <div className="overflow-hidden rounded-[28px] border border-white/80 bg-white/85 shadow-[0_30px_80px_-30px_rgba(26,99,244,0.45)] backdrop-blur-xl">
       <div className="border-b border-[var(--border)] bg-gradient-to-r from-[#F5F8FF] to-[#F0FBF6] p-4">
-        <p className="px-1 text-[13px] font-semibold text-[var(--muted)]">What is it about?</p>
-        <div role="radiogroup" aria-label="What is it about?" className="mt-2.5 space-y-1.5">
+        <p id="topic-label" className="px-1 text-[13px] font-semibold text-[var(--muted)]">What is it about?</p>
+        <div role="group" aria-labelledby="topic-label" className="mt-2.5 space-y-1.5">
           {TOPICS.map((t) => {
             const on = t.key === topicKey;
             return (
               <button
                 key={t.key}
                 type="button"
-                role="radio"
-                aria-checked={on}
+                aria-pressed={on}
                 onClick={() => setTopicKey(t.key)}
                 className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
                   on ? "bg-white shadow-sm ring-2 ring-[#1A63F4]" : "bg-white/70 ring-1 ring-[var(--border)] hover:bg-white"
@@ -117,7 +125,7 @@ function Composer() {
               >
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                    on ? "bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white" : "bg-[#F2F4F7] text-[#475467]"
+                    on ? "bg-gradient-to-br from-[#1A63F4] to-[#00875F] text-white" : "bg-[#F2F4F7] text-[#475467]"
                   }`}
                 >
                   {t.icon}
@@ -138,7 +146,7 @@ function Composer() {
         <div className="rounded-2xl border border-[var(--border)] bg-white text-[14.5px]">
           <div className="flex gap-3 border-b border-[var(--border)] px-4 py-2.5">
             <span className="w-16 shrink-0 text-[var(--muted)]">To</span>
-            <span className="font-semibold">{SITE.email}</span>
+            <span className="min-w-0 break-all font-semibold">{SITE.email}</span>
           </div>
           <div className="flex gap-3 border-b border-[var(--border)] px-4 py-2.5">
             <span className="w-16 shrink-0 text-[var(--muted)]">Subject</span>
@@ -149,7 +157,7 @@ function Composer() {
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="font-semibold"
+                className="min-w-0 font-semibold"
               >
                 {topic.subject}
               </motion.span>
@@ -178,7 +186,7 @@ function Composer() {
                   animate={{ x: 0 }}
                   className="flex gap-2.5 text-[15px] leading-snug"
                 >
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#00A87B]" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#00875F]" />
                   {a}
                 </motion.li>
               ))}
@@ -189,7 +197,7 @@ function Composer() {
         <div className="mt-4 flex flex-wrap gap-2.5">
           <a
             href={contactMailto({ subject: topic.subject, body })}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-5 py-2.5 text-[15px] font-semibold text-white shadow-[0_8px_22px_-8px_rgba(26,99,244,0.6)] hover:brightness-110"
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00875F] px-5 py-2.5 text-[15px] font-semibold text-white shadow-[0_8px_22px_-8px_rgba(26,99,244,0.6)] hover:brightness-110"
           >
             <Send className="h-4 w-4" /> Open in my email app
           </a>
@@ -198,8 +206,8 @@ function Composer() {
             onClick={copyAddress}
             className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-4 py-2.5 text-[15px] font-semibold text-[#17202A] hover:border-[#1A63F4]/40"
           >
-            {copied ? <Check className="h-4 w-4 text-[#00A87B]" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copied" : "Copy address"}
+            {copied ? <Check className="h-4 w-4 text-[#00875F]" /> : <Copy className="h-4 w-4" />}
+            <span aria-live="polite">{copied ? "Copied" : "Copy address"}</span>
           </button>
         </div>
       </div>
@@ -218,7 +226,7 @@ const NOTES = [
   },
   {
     title: "Say which part",
-    body: "The desktop app, the phone app, or the setup on the store PC, and roughly when it started."
+    body: "StoreDesk Desktop, Mobile, Service or Lottery, and roughly when it started."
   }
 ];
 
@@ -234,7 +242,7 @@ const FIRST_STOPS = [
   {
     href: DOCS.troubleshooting,
     title: "Something is not working",
-    body: "The service will not start, the register will not answer, phones cannot reach the store."
+    body: "StoreDesk Service will not start, the register will not answer, phones cannot reach the store."
   },
   {
     href: DOCS.install,
@@ -258,7 +266,7 @@ export function ContactClient() {
         aside={<Composer />}
       >
         <div className="mt-7 space-y-2.5">
-          <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#00875F]">
+          <p className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#006B4B]">
             <LifeBuoy className="h-4 w-4" aria-hidden />
             Try the guide first
           </p>
@@ -283,14 +291,14 @@ export function ContactClient() {
 
         <a
           href={contactMailto()}
-          className="mt-5 inline-flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-white/80 px-4 py-3 backdrop-blur hover:border-[#1A63F4]/40"
+          className="mt-5 inline-flex max-w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-white/80 px-4 py-3 backdrop-blur hover:border-[#1A63F4]/40"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#1A63F4] to-[#00A87B] text-white">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1A63F4] to-[#00875F] text-white">
             <Mail className="h-5 w-5" />
           </span>
-          <span>
+          <span className="min-w-0">
             <span className="block text-[13px] text-[var(--muted)]">Or write in your own words</span>
-            <span className="block text-[17px] font-semibold text-[#1A63F4]">{SITE.email}</span>
+            <span className="block break-all text-[17px] font-semibold text-[#1A63F4]">{SITE.email}</span>
           </span>
         </a>
       </PageHero>

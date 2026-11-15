@@ -64,7 +64,7 @@ src
 │           ├── setup-keys/redeem   activation (setup key)
 │           ├── organizations/…/worker-installations/…/bootstrap   store-server bootstrap
 │           ├── lottery/         StoreDesk Lottery sign-in, bind, token, roster, sign-out, unbind (D-26)
-│           └── app-auth/        e-mail sign-in, enrollment, legacy org-tag lookup (public, rate-limited)
+│           └── app-auth/        e-mail sign-in and enrollment (public, rate-limited)
 ├── config/pages.ts              GENERATED page registry
 ├── lib/                         one module per area (see README "What is where")
 ├── models/ControlPlane.ts       every Mongoose model

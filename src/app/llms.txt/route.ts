@@ -20,14 +20,21 @@ export async function GET() {
 
 ${SITE.name} is back-office software for independent convenience stores and gas stations that use a Verifone Commander register. It is local-first: the store's catalogue, supplier costs and sales history live on the back-office PC, not in the cloud.
 
+## Products
+
+- StoreDesk Desktop: the back-office app on the store's Windows PC. Price book, supplier costs, register changes, sales reports and transactions, Fuel Center, deals, Georgia ST-3 sales tax, Google Sheet export, users and roles.
+- StoreDesk Mobile: the Android phone app. Scan a barcode for price, cost and margin; price book; today's sales and analytics; transactions; fuel prices; deals; reports.
+- StoreDesk Service: the background program on the store PC. Holds the store's data, talks to the Verifone Commander, checks sign-ins offline, and serves the desktop and phone apps.
+- StoreDesk Lottery: a separate Windows app with its own installer and database, for the instant-ticket rack at the lottery counter. Runs with or without StoreDesk.
+
 ## Key facts
 
-- Platforms: Windows 10 or later (desktop app plus a background service on the back-office PC); Android 5.0 or later, installed from Google Play. There is no iPhone app.
-- Register: Verifone Commander, read over the store network. Writing back is a separate setting (off by default); when it is on, changes are staged and sent by a person, never automatically.
+- Platforms: StoreDesk Desktop and StoreDesk Service run on Windows 10 or later, on the back-office PC, from one installer. StoreDesk Mobile runs on Android 5.0 or later, from Google Play; the iPhone app is not released yet. StoreDesk Lottery is its own Windows app on the lottery counter PC.
+- Register: Verifone Commander, read over the store network. An item change (price, details or a new item) goes to the register only when a person sends it; StoreDesk checks the item first and reads it back. Deals and fuel prices are not sent to the register yet. Nothing is ever sent automatically.
 - Data location: the price book, supplier costs and sales reports stay on the store PC. The ${SITE.name} account holds only your stores, their licensing and which PCs are connected.
 - Offline: the register, the desktop app and staff sign-in all keep working with no internet, because passwords are checked on the store PC; a session lasts ${PLANS.offlineSessionHours} hours. Phones away from the store, the Google Sheet export and the ${SITE.name} account need the line.
 - Setup: a setup key is emailed when a store is created; it does not expire but is used once, and StoreDesk makes the next one as it is used. An admin reads the current key on the store PC to set up a replacement PC (which takes over); StoreDesk can also rotate it.
-- Licensing: a license covers one store with ${PLANS.defaultMaxWorkers} store PC, for a term agreed with ${SITE.name}; a business with several stores holds a license for each. Licenses are granted by ${SITE.name}, not bought online, so a new store is unlicensed until one is granted. Pricing is by enquiry.
+- Licensing: a license covers one store with ${PLANS.defaultMaxWorkers} store PC, for a term agreed with ${SITE.name}; a business with several stores holds a license for each. There is no organisation-wide or multi-store licence. Licenses are granted by ${SITE.name}, not bought online, so a new store is unlicensed until one is granted. Pricing is by enquiry.
 - Contact: ${SITE.email}
 - Documentation: ${DOCS_BASE}${release ? `
 - Current version: ${release.version}${release.channel === "beta" ? " (beta)" : ""}, published ${release.releaseDate.slice(0, 10)}. Release notes: ${release.notesUrl}
@@ -39,6 +46,18 @@ ${SITE.name} is back-office software for independent convenience stores and gas 
 ${Object.values(CAPABILITIES)
   .map((line) => `- ${line}`)
   .join("\n")}
+
+## StoreDesk Lottery
+
+- The rack: every box, what is in it, and how far through each pack is.
+- Receive packs by scanner, put a pack out, hold, move, take off or return a pack; packs listed by state with a history of every change.
+- Close a shift by scanning the ticket showing in each box, then typing three numbers from the lottery terminal. Lottery cash = instant sales - instant cashes + online sales - online cashes.
+- Correct a closed day: each correction is a new version with a reason, kept in an audit trail.
+- Settle the packs that are due (21 days after activation in Georgia).
+- Shift report with Print, a daily report, best sellers, rack advice and what to order.
+- Rack setup to match the counter; people and roles with the same sign-in as StoreDesk; a demo store with sample data.
+- Georgia Lottery instant tickets today.
+- With StoreDesk, each closed day's lottery totals go to StoreDesk Service. Packs, games and names stay on the lottery PC.
 
 ## Who it is for
 
@@ -59,21 +78,23 @@ ${FAQ.map((entry) => `**${entry.question}**\n${entry.answer}`).join("\n\n")}
 ## Not available yet
 
 - EDI, so invoices from H.T. Hackney and other distributors that support it become costs without typing, is planned and not shipped.
-- A lottery module for settling the daily ticket count is planned and not shipped.
-- There is no iPhone app, and the background service is Windows-only.
+- StoreDesk Lottery does not email reports yet (coming soon), does not import the Georgia settlement statement, and has no phone screens.
+- Deal and fuel price changes are not sent to the register yet; change them on the register.
+- The iPhone app is not released yet, and StoreDesk Service is Windows-only.
 - Sales tax returns cover Georgia (ST-3) only.
 
 ## Pages
 
-- [What it does](${SITE_URL}/product): the price book, supplier cost comparison, floor scanning, register sales reports, Georgia ST-3 sales tax and Google Sheets export.
+- [Product](${SITE_URL}/product): StoreDesk Desktop, Mobile, Service and Lottery: what each does, who uses it, what it needs and what is coming.
+- [StoreDesk Lottery](${SITE_URL}/product/lottery): the rack, the shift close by scanner, reports, and how it works with StoreDesk.
 - [How it works](${SITE_URL}/how-it-works): the four setup stages and what keeps working when the internet goes down.
 - [About](${SITE_URL}/about): why ${SITE.name} exists, and what is planned.
-- [Download](${SITE_URL}/download): the Windows installer and the Android app.
+- [Download](${SITE_URL}/download): the Windows installer (StoreDesk Desktop and Service) and StoreDesk Mobile for Android.
 - [Contact](${SITE_URL}/contact): email the team for setup keys, support or questions.
 
 ## Documentation
 
-- [User guide](${DOCS_BASE}): every desktop screen, every phone screen and the store PC service, with screenshots.
+- [User guide](${DOCS_BASE}): every StoreDesk Desktop, Mobile and Lottery screen, and StoreDesk Service, with screenshots.
 - [Install](${DOCS_BASE}/t/flow.install), [connect the register](${DOCS_BASE}/t/flow.connect-register), [set up the phone app](${DOCS_BASE}/t/flow.mobile).
 - [Troubleshooting](${DOCS_BASE}/t/service.troubleshooting) and [release notes](${DOCS_BASE}/t/release.latest).
 

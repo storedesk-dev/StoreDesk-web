@@ -2,7 +2,6 @@ import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import {
   AppUserModel,
-  ClientDeviceModel,
   EulaAcceptanceModel,
   OrganizationModel,
   SetupKeyModel,
@@ -37,8 +36,7 @@ import {
 } from "@/lib/store-setup-key";
 import { readRegisterConfig, registerConfigJson } from "@/lib/tenant-stores";
 import { writeAudit } from "@/lib/audit";
-import { coverageFor, coveringLicense, coveringLicenses, licenseProblem } from "@/lib/licenses";
-import { storeReach } from "@/lib/store-reach";
+import { coverageFor, coveringLicense, licenseProblem } from "@/lib/licenses";
 
 /**
  * The store-facing half of the control plane: activation (setup-key redeem),
@@ -581,6 +579,7 @@ const APP_USER_ID = /^(?:appu|apu)_[a-f0-9]{32}$/;
 export async function enrollAppUser(body: {
   enrollmentCredential: string;
   password: string;
+  /** Still required by the route for older callers; nothing is recorded per device any more. */
   deviceName: string;
   audience: "desktop" | "mobile";
 }) {
@@ -631,20 +630,9 @@ export async function enrollAppUser(body: {
   // The new password reaches the user's stores with their next access pull.
   scheduleAppUserNotify(appUserId, "app_user.enroll");
 
-  const deviceId = publicId("dev");
-  await ClientDeviceModel.create({
-    deviceId,
-    appUserId,
-    audience: body.audience,
-    deviceName: body.deviceName.trim(),
-    status: "active",
-    lastSeenAt: new Date()
-  });
-
   return {
     contractVersion: CONTRACT_VERSION,
     appUserId,
-    deviceId,
     assignments: await assignmentSummaries(appUserId)
   };
 }
@@ -670,71 +658,4 @@ async function assignmentSummaries(appUserId: string) {
       tunnelUrl: row?.tunnelUrl ? String(row.tunnelUrl) : null
     };
   });
-}
-
-/**
- * Lookup accepts any stored slug, including ones older builds wrote before the
- * org-tag rule (lib/organizations.ts ORG_SLUG); the fallback slug was an
- * organization id, hence `_`.
- */
-const ORGANIZATION_SLUG = /^[a-z0-9][a-z0-9._-]{0,99}$/;
-
-export function normalizeOrganizationSlug(raw: string): string | null {
-  const slug = raw.trim().toLowerCase();
-  return ORGANIZATION_SLUG.test(slug) ? slug : null;
-}
-
-async function activeOrganizationBySlug(rawSlug: string) {
-  const slug = normalizeOrganizationSlug(rawSlug);
-  if (!slug) throw new ControlPlaneError(400, "REQUEST_INVALID", "That tag is not valid");
-  await connectDb();
-  // A suspended organization is not found (P12).
-  const org = await OrganizationModel.findOne({ slug, status: "active" }).lean();
-  if (!org) {
-    throw new ControlPlaneError(404, "ORGANIZATION_NOT_FOUND", "Nothing matches that tag");
-  }
-  return org;
-}
-
-/**
- * The phone's first screen: the user types the org tag and the app saves the
- * answer, so it knows where each store's server is before anyone signs in.
- * Public and rate-limited, so it carries only public facts: the organization's
- * name and, per active store, its name, id, tunnel URL (a public hostname) and
- * `remote: {status: "online" | "offline" | "unknown", since}` — whether phones
- * can reach it now, and since when (rounded to the minute). An offline store
- * is still listed. Suspended organizations and stores are left out.
- */
-export async function lookupOrganization(rawSlug: string) {
-  const org = await activeOrganizationBySlug(rawSlug);
-  const stores = (await TenantStoreModel.find({
-    organizationId: org.organizationId,
-    status: "active"
-  })
-    .sort({ name: 1 })
-    .lean()) as Doc[];
-  // Tunnel URL, whether the store PC has been activated, and whether phones can reach it now — shared
-  // with the email sign-in's store list (`lib/store-reach.ts`) so the two answers never drift.
-  const reach = await storeReach(stores);
-  // Whether a licence covers each store: a state, never the licence number. (The lottery block that
-  // used to sit here went with the org tag in StoreDesk Lottery, D-26: that app signs in by email.)
-  const licenses = await coveringLicenses(stores);
-
-  const licenceOf = (store: Doc) => {
-    const license = licenses.get(String(store.storeId)) ?? null;
-    return { covered: license !== null, status: license ? String(license.status) : null };
-  };
-  return {
-    contractVersion: CONTRACT_VERSION,
-    organization: { slug: String(org.slug), name: String(org.name) },
-    stores: stores.map((store) => ({
-      storeId: String(store.storeId),
-      name: String(store.name),
-      storeNumber: store.storeNumber ? String(store.storeNumber) : null,
-      tunnelUrl: reach.get(String(store.storeId))?.tunnelUrl ?? null,
-      setup: reach.get(String(store.storeId))?.setup ?? ("none" as const),
-      licence: licenceOf(store),
-      remote: reach.get(String(store.storeId))?.remote ?? { status: "unknown" as const, since: null }
-    }))
-  };
 }

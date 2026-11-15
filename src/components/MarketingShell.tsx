@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { MotionConfig, motion, useReducedMotion } from "framer-motion";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
 /**
@@ -30,8 +30,10 @@ export function MarketingShell({
   });
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen text-[var(--foreground)]">
       <SiteHeader />
+      <main id="main" tabIndex={-1} className="outline-none">
       <div className="sd-hero-wash relative border-b border-[var(--border)]">
         <div className="relative mx-auto max-w-6xl px-6 py-16 md:py-20">
           {eyebrow ? (
@@ -59,7 +61,9 @@ export function MarketingShell({
         </div>
       </div>
       <div className="mx-auto max-w-6xl px-6 py-14 md:py-16">{children}</div>
+      </main>
       <SiteFooter />
     </div>
+    </MotionConfig>
   );
 }

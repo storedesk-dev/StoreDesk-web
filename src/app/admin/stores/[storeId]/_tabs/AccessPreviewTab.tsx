@@ -6,7 +6,7 @@ import { APPS, CAPABILITY_LABEL, pageLabel } from "../../../_lib/registry";
 import { Card, Chip, EmptyState, ErrorBanner, Spinner, useLoad } from "../../../_components/ui";
 import type { StoreTabProps } from "./shared";
 
-export function AccessPreviewTab({ storeId, store }: StoreTabProps) {
+export function AccessPreviewTab({ storeId }: StoreTabProps) {
   const { data, error, loading, reload } = useLoad(() => api.accessPreview(storeId), [storeId]);
 
   if (error && !data) return <ErrorBanner error={error} onRetry={reload} />;
@@ -33,8 +33,8 @@ export function AccessPreviewTab({ storeId, store }: StoreTabProps) {
 
       {data.roles.length === 0 ? (
         <EmptyState title="No roles">
-          Create roles on the organization&apos;s{" "}
-          <Link className="font-semibold text-[#0E43D8] hover:underline" href={`/admin/organizations/${encodeURIComponent(store.organizationId)}?tab=roles`}>
+          Create roles on this store&apos;s{" "}
+          <Link className="font-semibold text-[#0E43D8] hover:underline" href="?tab=roles">
             Roles tab
           </Link>
           .

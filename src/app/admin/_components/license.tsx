@@ -39,8 +39,9 @@ function PlanOptions() {
   );
 }
 
-const storeHref = (orgId: string, storeId: string, tab?: string) =>
-  `/admin/organizations/${encodeURIComponent(orgId)}/stores/${encodeURIComponent(storeId)}${tab ? `?tab=${tab}` : ""}`;
+// A store has its own page on its own id (D-22); the organization is not in the path.
+const storeHref = (storeId: string, tab?: string) =>
+  `/admin/stores/${encodeURIComponent(storeId)}${tab ? `?tab=${tab}` : ""}`;
 
 export function LicenseEnds({ license }: { license: { entitlementExpiresAt: string | null } }) {
   const days = daysUntil(license.entitlementExpiresAt);
@@ -520,7 +521,7 @@ export function LicenseCard({
                       {license.scope === "organization" ? <span className="text-slate-500">Every store:</span> : null}
                       {license.coveredStores.map((s, i) => (
                         <span key={s.storeId}>
-                          <Link href={storeHref(orgId, s.storeId, "license")} className="font-semibold hover:text-[#0E43D8] hover:underline">
+                          <Link href={storeHref(s.storeId, "license")} className="font-semibold hover:text-[#0E43D8] hover:underline">
                             {s.name}
                           </Link>
                           {i < license.coveredStores.length - 1 ? "," : ""}

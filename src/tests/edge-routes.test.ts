@@ -96,7 +96,6 @@ vi.mock("@/models/ControlPlane", () => {
     WorkerCredentialModel: model,
     SetupKeyModel: model,
     EulaAcceptanceModel: model,
-    ClientDeviceModel: model,
     ClientRefreshCredentialModel: model,
     ClientSessionModel: model,
     RotationChallengeModel: model

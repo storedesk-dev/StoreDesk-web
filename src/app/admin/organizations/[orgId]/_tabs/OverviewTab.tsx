@@ -111,7 +111,7 @@ export function OverviewTab({ orgId, org, goTo }: OrgTabProps & { goTo: Goto }) 
             {data.stores.slice(0, 6).map((s) => (
               <li key={s.storeId} className="flex items-center justify-between gap-2 px-4 py-2">
                 <Link
-                  href={`/admin/organizations/${encodeURIComponent(orgId)}/stores/${encodeURIComponent(s.storeId)}`}
+                  href={`/admin/stores/${encodeURIComponent(s.storeId)}`}
                   className="truncate text-sm font-semibold hover:text-[#0E43D8] hover:underline"
                 >
                   {s.name}

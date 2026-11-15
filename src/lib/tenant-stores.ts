@@ -483,8 +483,7 @@ export async function updateStoreSettings(
   if (changed.length === 0) {
     return { settings: current, settingsVersion: version, googleClientEmail: googleServiceAccountEmail() };
   }
-  // The admin cannot attach a sheet (only the switch), so SHEET_IN_USE applies
-  // where the store PC reports one: lib/store-sheets.ts.
+  // The admin cannot attach a sheet (only the switch); the sheet is connected on the store PC.
   const versionFilter = version === 1 ? { $in: [1, null] } : version;
   const written = await TenantStoreModel.updateOne(
     { organizationId, storeId, settingsVersion: versionFilter },

@@ -4,7 +4,7 @@ import { pageMetadata } from "@/lib/metadata";
 export const metadata = pageMetadata({
   title: "Download StoreDesk",
   description:
-    "StoreDesk for Windows and Android. Install on the back-office PC first, then add the phone app for the shop floor.",
+    "StoreDesk Desktop and Service for Windows, and StoreDesk Mobile for Android. Install on the back-office PC first, then add the phone app.",
   path: "/download"
 });
 

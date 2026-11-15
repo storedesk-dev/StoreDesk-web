@@ -3,7 +3,6 @@ import { setupMemoryMongo } from "./helpers/mongo";
 import { activatePc, call, createAdmin, lastAudit, request, seedOrganization, type TestAdmin } from "./helpers/api";
 import { GET as list, POST as create } from "@/app/api/v1/admin/organizations/route";
 import { DELETE as remove, GET as detail, PATCH as patch } from "@/app/api/v1/admin/organizations/[organizationId]/route";
-import { GET as lookup } from "@/app/api/v1/app-auth/organizations/[slug]/route";
 import { addUser } from "@/lib/users";
 import { revokeInstallationsAndNotify, scheduleNotify } from "@/lib/store-notify";
 import { deleteCloudflareTunnel } from "@/lib/cloudflare";
@@ -150,7 +149,7 @@ describe("GET /organizations and /organizations/{org}", () => {
 });
 
 describe("PATCH /organizations/{org}", () => {
-  it("renames and suspends, audits, notifies the stores, and hides the organization from the phone lookup", async () => {
+  it("renames and suspends, audits and notifies the stores", async () => {
     const { organization } = await seedOrganization(admin);
     const organizationId = organization.organizationId;
     const res = await call(
@@ -163,13 +162,6 @@ describe("PATCH /organizations/{org}", () => {
     const audit = await lastAudit("organization.update");
     expect(audit?.metadata).toMatchObject({ changed: ["name", "status"], status: "suspended", previousStatus: "active" });
     expect(scheduleNotify).toHaveBeenCalledWith({ organizationId, reason: "organization.update" });
-
-    const hidden = await call(lookup, request("GET", "/"), { slug: "example-retail" });
-    expect(hidden.status).toBe(404);
-    await call(patch, request("PATCH", "/", { token: admin.token, body: { status: "active" } }), { organizationId });
-    const shown = await call(lookup, request("GET", "/", { headers: { "x-forwarded-for": "192.0.2.2" } }), { slug: "example-retail" });
-    expect(shown.status).toBe(200);
-    expect(shown.body.stores).toHaveLength(1);
   });
 
   it("answers 409 for an org tag in use and 400 for a bad one or a bad status", async () => {

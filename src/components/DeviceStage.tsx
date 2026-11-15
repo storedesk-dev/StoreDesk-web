@@ -48,7 +48,7 @@ export function DeviceStage() {
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00B36B] text-white shadow-md">
-          <Scan className="h-4 w-4" />
+          <Scan className="h-4 w-4" aria-hidden />
         </span>
         <div>
           <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">On the floor</p>
@@ -62,17 +62,17 @@ export function DeviceStage() {
         transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1D4ED8] text-white shadow-md">
-          <BarChart3 className="h-4 w-4" />
+          <BarChart3 className="h-4 w-4" aria-hidden />
         </span>
         <div>
           <p className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">From the register</p>
-          <p className="text-[13px] font-extrabold text-[#00875F]">Sales by department</p>
+          <p className="text-[13px] font-extrabold text-[#006B4B]">Sales by department</p>
         </div>
       </motion.div>
 
       {/* 3D Floating Phone Device Container */}
       <motion.div
-        className="relative z-10 w-[275px] sm:w-[295px]"
+        className="relative z-10 w-[min(275px,100%)] sm:w-[295px]"
         style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
         initial={{ y: 36, scale: 0.95 }}
         animate={{ y: 0, scale: 1 }}
@@ -106,7 +106,7 @@ export function DeviceStage() {
             <div className="relative overflow-hidden bg-slate-900">
               <Image
                 src="/screenshots/mobile-app-2.jpeg"
-                alt="StoreDesk phone app dashboard: today's net sales by department and live transactions"
+                alt="StoreDesk Mobile dashboard: today's net sales by department and live transactions"
                 width={440}
                 height={900}
                 className="h-auto w-full object-cover transition-transform duration-500 hover:scale-105"

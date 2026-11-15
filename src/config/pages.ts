@@ -36,15 +36,11 @@ export const ALL_PAGES: PageDefinition[] = [
   {
     key: "pos",
     label: "POS Workspace",
-    description: "Point-of-sale terminal — ring up sales, accept payment, open cash drawer.",
+    description: "Reports and analytics — the register's daily and monthly sales, and the store's sales data.",
     app: "electron",
     filePath: "src/pages/POSWorkspacePage.tsx",
     defaultEnabled: true,
     knownFeatureFlags: {
-      enableRefunds: { label: "Refunds", description: "Allow cashiers to process refunds.", default: true },
-      enableDiscounts: { label: "Discounts", description: "Allow manual discount entry on line items.", default: true },
-      enableVoidTransaction: { label: "Void Transaction", description: "Allow voiding an active transaction.", default: true },
-      enableCashDrawer: { label: "Cash Drawer", description: "Trigger cash drawer open on payment.", default: true },
       manageData: { label: "Change sales data", description: "Import or clear the daily sales, and send them to Google Sheets.", default: false }
     }
   },
@@ -61,13 +57,11 @@ export const ALL_PAGES: PageDefinition[] = [
   {
     key: "products",
     label: "Products",
-    description: "Product catalog management — add, edit, search products and variants.",
+    description: "The store's own product catalog behind item search and vendor prices (the Products menu itself is the price book).",
     app: "electron",
-    filePath: "src/pages/ProductDetailPage.tsx",
+    filePath: "src/pages/PriceBookPage.tsx",
     defaultEnabled: true,
     knownFeatureFlags: {
-      enableBulkImport: { label: "Bulk Import", description: "Allow CSV bulk product import.", default: false },
-      enableBarcodeGeneration: { label: "Barcode Generation", description: "Generate internal barcodes for products.", default: true },
       manageCatalog: { label: "Change products", description: "Add, change and delete the store's own products and variants.", default: false }
     }
   },
@@ -135,10 +129,7 @@ export const ALL_PAGES: PageDefinition[] = [
     app: "electron",
     filePath: "src/pages/TransactionsPage.tsx",
     defaultEnabled: true,
-    knownFeatureFlags: {
-      enableExport: { label: "Export", description: "Allow exporting transaction history to CSV.", default: true },
-      enableRefundView: { label: "Refund View", description: "Show refunded transactions in the list.", default: true }
-    }
+    knownFeatureFlags: {}
   },
   {
     key: "manageWorker",
@@ -218,10 +209,7 @@ export const ALL_PAGES: PageDefinition[] = [
     app: "mobile",
     filePath: "lib/features/scanner/scanner_screen.dart",
     defaultEnabled: true,
-    knownFeatureFlags: {
-      enableCameraFlash: { label: "Camera Flash", description: "Allow toggling flashlight during scanning.", default: true },
-      enableManualEntry: { label: "Manual Code", description: "Allow manual barcode entry as fallback.", default: true }
-    }
+    knownFeatureFlags: {}
   },
   {
     key: "mobileProductSearch",
@@ -281,9 +269,7 @@ export const ALL_PAGES: PageDefinition[] = [
     app: "mobile",
     filePath: "lib/features/transactions/transactions_screen.dart",
     defaultEnabled: true,
-    knownFeatureFlags: {
-      enableExport: { label: "Export", description: "Allow exporting transactions to CSV from mobile.", default: false }
-    }
+    knownFeatureFlags: {}
   },
   {
     key: "mobileReports",

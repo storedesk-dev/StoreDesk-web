@@ -22,16 +22,16 @@ export const DEFAULT_ORG_ROLES = [
     accessKeys: {
       electron: {
         pages: [
-          { key: "pos",            enabled: true, featureFlags: { enableRefunds: true, enableDiscounts: true, enableVoidTransaction: true, enableCashDrawer: true } },
+          { key: "pos",            enabled: true, featureFlags: {} },
           { key: "dashboard",      enabled: true, featureFlags: {} },
-          { key: "products",       enabled: true, featureFlags: { enableBulkImport: true, enableBarcodeGeneration: true } },
+          { key: "products",       enabled: true, featureFlags: {} },
           { key: "vendors",        enabled: true, featureFlags: {} },
           { key: "priceBook",      enabled: true, featureFlags: { priceGroups: true } },
           { key: "costAnalysis",   enabled: true, featureFlags: {} },
           { key: "fuelPrices",     enabled: true, featureFlags: {} },
           { key: "deals",          enabled: true, featureFlags: {} },
           { key: "registerChanges", enabled: true, featureFlags: {} },
-          { key: "transactions",   enabled: true, featureFlags: { enableExport: true, enableRefundView: true } },
+          { key: "transactions",   enabled: true, featureFlags: {} },
           { key: "manageWorker",   enabled: true, featureFlags: {} },
           { key: "userManagement", enabled: true, featureFlags: {} },
           { key: "settings",       enabled: true, featureFlags: { reportMapping: true } }
@@ -40,13 +40,13 @@ export const DEFAULT_ORG_ROLES = [
       mobile: {
         pages: [
           { key: "mobileDashboard",      enabled: true, featureFlags: {} },
-          { key: "mobileScanner",        enabled: true, featureFlags: { enableCameraFlash: true, enableManualEntry: true } },
+          { key: "mobileScanner",        enabled: true, featureFlags: {} },
           { key: "mobileProductSearch",  enabled: true, featureFlags: {} },
           { key: "mobileVendorPrices",   enabled: true, featureFlags: {} },
           { key: "mobilePriceBook",      enabled: true, featureFlags: { priceGroups: true } },
           { key: "mobileFuelPrices",     enabled: true, featureFlags: {} },
           { key: "mobileDeals",          enabled: true, featureFlags: {} },
-          { key: "mobileTransactions",   enabled: true, featureFlags: { enableExport: true } },
+          { key: "mobileTransactions",   enabled: true, featureFlags: {} },
           { key: "mobileReports",        enabled: true, featureFlags: {} },
           { key: "mobileAnalytics",      enabled: true, featureFlags: {} },
           { key: "mobileSalesTax",       enabled: true, featureFlags: {} },

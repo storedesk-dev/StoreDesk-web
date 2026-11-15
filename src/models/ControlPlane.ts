@@ -479,19 +479,6 @@ const UserAssignmentSchema = new Schema(
 );
 UserAssignmentSchema.index({ appUserId: 1, storeId: 1, workerInstallationId: 1 }, { unique: true });
 
-const ClientDeviceSchema = new Schema(
-  {
-    deviceId: { ...id, unique: true },
-    appUserId: id,
-    audience: { type: String, enum: ["desktop", "mobile"], required: true },
-    deviceName: { type: String, required: true, trim: true },
-    status: { type: String, enum: ["active", "revoked"], default: "active" },
-    lastSeenAt: Date,
-    revokedAt: Date
-  },
-  timestamps
-);
-
 const AuditEventSchema = new Schema(
   {
     ...tenant,
@@ -667,5 +654,4 @@ export const WorkerCredentialModel =
 export const AppUserModel = models.AppUser || model("AppUser", AppUserSchema);
 export const UserAssignmentModel =
   models.UserAssignment || model("UserAssignment", UserAssignmentSchema);
-export const ClientDeviceModel = models.ClientDevice || model("ClientDevice", ClientDeviceSchema);
 export const AuditEventModel = models.AuditEvent || model("AuditEvent", AuditEventSchema);

@@ -2,7 +2,6 @@ import { z } from "zod";
 import { connectDb } from "@/lib/db";
 import {
   AppUserModel,
-  ClientDeviceModel,
   LegacySubscriptionModel,
   LicenseModel,
   OrganizationModel,
@@ -291,7 +290,6 @@ export async function deleteOrganization(admin: InternalAdminActor, organization
     WorkerCredentialModel.deleteMany({ workerInstallationId: byIds(installationIds) }),
     WorkerInstallationModel.deleteMany({ workerInstallationId: byIds(installationIds) }),
     UserAssignmentModel.deleteMany({ assignmentId: byIds(assignmentIds) }),
-    ClientDeviceModel.deleteMany({ appUserId: byIds(orphanUserIds) }),
     AppUserModel.deleteMany({ appUserId: byIds(orphanUserIds) }),
     TenantStoreModel.deleteMany({ storeId: byIds(storeIds) }),
     LicenseModel.deleteMany({ licenseId: byIds(licenseIds) }),
@@ -304,7 +302,7 @@ export async function deleteOrganization(admin: InternalAdminActor, organization
     installations: installationIds.length,
     licenses: licenseIds.length,
     assignments: assignmentIds.length,
-    usersDeleted: Number(results[6].deletedCount ?? 0),
+    usersDeleted: Number(results[5].deletedCount ?? 0),
     usersKept: memberIds.length - orphanUserIds.length,
     tunnelsNeedManualCleanup
   };

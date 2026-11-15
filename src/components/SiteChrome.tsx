@@ -52,8 +52,12 @@ export function SiteHeader() {
           : "border-white/50 bg-gradient-to-r from-white/75 via-[#eef4ff]/65 to-[#e8faf3]/70 shadow-sm shadow-blue-500/5"
       }`}
     >
+      {/* First tab stop on every page: jumps past the navigation to <main id="main">. */}
+      <a href="#main" className="sd-skip-link">
+        Skip to content
+      </a>
       {/* Brand hairline along the bottom edge of the glass. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#1A63F4]/45 to-[#00A87B]/45" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#1A63F4]/45 to-[#00875F]/45" />
 
       <div className="relative mx-auto grid h-14 max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-6">
         <Link
@@ -76,7 +80,7 @@ export function SiteHeader() {
         </Link>
 
         <LayoutGroup id="site-nav">
-          <nav className="hidden items-center gap-0.5 rounded-full border border-white/70 bg-white/50 p-1 shadow-[inset_0_1px_2px_rgba(23,32,42,0.06),0_4px_16px_-8px_rgba(26,99,244,0.25)] backdrop-blur-md md:flex">
+          <nav aria-label="Main" className="hidden items-center gap-0.5 rounded-full border border-white/70 bg-white/50 p-1 shadow-[inset_0_1px_2px_rgba(23,32,42,0.06),0_4px_16px_-8px_rgba(26,99,244,0.25)] backdrop-blur-md md:flex">
             {NAV_ITEMS.map((item) => {
               const active = isActive(pathname, item.href);
               return (
@@ -91,7 +95,7 @@ export function SiteHeader() {
                   {active ? (
                     <motion.span
                       layoutId="nav-active-chip"
-                      className="absolute inset-0 -z-10 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] shadow-[0_4px_14px_-4px_rgba(26,99,244,0.55)]"
+                      className="absolute inset-0 -z-10 rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00875F] shadow-[0_4px_14px_-4px_rgba(26,99,244,0.55)]"
                       transition={chipSpring}
                     />
                   ) : null}
@@ -124,7 +128,7 @@ export function SiteHeader() {
           </Link>
           <a
             href={contactMailto({ subject: "StoreDesk enquiry" })}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-4 py-1.5 text-[13.5px] font-semibold text-white shadow-[0_4px_14px_-4px_rgba(26,99,244,0.55)] transition-[filter] hover:brightness-110"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-gradient-to-r from-[#1A63F4] to-[#00875F] px-4 py-1.5 text-[13.5px] font-semibold text-white shadow-[0_4px_14px_-4px_rgba(26,99,244,0.55)] transition-[filter] hover:brightness-110"
           >
             <Mail className="h-3.5 w-3.5" aria-hidden />
             Email us
@@ -133,9 +137,10 @@ export function SiteHeader() {
 
         <button
           type="button"
-          className="col-start-3 flex h-9 w-9 items-center justify-center justify-self-end rounded-full border border-white/70 bg-white/50 text-[#17202A] backdrop-blur-md md:hidden"
+          className="col-start-3 flex h-11 w-11 items-center justify-center justify-self-end rounded-full border border-white/70 bg-white/50 text-[#17202A] backdrop-blur-md md:hidden"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
+          aria-controls="mobile-menu"
           aria-label={open ? "Close menu" : "Open menu"}
         >
           <span className="relative block h-3.5 w-5">
@@ -161,6 +166,8 @@ export function SiteHeader() {
       <AnimatePresence initial={false}>
         {open ? (
           <motion.nav
+            id="mobile-menu"
+            aria-label="Main"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -177,7 +184,7 @@ export function SiteHeader() {
                     aria-current={active ? "page" : undefined}
                     className={`rounded-xl px-3.5 py-2.5 text-[15px] font-semibold ${
                       active
-                        ? "bg-gradient-to-r from-[#1A63F4] to-[#00A87B] text-white shadow-[0_4px_14px_-4px_rgba(26,99,244,0.5)]"
+                        ? "bg-gradient-to-r from-[#1A63F4] to-[#00875F] text-white shadow-[0_4px_14px_-4px_rgba(26,99,244,0.5)]"
                         : "text-[#17202A] hover:bg-white/70"
                     }`}
                   >
@@ -201,7 +208,7 @@ export function SiteHeader() {
               </Link>
               <a
                 href={contactMailto({ subject: "StoreDesk enquiry" })}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1A63F4] to-[#00A87B] px-3 py-2.5 text-[15px] font-semibold text-white"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1A63F4] to-[#00875F] px-3 py-2.5 text-[15px] font-semibold text-white"
               >
                 <Mail className="h-4 w-4" aria-hidden />
                 Email us
@@ -260,15 +267,15 @@ export function SiteFooter() {
             {SITE.tagline}. Runs on the PC in your back office and keeps working when the
             internet does not.
           </p>
-          <a
+          <Link
             href="/download"
-            className="mt-5 inline-flex rounded-full bg-[#10B981] px-4 py-2 text-[13.5px] font-semibold text-[#0B0F19] shadow-md shadow-black/30 transition-transform hover:-translate-y-0.5"
+            className="mt-5 inline-flex rounded-full bg-[#10B981] px-4 py-2.5 text-[13.5px] font-semibold text-[#0B0F19] shadow-md shadow-black/30 transition-transform hover:-translate-y-0.5"
           >
             Get StoreDesk
-          </a>
+          </Link>
         </div>
 
-        <div>
+        <nav aria-label="Footer">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97AC]">Product</p>
           <ul className="mt-4 space-y-2.5 text-[14px]">
             {NAV_ITEMS.slice(1).map((item) => (
@@ -279,12 +286,17 @@ export function SiteFooter() {
               </li>
             ))}
             <li>
+              <Link href="/product/lottery" className="text-[#E4E7EC] transition-colors hover:text-white hover:underline">
+                StoreDesk Lottery
+              </Link>
+            </li>
+            <li>
               <Link href="/download" className="text-[#E4E7EC] transition-colors hover:text-white hover:underline">
                 Download
               </Link>
             </li>
           </ul>
-        </div>
+        </nav>
 
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97AC]">Support</p>
