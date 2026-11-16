@@ -28,7 +28,12 @@ export default function ContactPage() {
   return (
     <PageFrame>
       <PageHero
-        title="Talk to the people who build StoreDesk"
+        eyebrow="Contact"
+        title={
+          <>
+            Talk to the people <em className="sd-grad">who build StoreDesk</em>
+          </>
+        }
         lede="Pick what it is about and we start the email for you, with the details we would otherwise ask for."
         aside={<Composer />}
       >

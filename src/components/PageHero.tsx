@@ -8,25 +8,22 @@ import { breadcrumbJsonLd } from "@/lib/metadata";
 import { jsonLdScript } from "@/lib/json-ld";
 
 /**
- * The building blocks every public page is made of. Server components: no motion and no client
- * code, so a content page ships only the header's menu toggle plus whatever interactive piece the
- * page itself chooses to add.
+ * The building blocks every public page is made of. Server components: the only motion is CSS (the
+ * hero's entrance once on load, hover lifts, slow drifting cards), so a content page ships no motion
+ * library. Look: globals.css, "Brand layer".
  */
 
-export const primaryButton =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--blue)] px-5 text-[16px] font-bold text-white transition-colors hover:bg-[var(--blue-ink)]";
+export const primaryButton = "sd-btn";
 
-/** The second action is a text link, never a second button competing with the first. */
-export const textLink =
-  "inline-flex min-h-12 items-center gap-1.5 text-[16px] font-bold text-[var(--blue-ink)] underline decoration-[var(--blue-ink)]/30 underline-offset-4 hover:decoration-[var(--blue-ink)]";
+/** The second action beside the gradient button: the white pill. */
+export const textLink = "sd-btn-ghost";
 
 /** Kept for pages that need a bordered second button (download alternatives, account pages). */
-export const secondaryButton =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-white px-5 text-[16px] font-bold text-[var(--ink)] transition-colors hover:border-[var(--blue)] hover:text-[var(--blue-ink)]";
+export const secondaryButton = "sd-btn-ghost";
 
 export function PageFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[var(--wash)] text-[var(--ink)]">
+    <div className="min-h-screen text-[var(--ink)]">
       <SiteHeader />
       <main id="main" tabIndex={-1} className="outline-none">
         {children}
@@ -75,11 +72,14 @@ export function Breadcrumbs({ trail }: { trail: Crumb[] }) {
 }
 
 /**
- * The top of a page: optional trail, the h1, one sentence, one action. `aside` is what the page is
- * about (a real screenshot, or the one interactive piece), beside the title on wide screens.
+ * The top of a page on the grid ground: optional trail, an eyebrow, the h1 (wrap its key phrase in
+ * `<em className="sd-grad">`), one sentence, the actions. `aside` is what the page is about (a real
+ * screen in its frame, or the one interactive piece), beside the title on wide screens. The copy and
+ * the aside enter once on load.
  */
 export function PageHero({
   trail,
+  eyebrow,
   title,
   lede,
   actions,
@@ -87,6 +87,7 @@ export function PageHero({
   children
 }: {
   trail?: Crumb[];
+  eyebrow?: string;
   title: ReactNode;
   lede: ReactNode;
   actions?: ReactNode;
@@ -94,26 +95,27 @@ export function PageHero({
   children?: ReactNode;
 }) {
   return (
-    <section className="border-b border-[var(--line)] bg-white">
+    <section className="sd-hero-grid border-b border-[var(--line)]">
       <div
-        className={`mx-auto grid max-w-6xl gap-10 px-4 pb-14 pt-8 sm:px-6 md:pt-10 lg:pb-16 ${
-          aside ? "lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-12" : ""
+        className={`mx-auto grid max-w-6xl gap-10 px-4 pb-16 pt-8 sm:px-6 md:pt-10 lg:pb-20 ${
+          aside ? "lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center lg:gap-12" : ""
         }`}
       >
-        <div className="min-w-0">
+        <div className="sd-enter min-w-0">
           {trail ? <Breadcrumbs trail={trail} /> : null}
-          <h1 className={`sd-h1 max-w-3xl ${trail ? "mt-4" : "mt-2"}`}>{title}</h1>
+          {eyebrow ? <p className={`sd-eyebrow ${trail ? "mt-5" : "mt-4"}`}>{eyebrow}</p> : null}
+          <h1 className={`sd-h1 max-w-3xl ${eyebrow ? "mt-3" : trail ? "mt-4" : "mt-2"}`}>{title}</h1>
           <p className="sd-lede mt-5">{lede}</p>
           {children}
-          {actions ? <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2">{actions}</div> : null}
+          {actions ? <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">{actions}</div> : null}
         </div>
-        {aside ? <div className="min-w-0">{aside}</div> : null}
+        {aside ? <div className="sd-enter-3 min-w-0">{aside}</div> : null}
       </div>
     </section>
   );
 }
 
-/** A page section. `tone` alternates between the two light surfaces; never more than two. */
+/** A page section. `tone` alternates the brand bands: blue-tinted and green-tinted. */
 export function Section({
   id,
   title,
@@ -134,7 +136,7 @@ export function Section({
     <section
       id={id}
       aria-labelledby={headingId}
-      className={`border-b border-[var(--line)] ${tone === "white" ? "bg-white" : "bg-[var(--wash)]"}`}
+      className={`border-b border-[var(--line)] ${tone === "white" ? "sd-band-green" : "sd-band-blue"}`}
     >
       <div className={`mx-auto px-4 py-16 sm:px-6 md:py-20 ${width === "narrow" ? "max-w-4xl" : "max-w-6xl"}`}>
         <h2 id={headingId} className="sd-h2 max-w-3xl">
@@ -202,31 +204,66 @@ export function Screenshot({
   );
 }
 
-/** A phone screenshot with a plain body around it, so it reads as a phone at a glance. */
+/**
+ * A phone screen in a phone body: dark bezel, side buttons, rounded glass. `width`/`height` are the
+ * screenshot's own pixels (the 0.2.1 captures are 720x1565).
+ */
 export function PhoneShot({
   src,
   alt,
   priority = false,
   sizes = "260px",
+  width = 720,
+  height = 1565,
   className = ""
 }: {
   src: string;
   alt: string;
   priority?: boolean;
   sizes?: string;
+  width?: number;
+  height?: number;
   className?: string;
 }) {
   return (
-    <div className={`rounded-[34px] bg-[var(--stage)] p-2 shadow-[var(--shadow-shot)] ${className}`}>
-      <Image
-        src={src}
-        alt={alt}
-        width={720}
-        height={1412}
-        sizes={sizes}
-        priority={priority}
-        className="h-auto w-full rounded-[26px]"
-      />
+    <div
+      className={`relative rounded-[2.6rem] border-[8px] border-[#0f172a] bg-[#0f172a] shadow-[0_30px_60px_-20px_rgba(11,31,77,0.45)] ring-1 ring-white/30 ${className}`}
+    >
+      <span aria-hidden className="absolute -left-[11px] top-[18%] h-10 w-[3px] rounded-l bg-[#1e293b]" />
+      <span aria-hidden className="absolute -left-[11px] top-[27%] h-10 w-[3px] rounded-l bg-[#1e293b]" />
+      <span aria-hidden className="absolute -right-[11px] top-[22%] h-14 w-[3px] rounded-r bg-[#1e293b]" />
+      <Image src={src} alt={alt} width={width} height={height} sizes={sizes} priority={priority} className="h-auto w-full rounded-[2rem]" />
+    </div>
+  );
+}
+
+/** A floating card over a frame: a small icon tile, a label and what the screen is for. */
+export function FloatCard({
+  icon,
+  label,
+  text,
+  tone = "blue",
+  className = ""
+}: {
+  icon: ReactNode;
+  label: string;
+  text: string;
+  tone?: "blue" | "green";
+  className?: string;
+}) {
+  return (
+    <div className={`sd-float ${className}`} aria-hidden>
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${
+          tone === "green" ? "bg-[#00a87b]" : "bg-[#1a63f4]"
+        }`}
+      >
+        {icon}
+      </span>
+      <span className="leading-tight">
+        <span className="sd-float-label block">{label}</span>
+        <span className={`block text-[15px] font-extrabold ${tone === "green" ? "text-[var(--green-ink)]" : "text-[var(--ink)]"}`}>{text}</span>
+      </span>
     </div>
   );
 }

@@ -18,16 +18,16 @@ export default function MobilePage() {
       title="StoreDesk Mobile: your store on an Android phone"
       aside={
         // Two real screens side by side, the second set lower, so they read as two phones.
-        <div className="mx-auto grid max-w-[480px] grid-cols-2 gap-4 sm:gap-6">
+        <div className="sd-glow mx-auto grid max-w-[480px] grid-cols-2 gap-4 sm:gap-6">
           <PhoneShot
-            src="/screenshots/mobile-app-6.jpeg"
-            alt="StoreDesk Mobile cost analysis: each supplier's price for one item, cheapest first, marked Best cost"
+            src="/screenshots/phone-dashboard.webp"
+            alt="StoreDesk Mobile dashboard for the demo store: today's sales, inside and fuel sales, sales tax and cash expected"
             sizes="(min-width: 640px) 230px, 45vw"
             priority
           />
           <PhoneShot
-            src="/screenshots/mobile-app-2.jpeg"
-            alt="StoreDesk Mobile dashboard: today's net sales by department, with the day's sales listed"
+            src="/screenshots/phone-analytics.webp"
+            alt="StoreDesk Mobile analytics: sales for the last 7 days compared with the 7 days before, with a sales trend by day"
             sizes="(min-width: 640px) 230px, 45vw"
             className="mt-10"
           />

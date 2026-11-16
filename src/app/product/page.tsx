@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Check, Send, X } from "lucide-react";
 import { JsonLd, PageFrame, PageHero, Screenshot, Section, primaryButton, textLink } from "@/components/PageHero";
+import { Packages } from "@/components/Packages";
 import { FAQ, faqJsonLd } from "@/lib/faq";
 import { SITE_URL, pageMetadata } from "@/lib/metadata";
 import { DOCS, PLANS } from "@/lib/site";
@@ -21,6 +22,7 @@ const ON_THIS_PAGE = [
   { href: "#apps", label: "The four apps" },
   { href: "#register", label: "Your register" },
   { href: "#offline", label: "Internet down" },
+  { href: "#packages", label: "Packages" },
   { href: "#questions", label: "Questions" }
 ];
 
@@ -57,7 +59,12 @@ export default function ProductPage() {
             { name: "Home", path: "/" },
             { name: "Product", path: "/product" }
           ]}
-          title="Your back office, on the PC you already have"
+          eyebrow="Product"
+          title={
+            <>
+              Your back office, <em className="sd-grad">on the PC you already have</em>
+            </>
+          }
           lede="StoreDesk Desktop and Service on the back-office PC. StoreDesk Mobile on staff phones. StoreDesk Lottery at the ticket counter, if you want it. Your store data stays on the store PC."
           actions={
             <>
@@ -185,6 +192,19 @@ export default function ProductPage() {
               Try it: switch the internet off
             </Link>
           </p>
+        </Section>
+
+        <Section
+          id="packages"
+          title={
+            <>
+              Three packages, <em className="sd-grad">one licence per store</em>
+            </>
+          }
+          lede="The back office, the lottery counter, or both. We agree the price with each store."
+          tone="wash"
+        >
+          <Packages />
         </Section>
 
         <Section id="questions" title="What stores ask before they start" tone="white" width="narrow">

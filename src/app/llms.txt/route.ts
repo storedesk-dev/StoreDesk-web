@@ -29,7 +29,8 @@ ${SITE.name} is back-office software for independent convenience stores and gas 
 
 ## Key facts
 
-- Platforms: StoreDesk Desktop and StoreDesk Service run on Windows 10 or later, on the back-office PC, from one installer. StoreDesk Mobile runs on Android 5.0 or later, from Google Play; the iPhone app is not released yet. StoreDesk Lottery is its own Windows app on the lottery counter PC.
+- Packages: three, one licence per store, price agreed per store. Back office (StoreDesk Desktop, Service and Mobile); Lottery (StoreDesk Lottery on its own); Back office + Lottery (all four).
+- Platforms: StoreDesk Desktop and StoreDesk Service run on Windows 10 or later, on the back-office PC, from one installer. StoreDesk Mobile runs on Android 5.0 or later, from Google Play; the iPhone app is coming soon on the App Store. StoreDesk Lottery is its own Windows app on the lottery counter PC.
 - Register: Verifone Commander, read over the store network. An item change (price, details or a new item) goes to the register only when a person sends it; StoreDesk checks the item first and reads it back. Deals and fuel prices are not sent to the register yet. Nothing is ever sent automatically.
 - Data location: the price book, supplier costs and sales reports stay on the store PC. The ${SITE.name} account holds only your stores, their licensing and which PCs are connected.
 - Offline: the register, the desktop app and staff sign-in all keep working with no internet, because passwords are checked on the store PC; a session lasts ${PLANS.offlineSessionHours} hours. Phones away from the store, the Google Sheet export and the ${SITE.name} account need the line.
@@ -80,7 +81,7 @@ ${FAQ.map((entry) => `**${entry.question}**\n${entry.answer}`).join("\n\n")}
 - EDI, so invoices from H.T. Hackney and other distributors that support it become costs without typing, is planned and not shipped.
 - StoreDesk Lottery does not email reports yet (coming soon), does not import the Georgia settlement statement, has no phone screens, and keeps no lottery data in the cloud.
 - Deal and fuel price changes are not sent to the register yet; change them on the register.
-- The iPhone app is not released yet, and StoreDesk Service is Windows-only.
+- The iPhone app is coming soon on the App Store, and StoreDesk Service is Windows-only.
 - Sales tax returns cover Georgia (ST-3) only.
 
 ## Pages

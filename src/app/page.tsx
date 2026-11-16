@@ -1,10 +1,28 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  HardDrive,
+  KeyRound,
+  Monitor,
+  Percent,
+  ScanLine,
+  Send,
+  Server,
+  Smartphone,
+  Ticket,
+  TrendingUp,
+  WifiOff,
+  type LucideIcon
+} from "lucide-react";
+import { GooglePlayIcon, WindowsIcon } from "@/components/BrandIcons";
 import { MobileScreens } from "@/components/MobileScreens";
-import { PageFrame, PhoneShot, Screenshot, primaryButton, textLink } from "@/components/PageHero";
+import { Packages } from "@/components/Packages";
+import { FloatCard, PageFrame, PhoneShot, primaryButton, secondaryButton } from "@/components/PageHero";
 import { VerifoneBadge } from "@/components/VerifoneBadge";
 import { pageMetadata } from "@/lib/metadata";
-import { DOCS, PLANS, PRODUCT_NAV, SITE } from "@/lib/site";
+import { PLANS, PRODUCT_NAV, SITE } from "@/lib/site";
 
 export const metadata = pageMetadata({
   title: "StoreDesk: back-office software for convenience stores",
@@ -16,9 +34,25 @@ export const metadata = pageMetadata({
 /**
  * The home page. Server-rendered; the only client code is the header's menu and the phone screens.
  *
- * The hero is the product itself: the real desktop dashboard on the navy stage it uses, with a
- * phone screen over its corner. Every line below is a job a store owner already does by hand.
+ * The hero is the brand's: the promise with its key phrase in the blue-to-green, three proof points,
+ * Verifone and the downloads, and the real phone app with two floating cards saying what it is for.
+ * Every section below is a job a store owner already does by hand, as cards with icon tiles.
  */
+
+const PROOF_POINTS = [
+  "See every supplier's price on one item",
+  "Scan a shelf tag and get the margin",
+  "File your Georgia ST-3 without retyping it"
+];
+
+const JOB_ICONS: LucideIcon[] = [TrendingUp, Send, ScanLine, Percent, Ticket];
+const FACT_ICONS: LucideIcon[] = [HardDrive, WifiOff, KeyRound];
+const APP_ICONS: Record<string, LucideIcon> = {
+  "/product/desktop": Monitor,
+  "/product/mobile": Smartphone,
+  "/product/service": Server,
+  "/product/lottery": Ticket
+};
 
 /** What an owner does with it, in the order they would ask. Each line is true today. */
 const JOBS = [
@@ -73,77 +107,130 @@ const FACTS = [
 export default function HomePage() {
   return (
     <PageFrame>
-      {/* Hero: the one dark band on the page, because the screenshot is the app's own dark theme. */}
-      <section className="sd-stage overflow-hidden">
-        <div className="mx-auto grid max-w-6xl gap-12 px-4 pb-16 pt-12 sm:px-6 md:pt-16 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:pb-20">
-          <div className="min-w-0">
-            <h1 className="sd-h1 text-white">Know what you make on every item in the store.</h1>
-            <p className="mt-5 max-w-xl text-[19px] leading-relaxed text-[var(--stage-muted)]">
-              StoreDesk reads your Verifone Commander, puts each supplier&rsquo;s cost next to the shelf price, and runs
-              on the PC in your back office.
+      {/* Hero: grid ground, the promise, proof, Verifone and the downloads; the phone app on the right. */}
+      <section className="sd-hero-grid overflow-hidden border-b border-[var(--line)]">
+        <div className="mx-auto grid max-w-6xl gap-14 px-4 pb-20 pt-12 sm:px-6 md:pt-16 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-center lg:gap-10 lg:pb-24">
+          <div className="sd-enter min-w-0">
+            <p className="sd-eyebrow">For convenience stores and gas stations</p>
+            <h1 className="mt-4 text-[clamp(2.5rem,5vw,4rem)] font-extrabold leading-[1.03] tracking-[-0.045em]">
+              Take control of your <em className="sd-grad">convenience store margins.</em>
+            </h1>
+            <p className="sd-lede mt-6 !max-w-[36rem] !text-[clamp(1.1rem,1.4vw,1.3rem)]">
+              StoreDesk runs on your back-office PC and reads your Verifone Commander. See what every supplier charges, the
+              margin on every item and your fuel prices, and let staff scan barcodes anywhere on the floor.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-              <Link href="/contact" className={primaryButton}>
-                Ask about your store
-              </Link>
-              <Link
-                href="/product"
-                className="inline-flex min-h-12 items-center gap-1.5 text-[16px] font-bold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
-              >
-                See what it does
-              </Link>
-            </div>
-            <div className="mt-10">
+            <ul className="mt-6 space-y-2.5">
+              {PROOF_POINTS.map((point) => (
+                <li key={point} className="flex items-center gap-2.5 text-[17px] font-semibold">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--green)]" aria-hidden />
+                  {point}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-[rgba(14,67,216,0.12)] bg-white/90 px-4 py-2.5 text-[15.5px] font-semibold shadow-[var(--shadow-card)] xl:whitespace-nowrap">
+              <HardDrive className="h-4 w-4 text-[var(--blue)]" aria-hidden />
+              Your data stays in your store
+              <span className="text-[var(--muted)]" aria-hidden>
+                ·
+              </span>
+              Keeps working when the internet is down
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               <VerifoneBadge />
+              <Link href="/download" className="sd-card group inline-flex min-h-14 items-center gap-3 !rounded-2xl px-4 py-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0078D4] text-white">
+                  <WindowsIcon className="h-4 w-4" />
+                </span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--line)] bg-white">
+                  <GooglePlayIcon className="h-4 w-4" />
+                </span>
+                <span className="text-[16px] font-extrabold">Download</span>
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+              </Link>
             </div>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link href="/how-it-works" className={primaryButton}>
+                How it works
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+              <Link href="/contact" className={secondaryButton}>
+                Contact us
+              </Link>
+            </div>
+            <p className="mt-5 text-[15.5px] text-[var(--muted)]">
+              Work at a store that uses StoreDesk?{" "}
+              <Link href="/download" className="sd-link">
+                Get the phone app
+              </Link>
+            </p>
           </div>
 
-          <div className="relative min-w-0 pb-10 sm:pb-0 sm:pr-16">
-            <Screenshot
-              src="/screenshots/desktop-dashboard.png"
-              alt="StoreDesk Desktop dashboard for a demo store: today's sales, tax, fuel gallons, lottery net and cash expected, with sales by department"
-              sizes="(min-width: 1024px) 640px, 100vw"
-              priority
-              className="!bg-[var(--stage-raised)]"
+          <div className="sd-enter-3 relative mx-auto w-full max-w-[460px] min-w-0 py-6">
+            <div className="sd-glow relative mx-auto w-[min(330px,80%)]">
+              <PhoneShot
+                src="/screenshots/phone-dashboard.webp"
+                alt="StoreDesk Mobile dashboard for the demo store: today's sales, inside sales, high- and low-tax sales, sales tax, fuel sales and gallons, cash expected"
+                sizes="330px"
+                priority
+              />
+            </div>
+            <FloatCard
+              icon={<ScanLine className="h-5 w-5" aria-hidden />}
+              label="On the floor"
+              text="Scan a shelf tag"
+              tone="green"
+              className="sd-bob absolute left-0 top-[14%] hidden sm:flex"
             />
-            <PhoneShot
-              src="/screenshots/mobile-app-4.jpeg"
-              alt="StoreDesk Mobile price book on an Android phone"
-              sizes="150px"
-              className="absolute -bottom-2 right-0 w-[120px] sm:-bottom-10 sm:w-[150px]"
+            <FloatCard
+              icon={<BarChart3 className="h-5 w-5" aria-hidden />}
+              label="From the register"
+              text="Today's sales, live"
+              className="sd-bob-slow absolute bottom-[12%] right-0 hidden sm:flex"
             />
           </div>
         </div>
       </section>
 
       {/* The jobs. A list with rules, not a grid of identical cards. */}
-      <section aria-labelledby="jobs-heading" className="border-b border-[var(--line)] bg-white">
+      <section aria-labelledby="jobs-heading" className="sd-band-green border-b border-[var(--line)]">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 md:py-24 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <div>
-            <h2 id="jobs-heading" className="sd-h2 lg:sticky lg:top-28">
-              The back-office jobs you do by hand now
-            </h2>
+            <div className="lg:sticky lg:top-28">
+              <p className="sd-eyebrow">What it does</p>
+              <h2 id="jobs-heading" className="sd-h2 mt-3">
+                The back-office jobs you <em className="sd-grad">do by hand now</em>
+              </h2>
+            </div>
           </div>
-          <ol className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
-            {JOBS.map((job) => (
-              <li key={job.title} className="py-7">
-                <h3 className="sd-h3">{job.title}</h3>
-                <p className="mt-2 max-w-2xl text-[17px] leading-relaxed text-[var(--muted)]">{job.body}</p>
-                <Link href={job.href} className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-[16px] font-bold text-[var(--blue-ink)] hover:underline">
-                  {job.link}
-                  <ArrowRight className="h-4 w-4" aria-hidden />
-                </Link>
-              </li>
-            ))}
+          <ol className="space-y-4">
+            {JOBS.map((job, index) => {
+              const Icon = JOB_ICONS[index];
+              return (
+                <li key={job.title} className="sd-card sd-card-link flex gap-5 p-6">
+                  <span className="sd-icon-tile">
+                    <Icon className="h-5 w-5" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="sd-h3">{job.title}</h3>
+                    <p className="mt-2 max-w-2xl text-[17px] leading-relaxed text-[var(--muted)]">{job.body}</p>
+                    <Link href={job.href} className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-[16px] font-bold text-[var(--blue-ink)] hover:underline">
+                      {job.link}
+                      <ArrowRight className="h-4 w-4" aria-hidden />
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </div>
       </section>
 
       {/* StoreDesk Mobile, screen by screen. */}
-      <section aria-labelledby="phone-heading" className="border-b border-[var(--line)] bg-[var(--wash)]">
+      <section aria-labelledby="phone-heading" className="sd-band-blue border-b border-[var(--line)]">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-24">
-          <h2 id="phone-heading" className="sd-h2 max-w-3xl">
-            The same store on your phone
+          <p className="sd-eyebrow">StoreDesk Mobile</p>
+          <h2 id="phone-heading" className="sd-h2 mt-3 max-w-3xl">
+            The same store <em className="sd-grad">on your phone</em>
           </h2>
           <p className="sd-lede mt-4">Real screens from StoreDesk Mobile on Android, running against a demo store.</p>
           <div className="mt-12">
@@ -153,18 +240,25 @@ export default function HomePage() {
       </section>
 
       {/* Where things live. Three plain facts in a definition list. */}
-      <section aria-labelledby="facts-heading" className="border-b border-[var(--line)] bg-white">
+      <section aria-labelledby="facts-heading" className="sd-band-green border-b border-[var(--line)]">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
-          <h2 id="facts-heading" className="sd-h2 max-w-3xl">
-            It runs in your store, on your PC
+          <p className="sd-eyebrow">Where it runs</p>
+          <h2 id="facts-heading" className="sd-h2 mt-3 max-w-3xl">
+            It runs in your store, <em className="sd-grad">on your PC</em>
           </h2>
-          <dl className="mt-10 grid gap-x-10 gap-y-8 md:grid-cols-3">
-            {FACTS.map((fact) => (
-              <div key={fact.term} className="border-t-[3px] border-[var(--green)] pt-4">
-                <dt className="text-[19px] font-extrabold tracking-[-0.01em]">{fact.term}</dt>
-                <dd className="mt-2 text-[17px] leading-relaxed text-[var(--muted)]">{fact.detail}</dd>
-              </div>
-            ))}
+          <dl className="mt-10 grid gap-5 md:grid-cols-3">
+            {FACTS.map((fact, index) => {
+              const Icon = FACT_ICONS[index];
+              return (
+                <div key={fact.term} className="sd-card p-6">
+                  <span className="sd-icon-tile">
+                    <Icon className="h-5 w-5" aria-hidden />
+                  </span>
+                  <dt className="mt-5 text-[19px] font-extrabold tracking-[-0.01em]">{fact.term}</dt>
+                  <dd className="mt-2 text-[17px] leading-relaxed text-[var(--muted)]">{fact.detail}</dd>
+                </div>
+              );
+            })}
           </dl>
           <p className="mt-10 text-[17px]">
             <Link href="/how-it-works" className="sd-link">
@@ -175,46 +269,66 @@ export default function HomePage() {
       </section>
 
       {/* The four apps, as a directory into the product section. */}
-      <section aria-labelledby="apps-heading" className="border-b border-[var(--line)] bg-[var(--wash)]">
+      <section aria-labelledby="apps-heading" className="sd-band-blue border-b border-[var(--line)]">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
-          <h2 id="apps-heading" className="sd-h2 max-w-3xl">
-            Four apps. Lottery is optional.
+          <p className="sd-eyebrow">The apps</p>
+          <h2 id="apps-heading" className="sd-h2 mt-3 max-w-3xl">
+            Four apps. <em className="sd-grad">Back office, lottery, or both.</em>
           </h2>
-          <ul className="mt-10 grid border-t border-[var(--line)] md:grid-cols-2">
-            {PRODUCT_NAV.slice(1).map((item) => (
-              <li key={item.href} className="border-b border-[var(--line)] md:odd:border-r md:odd:pr-8 md:even:pl-8">
-                <Link href={item.href} className="group flex min-h-11 items-center justify-between gap-4 py-6">
-                  <span>
-                    <span className="block text-[20px] font-extrabold tracking-[-0.015em] group-hover:text-[var(--blue-ink)]">{item.label}</span>
-                    <span className="mt-1 block text-[17px] text-[var(--muted)]">{item.line}</span>
-                  </span>
-                  <ArrowRight className="h-5 w-5 shrink-0 text-[var(--blue-ink)]" aria-hidden />
-                </Link>
-              </li>
-            ))}
+          <ul className="mt-10 grid gap-4 md:grid-cols-2">
+            {PRODUCT_NAV.slice(1).map((item) => {
+              const Icon = APP_ICONS[item.href] ?? Monitor;
+              return (
+                <li key={item.href}>
+                  <Link href={item.href} className="sd-card group flex min-h-11 items-center gap-5 p-6">
+                    <span className="sd-icon-tile">
+                      <Icon className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[20px] font-extrabold tracking-[-0.015em] group-hover:text-[var(--blue-ink)]">{item.label}</span>
+                      <span className="mt-1 block text-[17px] text-[var(--muted)]">{item.line}</span>
+                    </span>
+                    <ArrowRight className="h-5 w-5 shrink-0 text-[var(--blue-ink)] transition-transform group-hover:translate-x-1" aria-hidden />
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </section>
 
+      {/* Packages: what a store can buy. */}
+      <section id="packages" aria-labelledby="packages-heading" className="sd-band-green border-b border-[var(--line)]">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
+          <p className="sd-eyebrow">Packages</p>
+          <h2 id="packages-heading" className="sd-h2 mt-3 max-w-3xl">
+            Pick what your store <em className="sd-grad">needs</em>
+          </h2>
+          <p className="sd-lede mt-4">One licence per store. The back office, the lottery counter, or both. We agree the price with each store.</p>
+          <Packages className="mt-10" />
+        </div>
+      </section>
+
       {/* Close: what happens next, and one action. */}
-      <section aria-labelledby="start-heading" className="bg-white">
+      <section aria-labelledby="start-heading" className="sd-band-mix">
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-16 sm:px-6 md:flex-row md:items-end md:justify-between md:py-20">
           <div className="max-w-2xl">
             <h2 id="start-heading" className="sd-h2">
-              Set up in an afternoon, on the PC you already have
+              Set up in about an hour, <em className="sd-grad">on the PC you already have</em>
             </h2>
             <p className="sd-lede mt-4">
               We set up your store and email you a setup key. You install StoreDesk, connect the register and let the
               price book import.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <Link href="/contact" className={primaryButton}>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href="/download" className={primaryButton}>
+              See the setup steps
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link href="/contact" className={secondaryButton}>
               Ask about your store
             </Link>
-            <a href={DOCS.install} className={textLink}>
-              Read the setup guide
-            </a>
           </div>
         </div>
       </section>

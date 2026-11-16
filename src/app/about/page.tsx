@@ -32,7 +32,7 @@ const RULES = [
 const NOT_YET = [
   "Supplier invoices by EDI, so costs arrive without typing.",
   "Sending deal and fuel price changes to the register. Change them on the register for now.",
-  "An iPhone app. StoreDesk Mobile is on Android today.",
+  "The iPhone app, coming soon on the App Store. StoreDesk Mobile is on Android today.",
   "StoreDesk Lottery shift reports by email. Coming soon."
 ];
 
@@ -40,7 +40,12 @@ export default function AboutPage() {
   return (
     <PageFrame>
       <PageHero
-        title="Because the margin report took a Sunday afternoon"
+        eyebrow="About"
+        title={
+          <>
+            Because the margin report took <em className="sd-grad">a Sunday afternoon</em>
+          </>
+        }
         lede="StoreDesk started as a spreadsheet, a stack of supplier invoices, and no clear answer to which items were making money."
         actions={
           <>

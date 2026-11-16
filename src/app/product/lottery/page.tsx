@@ -46,7 +46,7 @@ const OWNER = [
   "Settle the packs that are due, in one click.",
   "Best sellers, by game and by price.",
   "Which prices earn their rack space, and what to order for the next two weeks.",
-  "Each role sees only its pages. One sign-in, the same as StoreDesk.",
+  "Each role sees only its pages. Staff sign in with a StoreDesk email and password, which we set up for you; you don't need the back office.",
   "An idle lock signs the counter out after the minutes you choose."
 ];
 
@@ -104,8 +104,13 @@ export default function LotteryPage() {
           { name: "Product", path: "/product" },
           { name: product.name, path: product.href }
         ]}
-        title="StoreDesk Lottery: the ticket rack, counted by scanner"
-        lede="Receive packs, put them out, and close each shift by scanning the rack. It works out what sold and what the drawer owes."
+        eyebrow="StoreDesk Lottery"
+        title={
+          <>
+            The ticket rack, <em className="sd-grad">counted by scanner</em>
+          </>
+        }
+        lede="Receive packs, put them out, and close each shift by scanning the rack. It works out what sold and what the drawer owes. Buy it on its own, or with the back office."
         actions={
           <>
             <Link href="/contact" className={primaryButton}>
@@ -127,6 +132,30 @@ export default function LotteryPage() {
       >
         <p className="mt-4 text-[17px] font-semibold">Runs on its own, or alongside StoreDesk.</p>
       </PageHero>
+
+      <Section
+        id="get-it"
+        title={
+          <>
+            How you get it, <em className="sd-grad">with or without the back office</em>
+          </>
+        }
+        tone="white"
+      >
+        <ol className="grid gap-5 md:grid-cols-3">
+          {[
+            { n: "1", title: "Ask us", body: "Tell us the store and how many boxes your rack has. We set up your store and its sign-ins." },
+            { n: "2", title: "Install on the counter PC", body: "We send the installer. A Windows PC at the counter, online for the first sign-in, and a barcode scanner." },
+            { n: "3", title: "Sign in and set up the rack", body: "Sign in with your StoreDesk email and password, draw the rack, then scan box 1 to the last." }
+          ].map((step) => (
+            <li key={step.n} className="sd-card p-6">
+              <span className="sd-icon-tile text-[18px] font-extrabold">{step.n}</span>
+              <h3 className="mt-5 text-[19px] font-extrabold">{step.title}</h3>
+              <p className="mt-2 text-[16px] leading-relaxed text-[var(--muted)]">{step.body}</p>
+            </li>
+          ))}
+        </ol>
+      </Section>
 
       <Section id="close" title="Closing a shift takes a few minutes" lede="Every scan is saved as you go, so a clerk can stop and come back." tone="wash">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">

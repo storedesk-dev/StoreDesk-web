@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
-import { CheckList, PageFrame, PageHero, Section, primaryButton, textLink } from "@/components/PageHero";
+import { CheckList, PageFrame, PageHero, Section, primaryButton, secondaryButton } from "@/components/PageHero";
 import { PRODUCTS, PRODUCT_ORDER, type ProductEntry } from "./products";
 
 /**
@@ -11,6 +11,17 @@ import { PRODUCTS, PRODUCT_ORDER, type ProductEntry } from "./products";
  * `extra` is the page's own section, placed after the job list (the margin check on Desktop, the
  * shift close on Lottery).
  */
+/** "StoreDesk Mobile: your store on an Android phone": the part after the colon in the brand gradient. */
+function titleWithAccent(title: string) {
+  const at = title.indexOf(": ");
+  if (at < 0) return title;
+  return (
+    <>
+      {title.slice(0, at + 1)} <em className="sd-grad">{title.slice(at + 2)}</em>
+    </>
+  );
+}
+
 export function ProductDetail({
   product,
   title,
@@ -37,14 +48,15 @@ export function ProductDetail({
           { name: "Product", path: "/product" },
           { name: product.name, path: product.href }
         ]}
-        title={title}
+        eyebrow="Product"
+        title={titleWithAccent(title)}
         lede={product.line}
         actions={
           <>
             <Link href="/contact" className={primaryButton}>
               Ask about your store
             </Link>
-            <a href={product.guide} className={textLink}>
+            <a href={product.guide} className={secondaryButton}>
               {product.name} guide
             </a>
           </>

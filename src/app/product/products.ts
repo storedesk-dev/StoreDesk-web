@@ -56,7 +56,7 @@ export const PRODUCTS: Record<ProductKey, ProductEntry> = {
     key: "mobile",
     name: "StoreDesk Mobile",
     href: "/product/mobile",
-    line: "Prices, sales and scanning on an Android phone, in the aisle or away from the store.",
+    line: "Prices, sales and scanning on an Android phone, in the aisle or away from the store. iPhone coming soon.",
     who: "Staff on the shop floor, and the owner away from the store.",
     jobs: [
       "Scan a barcode: shelf price, what you paid, margin and the cheapest supplier.",
@@ -69,10 +69,10 @@ export const PRODUCTS: Record<ProductKey, ProductEntry> = {
     connects: [
       "Reaches StoreDesk Service on the store PC through a secure tunnel.",
       "On the store Wi-Fi it can connect directly, once an admin turns on local network access.",
-      "Each person signs in with their own StoreDesk account."
+      "Each person signs in with the org tag and the sign-in their manager gives them. There is no sign-up on this website."
     ],
     needs: ["Android 5.0 or later, from Google Play.", "The internet, when away from the store."],
-    notYet: ["An iPhone app. Being prepared, no date yet.", "Lottery screens on the phone."],
+    notYet: ["The iPhone app: coming soon on the App Store.", "Lottery screens on the phone."],
     guide: DOCS.mobile
   },
   service: {
@@ -92,7 +92,7 @@ export const PRODUCTS: Record<ProductKey, ProductEntry> = {
       "Backs up its database on the PC before each update."
     ],
     connects: [
-      "Your store data never leaves this PC.",
+      "Your store's database stays on this PC.",
       "Your StoreDesk account holds only the store, its licence, its PC and its people."
     ],
     needs: [

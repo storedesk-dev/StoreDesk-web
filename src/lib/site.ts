@@ -67,6 +67,37 @@ export const PLANS = {
   setupKeyHours: 24
 } as const;
 
+/**
+ * What a store can buy. Three packages, one licence per store each; the price is agreed per store,
+ * so the site names no price.
+ */
+export const PACKAGES = [
+  {
+    id: "back-office",
+    name: "Back office",
+    line: "The store's back office, on its PC and the staff phones.",
+    apps: ["StoreDesk Desktop", "StoreDesk Service", "StoreDesk Mobile"],
+    points: ["Price book, supplier costs and margins", "Price changes sent to the register", "Sales, fuel, reports and sales tax", "The phone app for the shop floor"],
+    featured: false
+  },
+  {
+    id: "back-office-lottery",
+    name: "Back office + Lottery",
+    line: "Everything: the back office, the phones and the lottery counter.",
+    apps: ["StoreDesk Desktop", "StoreDesk Service", "StoreDesk Mobile", "StoreDesk Lottery"],
+    points: ["All of Back office", "The lottery counter PC", "Lottery figures beside the store's sales", "One licence, one place to ask"],
+    featured: true
+  },
+  {
+    id: "lottery",
+    name: "Lottery",
+    line: "Just the lottery counter, on its own PC. No back office or register needed.",
+    apps: ["StoreDesk Lottery"],
+    points: ["Receive packs and put them out", "Close each shift by scanning the rack", "What sold and what the drawer owes", "Georgia Lottery instant tickets, for now"],
+    featured: false
+  }
+] as const;
+
 /** Opens the visitor's mail client with the subject pre-filled. */
 export function contactMailto(options?: { subject?: string; body?: string }) {
   const params = new URLSearchParams();
@@ -96,7 +127,7 @@ export const NAV = [
 export const PRODUCT_NAV = [
   { href: "/product", label: "Overview", line: "All four apps, the register and the internet" },
   { href: "/product/desktop", label: "StoreDesk Desktop", line: "The back office on your Windows PC" },
-  { href: "/product/mobile", label: "StoreDesk Mobile", line: "Prices, sales and scanning on Android" },
+  { href: "/product/mobile", label: "StoreDesk Mobile", line: "Prices, sales and scanning on Android. iPhone coming soon" },
   { href: "/product/service", label: "StoreDesk Service", line: "Runs on the store PC and talks to the register" },
   { href: "/product/lottery", label: "StoreDesk Lottery", line: "The ticket rack and the shift close" }
 ] as const;

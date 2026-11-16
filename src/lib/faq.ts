@@ -53,7 +53,7 @@ export const FAQ: FaqEntry[] = [
   {
     question: "What do I need to run it?",
     answer:
-      "A Windows 10 or later PC in the back office that can reach your register over the store network, and an Android 5.0 or later phone for the shop floor. There is no iPhone app yet.",
+      "For the back office: a 64-bit Windows 10 or 11 PC in the back office that can reach your register over the store network, and Android 5.0 or later phones for the shop floor (the iPhone app is coming soon on the App Store). For Lottery on its own: a Windows PC at the counter, online for the first sign-in, and a barcode scanner.",
     href: "/download"
   },
   {
@@ -64,12 +64,12 @@ export const FAQ: FaqEntry[] = [
   },
   {
     question: "How do staff get the phone app?",
-    answer: `From Google Play, like any other app. Each person signs in with an account you create for them, and you choose which screens they can open. There is no public sign-up.`,
+    answer: `From Google Play, like any other app; the iPhone app is coming soon. Each person signs in with your org tag and the email and password from their invitation, and you choose which screens each role opens. There is no public sign-up.`,
     href: PLAY_STORE_URL
   },
   {
     question: "How long does setup take?",
-    answer: `About an afternoon. Install on the back-office PC and paste the setup key we email you, then point StoreDesk at your register and let the price book import.`,
+    answer: `About an hour at the store, once we have set up your store and emailed your setup key. Install on the back-office PC, paste the key, then point StoreDesk at your register and let the price book import. Lottery on its own needs only its installer and a sign-in.`,
     href: `${DOCS_BASE}/t/flow.install`
   },
   {

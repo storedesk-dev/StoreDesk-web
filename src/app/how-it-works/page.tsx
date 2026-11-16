@@ -22,7 +22,7 @@ const STEPS = [
   {
     title: "Install on the back-office PC",
     outcome:
-      "Run the installer and paste the setup key from your email. The key works until it is used; StoreDesk then makes a new one, which an admin reads on the store PC to set up a replacement.",
+      "Run the installer, then paste the one-time setup key we email you. It starts with set_ and expires 24 hours after we send it.",
     time: "About 10 minutes",
     href: DOCS.install
   },
@@ -40,7 +40,7 @@ const STEPS = [
   },
   {
     title: "Give your staff the phone app",
-    outcome: "Staff install StoreDesk Mobile from Google Play and sign in with the account you made them. You choose which screens each person opens.",
+    outcome: "Staff install StoreDesk Mobile from Google Play and sign in with your org tag and the email and password from their invitation. You choose which screens each role opens.",
     time: "A few minutes each",
     href: DOCS.mobileSetup
   }
@@ -50,8 +50,13 @@ export default function HowItWorksPage() {
   return (
     <PageFrame>
       <PageHero
-        title="Set up in an afternoon, on hardware you already own"
-        lede="Four steps, on the back-office PC and your phones. Nothing to rewire at the till. Each step links to the guide, which walks it screen by screen."
+        eyebrow="How it works"
+        title={
+          <>
+            Set up in about an hour, <em className="sd-grad">on hardware you already own</em>
+          </>
+        }
+        lede="Four stages, on the back-office PC and your phones. Nothing to rewire at the till. The step-by-step list is on the Download page, and each stage links to the guide."
         actions={
           <>
             <Link href="/contact" className={primaryButton}>

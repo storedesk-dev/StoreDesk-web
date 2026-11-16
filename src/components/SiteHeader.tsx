@@ -4,80 +4,116 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
-import { Wordmark } from "@/components/Wordmark";
+import { ArrowDownToLine, BookOpen, Menu, X } from "lucide-react";
 import { DOCS, NAV, SITE } from "@/lib/site";
 
+/** Home first, the four sections, then Contact (the header's one button is Download). */
+const NAV_ITEMS = [{ href: "/", label: "Home" }, ...NAV, { href: "/contact", label: "Contact" }] as const;
+
 function isActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
   // "/product" owns its section except the lottery page, which has its own header item.
   if (href === "/product") return pathname === "/product" || (pathname.startsWith("/product/") && !pathname.startsWith("/product/lottery"));
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 /**
- * Site header: solid white, one rule under it. The current page carries a blue underline and
- * aria-current. Contact is the one filled button; Download and the guide are plain links beside it.
+ * Site header: a glass bar in the brand's blue-to-mint, the nav centred in one pill with the current
+ * page as a gradient chip, the guide as a link and Download as the one gradient button. The bar firms
+ * up once the page scrolls, so content underneath never fights the type.
  *
- * Client only for the menu toggle on narrow screens and the current-page check.
+ * Client only for the scroll state, the menu toggle on narrow screens and the current-page check.
  */
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname() || "/";
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Close the menu on navigation, or it stays open over the new page.
   useEffect(() => setOpen(false), [pathname]);
 
-  const linkClass = (active: boolean) =>
-    `relative inline-flex min-h-11 items-center px-3 text-[15px] font-semibold transition-colors ${
-      active
-        ? "text-[var(--ink)] after:absolute after:inset-x-3 after:bottom-1.5 after:h-[2px] after:rounded-full after:bg-[var(--blue)]"
-        : "text-[var(--muted)] hover:text-[var(--ink)]"
-    }`;
+  const onDownload = isActive(pathname, "/download");
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-white">
+    <header
+      className={`sticky top-0 z-50 border-b backdrop-blur-xl backdrop-saturate-150 transition-[background-color,box-shadow] duration-300 ${
+        scrolled
+          ? "border-white/70 bg-gradient-to-r from-white/92 via-[#eef4ff]/90 to-[#e8faf3]/92 shadow-[0_8px_30px_-12px_rgba(26,99,244,0.28)]"
+          : "border-white/50 bg-gradient-to-r from-white/80 via-[#eef4ff]/70 to-[#e8faf3]/75"
+      }`}
+    >
       {/* First tab stop on every page: jumps past the navigation to <main id="main">. */}
       <a href="#main" className="sd-skip-link">
         Skip to content
       </a>
+      {/* Brand hairline along the bottom edge of the glass. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#1A63F4]/45 to-[#00875F]/45" />
 
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
-        <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label={`${SITE.name} home`}>
-          <Image src="/brand/logo-mark.png" alt="" width={64} height={64} priority className="h-8 w-8" />
-          <Wordmark />
+      <div className="relative mx-auto grid h-16 max-w-6xl grid-cols-[1fr_auto] items-center gap-4 px-4 sm:px-6 lg:grid-cols-[1fr_auto_1fr]">
+        <Link href="/" className="flex min-h-11 w-fit items-center gap-2.5" aria-label={`${SITE.name} home`}>
+          <Image
+            src="/brand/logo-mark.png"
+            alt=""
+            width={64}
+            height={64}
+            priority
+            className="h-8 w-8 object-contain drop-shadow-[0_2px_6px_rgba(26,99,244,0.25)]"
+          />
+          <span className="sd-wordmark whitespace-nowrap text-[18px] font-extrabold uppercase tracking-[0.03em]">Store Desk</span>
         </Link>
 
-        <nav aria-label="Main" className="hidden flex-1 items-center md:flex">
-          {NAV.map((item) => {
+        <nav
+          aria-label="Main"
+          className="hidden items-center gap-0.5 rounded-full border border-white/70 bg-white/60 p-1 shadow-[inset_0_1px_2px_rgba(23,32,42,0.06),0_4px_16px_-8px_rgba(26,99,244,0.25)] backdrop-blur-md lg:flex"
+        >
+          {NAV_ITEMS.map((item) => {
             const active = isActive(pathname, item.href);
             return (
-              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={linkClass(active)}>
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`inline-flex min-h-10 items-center rounded-full px-3.5 text-[14.5px] font-semibold transition-colors ${
+                  active
+                    ? "bg-gradient-to-r from-[#1A63F4] to-[#00875F] text-white shadow-[0_4px_14px_-4px_rgba(26,99,244,0.55)]"
+                    : "text-[#475467] hover:bg-white/80 hover:text-[#1A63F4]"
+                }`}
+              >
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="ml-auto hidden items-center gap-1 md:flex">
+        <div className="hidden items-center gap-2 justify-self-end lg:flex">
           {/* The user guide is its own site (docs.storedesk.net), so a plain anchor, not next/link. */}
-          <a href={DOCS.home} className={linkClass(false)}>
+          <a
+            href={DOCS.home}
+            className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[14.5px] font-semibold text-[#475467] transition-colors hover:text-[#1A63F4]"
+          >
+            <BookOpen className="h-4 w-4" aria-hidden />
             Guide
           </a>
-          <Link href="/download" aria-current={pathname === "/download" ? "page" : undefined} className={linkClass(pathname === "/download")}>
-            Download
-          </Link>
           <Link
-            href="/contact"
-            aria-current={pathname === "/contact" ? "page" : undefined}
-            className="ml-2 inline-flex min-h-11 items-center rounded-[var(--radius-sm)] bg-[var(--blue)] px-4 text-[15px] font-bold text-white transition-colors hover:bg-[var(--blue-ink)]"
+            href="/download"
+            aria-current={onDownload ? "page" : undefined}
+            className={`sd-btn !min-h-11 !px-5 !text-[14.5px] ${onDownload ? "ring-2 ring-white" : ""}`}
           >
-            Contact us
+            <ArrowDownToLine className="h-4 w-4" aria-hidden />
+            Download
           </Link>
         </div>
 
         <button
           type="button"
-          className="ml-auto flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--line)] text-[var(--ink)] md:hidden"
+          className="flex h-11 w-11 items-center justify-center justify-self-end rounded-full border border-white/70 bg-white/60 text-[var(--ink)] backdrop-blur-md lg:hidden"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
           aria-controls="mobile-menu"
@@ -88,17 +124,19 @@ export function SiteHeader() {
       </div>
 
       {open ? (
-        <nav id="mobile-menu" aria-label="Main" className="border-t border-[var(--line)] bg-white md:hidden">
-          <ul className="flex flex-col px-4 py-3">
-            {[...NAV, { href: "/download", label: "Download" }].map((item) => {
+        <nav id="mobile-menu" aria-label="Main" className="border-t border-white/60 bg-white/90 backdrop-blur-xl lg:hidden">
+          <ul className="flex flex-col gap-1 px-4 py-3">
+            {NAV_ITEMS.map((item) => {
               const active = isActive(pathname, item.href);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={`flex min-h-12 items-center border-b border-[var(--line)] text-[17px] font-semibold ${
-                      active ? "text-[var(--blue-ink)]" : "text-[var(--ink)]"
+                    className={`flex min-h-12 items-center rounded-xl px-3.5 text-[17px] font-semibold ${
+                      active
+                        ? "bg-gradient-to-r from-[#1A63F4] to-[#00875F] text-white shadow-[0_4px_14px_-4px_rgba(26,99,244,0.5)]"
+                        : "text-[var(--ink)] hover:bg-white"
                     }`}
                   >
                     {item.label}
@@ -107,16 +145,15 @@ export function SiteHeader() {
               );
             })}
             <li>
-              <a href={DOCS.home} className="flex min-h-12 items-center border-b border-[var(--line)] text-[17px] font-semibold text-[var(--ink)]">
+              <a href={DOCS.home} className="flex min-h-12 items-center gap-2 rounded-xl px-3.5 text-[17px] font-semibold text-[var(--ink)] hover:bg-white">
+                <BookOpen className="h-4 w-4" aria-hidden />
                 User guide
               </a>
             </li>
-            <li className="pt-3">
-              <Link
-                href="/contact"
-                className="flex min-h-12 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--blue)] text-[17px] font-bold text-white"
-              >
-                Contact us
+            <li className="pt-2">
+              <Link href="/download" className="sd-btn w-full">
+                <ArrowDownToLine className="h-4 w-4" aria-hidden />
+                Download
               </Link>
             </li>
           </ul>

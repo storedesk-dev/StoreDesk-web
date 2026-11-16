@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowDownToLine, Check, Copy } from "lucide-react";
-import { GooglePlayIcon, WindowsIcon } from "@/components/BrandIcons";
+import { AppleIcon, GooglePlayIcon, WindowsIcon } from "@/components/BrandIcons";
 import { PLAY_STORE_URL, contactMailto } from "@/lib/site";
 import { formatSize, type LatestRelease, type ReleaseFile } from "@/lib/release";
 
@@ -54,15 +54,15 @@ export function Installers({ release }: { release: LatestRelease | null }) {
         return (
           <div
             key={it.platform}
-            className={`rounded-[var(--radius-lg)] border bg-white p-6 ${mine ? "border-[var(--blue)] ring-1 ring-[var(--blue)]" : "border-[var(--line)]"}`}
+            className={`sd-card sd-card-link p-6 ${mine ? "!border-[var(--blue)] ring-2 ring-[var(--blue)]/30" : ""}`}
           >
             <div className="flex items-start gap-4">
               <span
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] ${
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] shadow-[var(--shadow-card)] ${
                   it.platform === "windows" ? "bg-[#0078D4] text-white" : "border border-[var(--line)] bg-white"
                 }`}
               >
-                {it.platform === "windows" ? <WindowsIcon className="h-5 w-5" /> : <GooglePlayIcon className="h-5 w-5" />}
+                {it.platform === "windows" ? <WindowsIcon className="h-6 w-6" /> : <GooglePlayIcon className="h-6 w-6" />}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -80,7 +80,7 @@ export function Installers({ release }: { release: LatestRelease | null }) {
             {href ? (
               <a
                 href={href}
-                className="mt-5 flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--blue)] px-5 text-[16px] font-bold text-white hover:bg-[var(--blue-ink)]"
+                className="sd-btn mt-5 w-full"
               >
                 {it.platform === "windows" ? <ArrowDownToLine className="h-4 w-4" aria-hidden /> : <GooglePlayIcon className="h-4 w-4" />}
                 {it.cta}
@@ -88,7 +88,7 @@ export function Installers({ release }: { release: LatestRelease | null }) {
             ) : (
               // The downloads site could not be read, or this release has no file for this platform.
               // Never show a button that goes nowhere.
-              <p className="mt-5 rounded-[var(--radius-sm)] bg-[var(--wash)] px-5 py-3 text-center text-[16px] font-semibold">
+              <p className="mt-5 rounded-2xl bg-[var(--wash)] px-5 py-3 text-center text-[16px] font-semibold">
                 Not available right now.{" "}
                 <a href={contactMailto({ subject: "StoreDesk download" })} className="sd-link">
                   Ask us for it
@@ -99,6 +99,17 @@ export function Installers({ release }: { release: LatestRelease | null }) {
           </div>
         );
       })}
+      {/* The iPhone app: listed so an iPhone visitor knows it is coming, with nothing to click yet. */}
+      <div className="sd-card flex items-center gap-4 p-5">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#111] text-white shadow-[var(--shadow-card)]">
+          <AppleIcon className="h-6 w-6" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[18px] font-extrabold">StoreDesk Mobile for iPhone</h2>
+          <p className="text-[15px] text-[var(--muted)]">On the App Store soon. Until then, use the Android app.</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-[var(--blue-tint)] px-3 py-1 text-[13px] font-bold text-[var(--blue-ink)]">Coming soon</span>
+      </div>
     </div>
   );
 }

@@ -3,13 +3,10 @@
 /*
  * StoreDesk public site: tokens.
  *
- * Direction: "the back office, then the app". Pages are the brand's pale wash and plain white
- * surfaces, set in heavy ink type. The one dark surface is the stage that holds a real screenshot:
- * the same navy as the desktop app's own dark theme, so the screenshot sits on its native ground
- * instead of floating in a frame. One accent (brand blue) for actions and links; green marks
- * "done / safe" and is used as text only in its darker, AA-safe shade.
- *
- * No gradients, glows or glass. One shadow, used only under screenshots.
+ * Direction: the brand's own blue-to-green. Pages sit on a pale blue-to-mint wash, headers on a
+ * faint grid, and the brand gradient carries the wordmark, one key phrase per headline, the main
+ * button and the active nav chip. Real app screens sit in phone and window frames with soft brand
+ * glows and small floating cards that say what each screen is for. Violet is never used.
  */
 :root {
   --ink: #122033;
@@ -34,6 +31,11 @@
   --radius-md: 14px;
   --radius-lg: 20px;
   --shadow-shot: 0 1px 2px rgba(18, 32, 51, 0.08), 0 18px 40px -18px rgba(18, 32, 51, 0.45);
+  --grad: linear-gradient(90deg, #1a63f4 0%, #0f86c4 50%, #00a87b 100%);
+  --grad-btn: linear-gradient(90deg, #1a63f4 0%, #00875f 100%);
+  --page-tint: linear-gradient(160deg, #e8f0ff 0%, #f4f7fb 38%, #e6f8f1 100%);
+  --shadow-brand: 0 10px 30px -12px rgba(26, 99, 244, 0.45);
+  --shadow-card: 0 1px 2px rgba(18, 32, 51, 0.05), 0 12px 32px -18px rgba(18, 32, 51, 0.28);
 
   /* Older names still read by the account pages (enroll, verify, reset-password, 404). */
   --sd-blue: var(--blue);
@@ -53,7 +55,8 @@
 }
 
 body {
-  background: var(--wash);
+  background: var(--page-tint);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans), "Segoe UI", system-ui, sans-serif;
   font-size: 17px;
@@ -201,4 +204,212 @@ html {
 }
 .sd-toast {
   animation: sd-toast-in 0.2s ease-out;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * Brand layer: gradients, the grid header ground, frames, floating cards and the motion layer.
+ * ------------------------------------------------------------------------------------------- */
+
+/* The lockup's blue-to-green, as live text. */
+.sd-wordmark {
+  background-image: linear-gradient(90deg, #2859c0 0%, #368ca5 52%, #46b088 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* One key phrase per headline. */
+.sd-grad {
+  background-image: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-style: normal;
+}
+
+/* Small upper-case line above a page's h1. */
+.sd-eyebrow {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+/* Page-header ground: a faint grid that fades out at the edges, with one brand glow. */
+.sd-hero-grid {
+  position: relative;
+  isolation: isolate;
+  background-color: rgba(251, 252, 253, 0.7);
+  background-image:
+    linear-gradient(to right, rgba(23, 32, 42, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(23, 32, 42, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  background-position: center top;
+}
+.sd-hero-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(700px 420px at 82% 30%, rgba(26, 99, 244, 0.14), transparent 70%),
+    radial-gradient(560px 360px at 95% 85%, rgba(0, 168, 123, 0.12), transparent 70%),
+    radial-gradient(ellipse 90% 70% at 50% 0%, transparent 30%, rgba(251, 252, 253, 0.9) 92%);
+}
+
+/* Section grounds. */
+.sd-band-blue {
+  background: linear-gradient(180deg, rgba(26, 99, 244, 0.08) 0%, rgba(255, 255, 255, 0.85) 60%, #fff 100%);
+}
+.sd-band-green {
+  background: linear-gradient(180deg, rgba(0, 168, 123, 0.09) 0%, rgba(255, 255, 255, 0.88) 60%, #fff 100%);
+}
+.sd-band-mix {
+  background: linear-gradient(135deg, rgba(26, 99, 244, 0.12), rgba(0, 168, 123, 0.1));
+}
+
+/* Buttons: the gradient pill, and the white pill beside it. Both step on hover, press on click. */
+.sd-btn,
+.sd-btn-ghost {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0 1.5rem;
+  font-size: 16px;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease, border-color 0.2s ease;
+}
+.sd-btn {
+  background-image: var(--grad-btn);
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+.sd-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 14px 34px -12px rgba(26, 99, 244, 0.55);
+}
+.sd-btn-ghost {
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
+.sd-btn-ghost:hover {
+  transform: translateY(-1px);
+  border-color: var(--blue);
+  color: var(--blue-ink);
+}
+.sd-btn:active,
+.sd-btn-ghost:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Cards: white, soft shadow; a linked card lifts 2px. */
+.sd-card {
+  border: 1px solid rgba(14, 67, 216, 0.1);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-card);
+}
+a.sd-card,
+.sd-card-link {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+a.sd-card:hover,
+.sd-card-link:hover {
+  transform: translateY(-2px);
+  border-color: rgba(26, 99, 244, 0.35);
+  box-shadow: 0 18px 40px -20px rgba(26, 99, 244, 0.45);
+}
+
+/* Square icon tile with the brand gradient. */
+.sd-icon-tile {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background-image: var(--grad-btn);
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+
+/* A small floating card on a phone or window frame: what the screen is for. */
+.sd-float {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 0.7rem 1rem 0.7rem 0.7rem;
+  box-shadow: 0 18px 40px -16px rgba(18, 32, 51, 0.35);
+}
+.sd-float-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Soft brand glow behind a frame. */
+.sd-glow {
+  position: relative;
+  isolation: isolate;
+}
+.sd-glow::before {
+  content: "";
+  position: absolute;
+  inset: 8% -6% -4% -6%;
+  z-index: -1;
+  border-radius: 40px;
+  background: radial-gradient(closest-side, rgba(26, 99, 244, 0.22), rgba(0, 168, 123, 0.12) 60%, transparent);
+  filter: blur(24px);
+}
+
+/* Hero entrance: once, on load. Nothing else animates because the page scrolled. */
+@keyframes sd-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sd-enter {
+  animation: sd-enter 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.sd-enter-2 {
+  animation: sd-enter 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.12s both;
+}
+.sd-enter-3 {
+  animation: sd-enter 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.24s both;
+}
+
+/* The floating cards drift a few pixels, slowly. Rests under reduced motion. */
+@keyframes sd-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.sd-bob {
+  animation: sd-bob 5s ease-in-out infinite;
+}
+.sd-bob-slow {
+  animation: sd-bob 6.5s ease-in-out 0.8s infinite;
 }
