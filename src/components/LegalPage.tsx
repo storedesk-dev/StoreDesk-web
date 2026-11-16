@@ -25,12 +25,12 @@ export function LegalSection({
   return (
     <section id={id} className="scroll-mt-28">
       <div className="flex items-start gap-3.5">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1A63F4]/10 text-[#1A63F4]">
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--blue-tint)] text-[var(--blue-ink)]">
           {icon ?? <span className="sd-num text-[14px] font-bold">{index}</span>}
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-[21px] font-bold tracking-tight text-[var(--foreground)]">
-            <a href={`#${id}`} className="hover:text-[#1A63F4]">
+            <a href={`#${id}`} className="hover:text-[var(--blue-ink)]">
               {title}
             </a>
           </h2>
@@ -48,11 +48,11 @@ export function LegalHighlights({ items }: { items: Array<{ value: string; label
       {items.map((item) => (
         <div
           key={item.label}
-          className={`rounded-2xl border p-5 ${
+          className={`rounded-[var(--radius-md)] border p-5 ${
             item.tone === "good" ? "border-[#00A87B]/30 bg-[#00A87B]/[0.06]" : "border-[var(--border)] bg-white"
           }`}
         >
-          <p className={`text-[28px] font-bold tracking-tight ${item.tone === "good" ? "text-[#00875F]" : "text-[var(--foreground)]"}`}>
+          <p className={`text-[28px] font-bold tracking-tight ${item.tone === "good" ? "text-[var(--green-ink)]" : "text-[var(--foreground)]"}`}>
             {item.value}
           </p>
           <p className="mt-1 text-[14.5px] leading-snug text-[var(--muted)]">{item.label}</p>
@@ -72,13 +72,13 @@ export function LegalSplit({
 }) {
   const panel = (side: typeof left, tone: "green" | "blue") => (
     <div
-      className={`rounded-3xl border p-6 ${
+      className={`rounded-[var(--radius-lg)] border p-6 ${
         tone === "green" ? "border-[#00A87B]/25 bg-[#00A87B]/[0.05]" : "border-[#1A63F4]/25 bg-[#1A63F4]/[0.04]"
       }`}
     >
       <span
         className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-          tone === "green" ? "bg-[#00A87B]/15 text-[#00875F]" : "bg-[#1A63F4]/12 text-[#1A63F4]"
+          tone === "green" ? "bg-[#00A87B]/15 text-[var(--green-ink)]" : "bg-[#1A63F4]/12 text-[#1A63F4]"
         }`}
       >
         {side.icon}
@@ -107,7 +107,7 @@ export function LegalSplit({
 export function LegalCallout({ tone = "info", children }: { tone?: "info" | "warn"; children: ReactNode }) {
   return (
     <div
-      className={`rounded-2xl border-l-4 px-5 py-4 text-[16px] leading-relaxed ${
+      className={`rounded-[var(--radius-md)] border-l-4 px-5 py-4 text-[16px] leading-relaxed ${
         tone === "warn"
           ? "border-l-[#B54708] bg-[#FFFCF5] text-[#344054]"
           : "border-l-[#1A63F4] bg-[#F5F8FF] text-[#344054]"
@@ -121,12 +121,12 @@ export function LegalCallout({ tone = "info", children }: { tone?: "info" | "war
 /** A table of contents built from the sections below it, so a long page is navigable. */
 export function LegalContents({ sections }: { sections: Array<{ id: string; title: string }> }) {
   return (
-    <nav aria-label="On this page" className="rounded-2xl border border-[var(--border)] bg-white p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">On this page</p>
+    <nav aria-label="On this page" className="rounded-[var(--radius-md)] border border-[var(--border)] bg-white p-5">
+      <p className="text-[15px] font-bold text-[var(--ink)]">On this page</p>
       <ol className="mt-3 space-y-1.5">
         {sections.map((section, index) => (
           <li key={section.id} className="text-[15px]">
-            <a href={`#${section.id}`} className="text-[#344054] hover:text-[#1A63F4] hover:underline">
+            <a href={`#${section.id}`} className="text-[#344054] hover:text-[var(--blue-ink)] hover:underline">
               <span className="sd-num mr-2 text-[var(--muted)]">{index + 1}.</span>
               {section.title}
             </a>
@@ -140,12 +140,12 @@ export function LegalContents({ sections }: { sections: Array<{ id: string; titl
 /** What a table of data says, in the same shape on both pages. */
 export function DataTable({ rows, columns }: { columns: [string, string, string]; rows: Array<[string, string, string]> }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
+    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
       <table className="w-full min-w-[520px] border-collapse text-left text-[15.5px]">
         <thead>
           <tr className="bg-[#F9FAFB]">
             {columns.map((column) => (
-              <th key={column} className="px-4 py-2.5 text-[12.5px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+              <th key={column} className="px-4 py-2.5 text-[14px] font-bold text-[var(--ink)]">
                 {column}
               </th>
             ))}

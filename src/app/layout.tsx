@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastContext";
@@ -23,18 +23,24 @@ const sans = Plus_Jakarta_Sans({
   display: "swap"
 });
 
+// Only the download page's SHA-256 uses it, so it is not preloaded on every page.
 const mono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  display: "swap"
+  display: "swap",
+  preload: false
 });
 
 const siteUrl = SITE_URL;
 
+export const viewport: Viewport = {
+  themeColor: "#ffffff"
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "StoreDesk — back-office software for convenience stores",
+    default: "StoreDesk: back-office software for convenience stores",
     template: "%s · StoreDesk"
   },
   description: SITE.summary,
@@ -50,12 +56,12 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: siteUrl,
     siteName: "StoreDesk",
-    title: "StoreDesk — back-office software for convenience stores",
+    title: "StoreDesk: back-office software for convenience stores",
     description: SITE.summary,
   },
   twitter: {
     card: "summary_large_image",
-    title: "StoreDesk — back-office software for convenience stores",
+    title: "StoreDesk: back-office software for convenience stores",
     description: SITE.summary
   },
   verification: {
@@ -86,7 +92,8 @@ function jsonLdFor(release: LatestRelease | null) {
         "operatingSystem": "Windows 10 or later, Android 5.0 or later",
         "downloadUrl": `${siteUrl}/download`,
         "url": siteUrl,
-        "image": `${siteUrl}/brand/logo-mark.png`,
+        "image": `${siteUrl}/screenshots/desktop-dashboard.png`,
+        "screenshot": [`${siteUrl}/screenshots/desktop-dashboard.png`, `${siteUrl}/screenshots/lottery-rack.png`],
         "featureList": Object.values(CAPABILITIES),
         "description": SITE.summary,
         "creator": { "@type": "Organization", "name": "StoreDesk" },

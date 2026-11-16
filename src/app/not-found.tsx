@@ -1,37 +1,39 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { PageFrame, primaryButton, textLink } from "@/components/PageHero";
 import { adminCookieName } from "@/lib/admin-auth";
+import { PRODUCT_NAV } from "@/lib/site";
 
 export default async function NotFound() {
   const cookieStore = await cookies();
   const hasAdminCookie = cookieStore.has(adminCookieName());
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--surface)] text-center px-4">
-      <h1 className="text-6xl font-extrabold tracking-tight text-[var(--sd-blue)]">404</h1>
-      <h2 className="mt-4 text-2xl font-bold tracking-tight text-[var(--foreground)]">
-        Page not found
-      </h2>
-      <p className="mt-2 max-w-md text-[var(--muted)]">
-        Sorry, we couldn&apos;t find the page you&apos;re looking for. It might have been moved or doesn&apos;t exist.
-      </p>
-      
-      <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
-        <Link
-          href="/"
-          className="rounded-xl border border-[var(--border)] bg-white px-5 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm hover:bg-slate-50 transition-colors"
-        >
-          Go back home
-        </Link>
-        {hasAdminCookie && (
-          <Link
-            href="/admin"
-            className="rounded-xl bg-[var(--sd-blue)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--sd-blue-shadow)] transition-colors"
-          >
-            Admin Dashboard
+    <PageFrame>
+      <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
+        <p className="sd-label">404</p>
+        <h1 className="sd-h1 mt-3">This page is not here</h1>
+        <p className="sd-lede mt-5">It may have moved. These are the pages people usually want.</p>
+        <ul className="mt-8 divide-y divide-[var(--line)] border-y border-[var(--line)]">
+          {PRODUCT_NAV.map((item) => (
+            <li key={item.href}>
+              <Link href={item.href} className="flex min-h-12 items-center text-[17px] font-semibold text-[var(--blue-ink)] hover:underline">
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <Link href="/" className={primaryButton}>
+            Go to the home page
           </Link>
-        )}
+          {hasAdminCookie ? (
+            <Link href="/admin" className={textLink}>
+              Admin dashboard
+            </Link>
+          ) : null}
+        </div>
       </div>
-    </main>
+    </PageFrame>
   );
 }

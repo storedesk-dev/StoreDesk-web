@@ -78,14 +78,17 @@ ${FAQ.map((entry) => `**${entry.question}**\n${entry.answer}`).join("\n\n")}
 ## Not available yet
 
 - EDI, so invoices from H.T. Hackney and other distributors that support it become costs without typing, is planned and not shipped.
-- StoreDesk Lottery does not email reports yet (coming soon), does not import the Georgia settlement statement, and has no phone screens.
+- StoreDesk Lottery does not email reports yet (coming soon), does not import the Georgia settlement statement, has no phone screens, and keeps no lottery data in the cloud.
 - Deal and fuel price changes are not sent to the register yet; change them on the register.
 - The iPhone app is not released yet, and StoreDesk Service is Windows-only.
 - Sales tax returns cover Georgia (ST-3) only.
 
 ## Pages
 
-- [Product](${SITE_URL}/product): StoreDesk Desktop, Mobile, Service and Lottery: what each does, who uses it, what it needs and what is coming.
+- [Product overview](${SITE_URL}/product): the four apps, what StoreDesk reads from and sends to the register, what works with the internet down, and the common questions.
+- [StoreDesk Desktop](${SITE_URL}/product/desktop): the back-office app on the Windows PC: what it does, who uses it, what it needs, what is not built yet.
+- [StoreDesk Mobile](${SITE_URL}/product/mobile): the Android app: scanning, price book, sales, and how it reaches the store.
+- [StoreDesk Service](${SITE_URL}/product/service): the background program on the store PC that keeps the data and talks to the register.
 - [StoreDesk Lottery](${SITE_URL}/product/lottery): the rack, the shift close by scanner, reports, and how it works with StoreDesk.
 - [How it works](${SITE_URL}/how-it-works): the four setup stages and what keeps working when the internet goes down.
 - [About](${SITE_URL}/about): why ${SITE.name} exists, and what is planned.

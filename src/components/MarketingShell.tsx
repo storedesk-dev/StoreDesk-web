@@ -1,15 +1,14 @@
-"use client";
-
 import type { ReactNode } from "react";
-import { MotionConfig, motion, useReducedMotion } from "framer-motion";
-import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
+import { PageFrame } from "@/components/PageHero";
 
 /**
- * Frame for every page except the landing page.
+ * Frame for the text pages: privacy, terms, account deletion, and the account pages a link in an
+ * email opens (enroll, verify, reset password). A white header block with the h1 and one sentence,
+ * then the content on the wash.
  *
- * The header block is a grid ground with a rule under it, not a blurred
- * gradient — see `.sd-hero-wash`. `lede` exists so a page can say what it is in
- * a sentence instead of dropping the reader straight into body copy.
+ * No directive and no hooks, so it renders on the server for the legal pages and inside the client
+ * components of the account pages alike. `eyebrow` is accepted for those callers and shown as a
+ * plain sentence-case label.
  */
 export function MarketingShell({
   children,
@@ -22,48 +21,16 @@ export function MarketingShell({
   eyebrow?: string;
   lede?: string;
 }) {
-  const reduceMotion = useReducedMotion();
-  const rise = (delay: number) => ({
-    initial: { y: reduceMotion ? 0 : 10 },
-    animate: { y: 0 },
-    transition: { duration: reduceMotion ? 0 : 0.45, delay: reduceMotion ? 0 : delay, ease: [0.22, 1, 0.36, 1] as const }
-  });
-
   return (
-    <MotionConfig reducedMotion="user">
-    <div className="min-h-screen text-[var(--foreground)]">
-      <SiteHeader />
-      <main id="main" tabIndex={-1} className="outline-none">
-      <div className="sd-hero-wash relative border-b border-[var(--border)]">
-        <div className="relative mx-auto max-w-6xl px-6 py-16 md:py-20">
-          {eyebrow ? (
-            <motion.p
-              {...rise(0)}
-              className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#1A63F4]"
-            >
-              {eyebrow}
-            </motion.p>
-          ) : null}
-          <motion.h1
-            {...rise(0.06)}
-            className="max-w-3xl text-balance text-[32px] font-semibold leading-[1.1] tracking-[-0.02em] md:text-[44px]"
-          >
-            {title}
-          </motion.h1>
-          {lede ? (
-            <motion.p
-              {...rise(0.12)}
-              className="mt-5 max-w-2xl text-[17px] leading-relaxed text-[var(--muted)]"
-            >
-              {lede}
-            </motion.p>
-          ) : null}
+    <PageFrame>
+      <div className="border-b border-[var(--line)] bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 md:py-16">
+          {eyebrow ? <p className="sd-label">{eyebrow}</p> : null}
+          <h1 className={`sd-h1 max-w-3xl ${eyebrow ? "mt-3" : ""}`}>{title}</h1>
+          {lede ? <p className="sd-lede mt-5">{lede}</p> : null}
         </div>
       </div>
-      <div className="mx-auto max-w-6xl px-6 py-14 md:py-16">{children}</div>
-      </main>
-      <SiteFooter />
-    </div>
-    </MotionConfig>
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 md:py-16">{children}</div>
+    </PageFrame>
   );
 }

@@ -51,7 +51,7 @@ describe("what the site claims about the register", () => {
   });
 
   it("says writes are off until you turn them on, and that a person sends them", () => {
-    const product = read("src/app/product/ProductClient.tsx");
+    const product = read("src/app/product/page.tsx");
     expect(product).toMatch(/off until you turn it on/i);
     expect(product).toMatch(/confirmed by a person/i);
   });

@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Terms",
-  description: "The terms for StoreDesk Desktop, StoreDesk Mobile and the StoreDesk Service in your store."
-};
+  description: "The terms for StoreDesk Desktop, StoreDesk Mobile, StoreDesk Service and StoreDesk Lottery in your store.",
+  path: "/terms"
+});
 
 export default function TermsLayout({ children }: { children: React.ReactNode }) {
   return children;

@@ -79,11 +79,26 @@ export function contactMailto(options?: { subject?: string; body?: string }) {
 export const PLAY_STORE_ID = "com.storedesk";
 export const PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${PLAY_STORE_ID}`;
 
+/**
+ * The header. Four places an owner choosing software actually goes: what it does, the lottery app
+ * (a separate buying decision), how setup goes, and who we are. Contact is the header's one button,
+ * because a licence is granted by us, not bought online; Download and the guide sit beside it as
+ * plain links for stores that already run StoreDesk.
+ */
 export const NAV = [
   { href: "/product", label: "Product" },
+  { href: "/product/lottery", label: "Lottery" },
   { href: "/how-it-works", label: "How it works" },
-  { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact" }
+  { href: "/about", label: "About" }
+] as const;
+
+/** The product section: the overview, then one page per app. Also the footer's first column. */
+export const PRODUCT_NAV = [
+  { href: "/product", label: "Overview", line: "All four apps, the register and the internet" },
+  { href: "/product/desktop", label: "StoreDesk Desktop", line: "The back office on your Windows PC" },
+  { href: "/product/mobile", label: "StoreDesk Mobile", line: "Prices, sales and scanning on Android" },
+  { href: "/product/service", label: "StoreDesk Service", line: "Runs on the store PC and talks to the register" },
+  { href: "/product/lottery", label: "StoreDesk Lottery", line: "The ticket rack and the shift close" }
 ] as const;
 
 /**
@@ -102,6 +117,7 @@ export const DOCS = {
   /** Topics the marketing pages link straight to; each one is in store-desk-docs/topics/topics.json. */
   topic: (topic: string) => `${DOCS_BASE}/t/${topic}`,
   install: `${DOCS_BASE}/t/flow.install`,
+  lottery: `${DOCS_BASE}/t/product.lottery`,
   activate: `${DOCS_BASE}/t/flow.activate`,
   connectRegister: `${DOCS_BASE}/t/flow.connect-register`,
   mobileSetup: `${DOCS_BASE}/t/flow.mobile`,

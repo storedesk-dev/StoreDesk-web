@@ -1,34 +1,63 @@
 @import "tailwindcss";
 
+/*
+ * StoreDesk public site: tokens.
+ *
+ * Direction: "the back office, then the app". Pages are the brand's pale wash and plain white
+ * surfaces, set in heavy ink type. The one dark surface is the stage that holds a real screenshot:
+ * the same navy as the desktop app's own dark theme, so the screenshot sits on its native ground
+ * instead of floating in a frame. One accent (brand blue) for actions and links; green marks
+ * "done / safe" and is used as text only in its darker, AA-safe shade.
+ *
+ * No gradients, glows or glass. One shadow, used only under screenshots.
+ */
 :root {
-  --font-display: var(--font-sans);
-  --sd-blue: #1a63f4;
-  --sd-blue-shadow: #0e43d8;
-  --sd-green: #00a87b;
-  --sd-mint: #28c88b;
-  --background: #f3f7ff;
-  --foreground: #122033;
-  --muted: #4f5d73;
+  --ink: #122033;
+  --muted: #475569;
+  --wash: #f3f7ff;
   --surface: #ffffff;
-  --border: rgba(14, 67, 216, 0.16);
-  --page-tint: linear-gradient(160deg, #e8f0ff 0%, #f4f7fb 38%, #e6f8f1 100%);
+  --line: #dbe3ef;
+  --line-strong: #c3cedd;
+  --blue: #1a63f4;
+  --blue-ink: #0e43d8;
+  --blue-tint: #e8f0ff;
+  --green: #00a87b;
+  --green-ink: #006b4b;
+  --green-tint: #e3f6ef;
+  --amber-ink: #8a4b06;
+  --red-ink: #b42318;
+  --stage: #0b1424;
+  --stage-raised: #131f35;
+  --stage-text: #e8edf5;
+  --stage-muted: #a9b5c8;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --shadow-shot: 0 1px 2px rgba(18, 32, 51, 0.08), 0 18px 40px -18px rgba(18, 32, 51, 0.45);
+
+  /* Older names still read by the account pages (enroll, verify, reset-password, 404). */
+  --sd-blue: var(--blue);
+  --sd-blue-shadow: var(--blue-ink);
+  --sd-green: var(--green);
+  --background: var(--wash);
+  --foreground: var(--ink);
+  --border: var(--line);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--wash);
+  --color-foreground: var(--ink);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-display: var(--font-sans);
 }
 
 body {
-  background: var(--page-tint);
-  background-attachment: fixed;
-  color: var(--foreground);
+  background: var(--wash);
+  color: var(--ink);
   font-family: var(--font-sans), "Segoe UI", system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 1.55;
+  font-size: 17px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -38,103 +67,76 @@ h3,
 h4 {
   font-family: var(--font-sans), "Segoe UI", system-ui, sans-serif;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
   line-height: 1.12;
-  color: var(--foreground);
+  color: inherit;
 }
 
-.sd-section-blue {
-  background: linear-gradient(180deg, rgba(26, 99, 244, 0.1) 0%, rgba(255, 255, 255, 0.92) 55%, #fff 100%);
+p {
+  text-wrap: pretty;
 }
 
-.sd-section-green {
-  background: linear-gradient(180deg, rgba(0, 168, 123, 0.12) 0%, rgba(255, 255, 255, 0.94) 55%, #fff 100%);
-}
-
-.sd-section-mix {
-  background: linear-gradient(135deg, rgba(26, 99, 244, 0.14), rgba(0, 168, 123, 0.12));
-}
-
-/*
- * Page-header ground.
- *
- * A faint grid rather than a blurred gradient. Two soft radial washes over a
- * pale ground read as "AI landing page" on sight, and they gave every header
- * the same shapeless blue-green smear regardless of the page. A grid suits the
- * subject — this is software for counting stock and reconciling tills — and it
- * gives the type an edge to sit against.
- */
-.sd-hero-wash {
-  background-color: #FBFCFD;
-  background-image:
-    linear-gradient(to right, rgba(23, 32, 42, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(23, 32, 42, 0.045) 1px, transparent 1px);
-  background-size: 44px 44px;
-  background-position: center top;
-}
-
-/* Fades the grid out at the edges so it never competes with the content. */
-.sd-hero-wash::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse 90% 70% at 50% 0%, transparent 30%, #FBFCFD 92%);
-}
-
-.perspective-\[1200px\] {
-  perspective: 1200px;
-}
-
-/* Brand wordmark: the lockup's own blue-to-green, sampled from logo-lockup-horizontal.png. */
-.sd-wordmark {
-  background-image: linear-gradient(90deg, #2859c0 0%, #368ca5 52%, #46b088 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Marketing reading sizes. Body copy under 16px was the main reason pages felt thin. */
-.sd-lede {
-  font-size: clamp(1.0625rem, 1.2vw, 1.1875rem);
-  font-weight: 500;
-  line-height: 1.6;
-  color: #3b4a60;
-}
-.sd-eyebrow {
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--sd-blue);
-}
+/* Type scale: 14 / 17 / 20 / 24 / 36 / 56. */
 .sd-h1 {
-  font-size: clamp(2.35rem, 4.6vw, 3.6rem);
-  line-height: 1.03;
-  letter-spacing: -0.04em;
-  font-weight: 800;
-  text-wrap: balance;
-}
-.sd-h2 {
-  font-size: clamp(1.75rem, 3vw, 2.4rem);
-  line-height: 1.08;
+  font-size: clamp(2.2rem, 4.6vw, 3.5rem);
+  line-height: 1.04;
   letter-spacing: -0.035em;
   font-weight: 800;
-  text-wrap: balance;
+}
+.sd-h2 {
+  font-size: clamp(1.65rem, 2.8vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+.sd-h3 {
+  font-size: 1.25rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 800;
+}
+.sd-lede {
+  font-size: clamp(1.0625rem, 1.3vw, 1.25rem);
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 38rem;
+}
+/* A short sentence-case label, used once per page at most. Never all caps. */
+.sd-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--blue-ink);
 }
 .sd-num {
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+}
+
+/* The one dark surface: holds a real screenshot. */
+.sd-stage {
+  background: var(--stage);
+  color: var(--stage-text);
+}
+
+/* Links in running text. */
+.sd-link {
+  color: var(--blue-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(14, 67, 216, 0.35);
+}
+.sd-link:hover {
+  text-decoration-color: currentColor;
 }
 
 /*
  * Accessibility baseline for the public pages (WCAG 2.2 AA).
  *
- * - The sticky header is 56px; anchors and focused elements stop below it (2.4.11).
- * - One visible focus ring everywhere, 3:1 against both the light pages and the dark footer.
+ * - The sticky header is 64px; anchors and focused elements stop below it (2.4.11).
+ * - One visible focus ring everywhere, 3:1 against the light pages, the navy stage and the footer.
  * - Headings balance their lines; long words wrap instead of pushing the page sideways at 320px.
- * - Reduced motion turns CSS transitions and animations off; Framer Motion follows the same
- *   setting through MotionConfig in the page frames.
+ * - Reduced motion turns CSS transitions and animations off.
  */
 html {
   scroll-padding-top: 5rem;
@@ -146,13 +148,13 @@ html {
 }
 
 :where(a, button, input, select, textarea, summary, [tabindex]:not(main)):focus-visible {
-  outline: 3px solid var(--sd-blue);
+  outline: 3px solid var(--blue);
   outline-offset: 2px;
   border-radius: 6px;
 }
 
-footer :where(a, button):focus-visible {
-  outline-color: #6e9bfa;
+:where(footer, .sd-stage) :where(a, button, [tabindex]):focus-visible {
+  outline-color: #7aa5ff;
 }
 
 .sd-skip-link {
@@ -160,8 +162,8 @@ footer :where(a, button):focus-visible {
   left: 12px;
   top: -64px;
   z-index: 100;
-  border-radius: 9999px;
-  background: var(--foreground);
+  border-radius: var(--radius-sm);
+  background: var(--ink);
   color: #fff;
   padding: 10px 18px;
   font-size: 15px;
@@ -170,7 +172,7 @@ footer :where(a, button):focus-visible {
 }
 .sd-skip-link:focus,
 .sd-skip-link:focus-visible {
-  top: 8px;
+  top: 10px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -184,4 +186,19 @@ footer :where(a, button):focus-visible {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Toast entrance (components/ToastContext). Turned off with the rest under reduced motion. */
+@keyframes sd-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sd-toast {
+  animation: sd-toast-in 0.2s ease-out;
 }

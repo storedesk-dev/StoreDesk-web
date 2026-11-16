@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 type ToastType = "success" | "error" | "info";
 
@@ -18,6 +17,12 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
+/**
+ * Toasts for the admin console and the account pages.
+ *
+ * The entrance is a CSS keyframe (`.sd-toast` in globals.css), not framer-motion: this provider
+ * wraps every page from the root layout, so whatever it imports ships on the public site too.
+ */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -26,7 +31,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     if (typeof message === "object") {
       try { msg = JSON.stringify(message); } catch { msg = String(message); }
     }
-    
+
     const id = Math.random().toString(36).substr(2, 9);
     setToasts((prev) => [...prev, { id, message: msg, type }]);
     setTimeout(() => {
@@ -37,32 +42,29 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
-        <AnimatePresence>
-          {toasts.map((t) => (
-            <motion.div
-              key={t.id}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-              className={`pointer-events-auto flex items-center justify-between gap-3 w-80 rounded-xl px-4 py-3 shadow-lg ${
-                t.type === "error"
-                  ? "bg-red-50 text-red-900 border border-red-200"
-                  : t.type === "success"
-                  ? "bg-green-50 text-green-900 border border-green-200"
-                  : "bg-white text-gray-900 border border-gray-200"
-              }`}
+      <div role="status" aria-live="polite" className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`sd-toast pointer-events-auto flex items-center justify-between gap-3 w-80 max-w-[calc(100vw-2rem)] rounded-xl px-4 py-3 shadow-lg ${
+              t.type === "error"
+                ? "bg-red-50 text-red-900 border border-red-200"
+                : t.type === "success"
+                ? "bg-green-50 text-green-900 border border-green-200"
+                : "bg-white text-gray-900 border border-gray-200"
+            }`}
+          >
+            <p className="text-sm font-medium leading-tight">{t.message}</p>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+              className="shrink-0 rounded-md p-1 opacity-50 hover:bg-black/5 hover:opacity-100 transition-all"
             >
-              <p className="text-sm font-medium leading-tight">{t.message}</p>
-              <button
-                onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-                className="shrink-0 rounded-md p-1 opacity-50 hover:bg-black/5 hover:opacity-100 transition-all"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
       </div>
     </ToastContext.Provider>
   );
