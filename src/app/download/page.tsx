@@ -127,9 +127,9 @@ const STEPS: Array<{
     time: "2 minutes a phone",
     body: "Turn on remote access on the store PC first, or phones say No remote access yet. Then each person installs from Google Play and signs in.",
     points: [
-      "Give each person your org tag (ask us if you don't have it)",
-      "They set a password from their invitation email",
-      "Org tag, Continue, choose the store, then email and password"
+      "Each person sets a password from their invitation email",
+      "They sign in with that email and password",
+      "Then they choose your store, if they work at more than one"
     ],
     guide: { href: DOCS.mobileSetup, label: "Set up the phone app" }
   }
@@ -204,7 +204,7 @@ export default async function DownloadPage() {
           <li className="flex flex-wrap items-center gap-x-2">
             <Smartphone className="h-4 w-4 text-[var(--blue)]" aria-hidden />
             <span className="font-bold">Staff getting the phone app?</span>
-            <span className="text-[var(--muted)]">Android: Google Play, below. iPhone: coming soon. Your manager gives you the org tag and sign-in.</span>
+            <span className="text-[var(--muted)]">Android: Google Play, below. iPhone: coming soon. Your manager sets up your sign-in.</span>
           </li>
           <li className="flex flex-wrap items-center gap-x-2">
             <Ticket className="h-4 w-4 text-[var(--blue)]" aria-hidden />

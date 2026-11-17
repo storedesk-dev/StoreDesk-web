@@ -40,7 +40,7 @@ const STEPS = [
   },
   {
     title: "Give your staff the phone app",
-    outcome: "Staff install StoreDesk Mobile from Google Play and sign in with your org tag and the email and password from their invitation. You choose which screens each role opens.",
+    outcome: "Staff install StoreDesk Mobile from Google Play and sign in with the email and password from their invitation, then pick the store. You choose which screens each role opens.",
     time: "A few minutes each",
     href: DOCS.mobileSetup
   }

@@ -69,7 +69,7 @@ export const PRODUCTS: Record<ProductKey, ProductEntry> = {
     connects: [
       "Reaches StoreDesk Service on the store PC through a secure tunnel.",
       "On the store Wi-Fi it can connect directly, once an admin turns on local network access.",
-      "Each person signs in with the org tag and the sign-in their manager gives them. There is no sign-up on this website."
+      "Each person signs in with the email and password from their invitation, then picks the store. There is no sign-up on this website."
     ],
     needs: ["Android 5.0 or later, from Google Play.", "The internet, when away from the store."],
     notYet: ["The iPhone app: coming soon on the App Store.", "Lottery screens on the phone."],

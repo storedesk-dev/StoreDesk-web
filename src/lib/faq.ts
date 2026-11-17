@@ -64,7 +64,7 @@ export const FAQ: FaqEntry[] = [
   },
   {
     question: "How do staff get the phone app?",
-    answer: `From Google Play, like any other app; the iPhone app is coming soon. Each person signs in with your org tag and the email and password from their invitation, and you choose which screens each role opens. There is no public sign-up.`,
+    answer: `From Google Play, like any other app; the iPhone app is coming soon. Each person signs in with the email and password from their invitation, and you choose which screens each role opens. There is no public sign-up.`,
     href: PLAY_STORE_URL
   },
   {
